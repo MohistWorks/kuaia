@@ -1,0 +1,29 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "com.kuaia.common.rpc";
+
+service CoordinatorService {
+  rpc RegisterWorker (WorkerInfo) returns (RegistrationResponse) {}
+  rpc Heartbeat (WorkerHeartbeat) returns (HeartbeatResponse) {}
+}
+
+message WorkerInfo {
+  string id = 1;
+  string host = 2;
+  int32 port = 3;
+}
+
+message RegistrationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message WorkerHeartbeat {
+  string id = 1;
+  double cpu_load = 2;
+  double mem_load = 3;
+}
+
+message HeartbeatResponse {
+  bool ack = 1;
+}
