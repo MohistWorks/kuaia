@@ -5,6 +5,7 @@ option java_package = "com.kuaia.common.rpc";
 service CoordinatorService {
   rpc RegisterWorker (WorkerInfo) returns (RegistrationResponse) {}
   rpc Heartbeat (WorkerHeartbeat) returns (HeartbeatResponse) {}
+  rpc TaskStream (stream WorkerMessage) returns (stream CoordinatorMessage) {}
 }
 
 message WorkerInfo {
@@ -26,4 +27,39 @@ message WorkerHeartbeat {
 
 message HeartbeatResponse {
   bool ack = 1;
+}
+
+message WorkerMessage {
+  string worker_id = 1;
+  oneof payload {
+    WorkerHeartbeat heartbeat = 2;
+    TaskAck ack = 3;
+    ControlSignal signal = 4;
+  }
+}
+
+message CoordinatorMessage {
+  oneof payload {
+    TaskPayload task = 1;
+    ControlCommand command = 2;
+  }
+}
+
+message TaskPayload {
+  int64 seq_id = 1;
+  string task_id = 2;
+  bytes content = 3;
+}
+
+message TaskAck {
+  int64 seq_id = 1;
+  bool success = 2;
+}
+
+message ControlSignal {
+  string type = 1; // e.g., "BACKPRESSURE_HIGH"
+}
+
+message ControlCommand {
+  string type = 1; // e.g., "PAUSE", "RESUME"
 }
