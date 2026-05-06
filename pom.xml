@@ -16,6 +16,8 @@
         <grpc.version>1.58.0</grpc.version>
         <protobuf.version>3.24.0</protobuf.version>
         <junit.version>5.10.0</junit.version>
+        <rocksdb.version>8.1.1.1</rocksdb.version>
+        <roaringbitmap.version>0.9.44</roaringbitmap.version>
     </properties>
 
     <dependencies>
