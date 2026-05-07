@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Kuaia Coordinator 核心架构</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background: #f5f5f7; }
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h1 { color: #1d1d1f; font-size: 24px; margin-bottom: 20px; }
+        .legend { margin-top: 20px; display: flex; gap: 20px; font-size: 14px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .box { width: 16px; height: 16px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Coordinator (Master) 内部架构逻辑图</h1>
+        <div class="mermaid">
+graph TD
+    API[用户提交 Job / YAML] --> Planner[Task Planner<br/>任务切分与 DAG 生成]
+    Planner --> Store[<b>Unified State Store</b><br/>状态统一抽象接口]
+    
+    subgraph "HA 存储层 (混合模式)"
+        Store -- Standalone --> Raft[(Raft Log / Ratis)]
+        Store -- K8s Mode --> CRD[(K8s CRD Status)]
+    end
+
+    Store --> Scheduler[<b>AI-Ready Scheduler</b><br/>最小负载优先调度]
+    
+    subgraph "调度与分发"
+        Scheduler --> Dispatcher[Task Dispatcher<br/>gRPC 分发任务]
+    end
+
+    Dispatcher --> Workers[[Worker Nodes]]
+    
+    Workers -- Heartbeat --> Registry[Worker Registry<br/>负载监控与心跳管理]
+    Registry -- 实时负载数据 --> Scheduler
+
+    Workers -- Task Failed --> Healer[<b>AI Self-Healer</b><br/>异常诊断与自愈]
+    Healer -- 瞬时故障 --> Scheduler
+    Healer -- 配置/永久故障 --> DeadLetter[死信队列 / 告警]
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item"><div class="box" style="background: #e1f5fe; border: 1px solid #01579b;"></div> 核心逻辑组件</div>
+            <div class="legend-item"><div class="box" style="background: #fff9c4; border: 1px solid #fbc02d;"></div> 存储/持久化</div>
+            <div class="legend-item"><div class="box" style="background: #f1f8e9; border: 1px solid #33691e;"></div> 外部交互</div>
+        </div>
+    </div>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+    </script>
+</body>
+</html>
