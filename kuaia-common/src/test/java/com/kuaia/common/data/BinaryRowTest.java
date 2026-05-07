@@ -21,4 +21,12 @@ public class BinaryRowTest {
         assertEquals(1L, row.getLong(0));
         assertEquals("Hello Kuaia", row.getString(1));
     }
+
+    @Test
+    public void testSetGetVector() {
+        BinaryRow row = new BinaryRow(1);
+        float[] vector = new float[]{0.1f, -0.2f, 3.14f};
+        row.setVector(0, vector);
+        assertArrayEquals(vector, row.getVector(0));
+    }
 }
