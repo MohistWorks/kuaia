@@ -12,4 +12,13 @@ public class BinaryRowTest {
         assertEquals(123456789L, row.getLong(0));
         assertEquals(987654321L, row.getLong(1));
     }
+
+    @Test
+    public void testSetGetString() {
+        BinaryRow row = new BinaryRow(2);
+        row.setLong(0, 1L);
+        row.setString(1, "Hello Kuaia");
+        assertEquals(1L, row.getLong(0));
+        assertEquals("Hello Kuaia", row.getString(1));
+    }
 }
