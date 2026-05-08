@@ -150,6 +150,21 @@ public class TaskRecord implements Serializable {
                 errorMessage);
     }
 
+    public TaskRecord retryingAfterLeaseExpiration(String errorCode, String errorMessage) {
+        if (state != TaskState.DISPATCHING && state != TaskState.RUNNING) {
+            throw new IllegalStateException("Cannot recover expired lease from state " + state);
+        }
+        return copy(
+                TaskState.RETRYING,
+                null,
+                null,
+                attemptNo,
+                0L,
+                lastCheckpointSeq,
+                errorCode,
+                errorMessage);
+    }
+
     public TaskRecord fail(String attemptId, String errorCode, String errorMessage) {
         requireCurrentAttempt(attemptId);
         if (state != TaskState.RUNNING && state != TaskState.RETRYING) {
