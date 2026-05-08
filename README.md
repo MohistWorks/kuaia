@@ -81,6 +81,10 @@ mvn -q -pl kuaia-engine exec:java \
 
 Internal design notes are intentionally not part of the public documentation tree. Public user-facing docs should live in `README.md` or future files under `docs/`.
 
+## License
+
+Kuaia is licensed under the Apache License, Version 2.0. See `LICENSE`.
+
 ## Development Notes
 
 The codebase is intentionally small and test-first. Before making behavioral changes, add a focused failing test, implement the minimum production code, and run:
