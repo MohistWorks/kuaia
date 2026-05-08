@@ -5,6 +5,8 @@ option java_package = "com.kuaia.common.raft";
 enum CommandType {
   SAVE_TASK = 0;
   UPDATE_STATE = 1;
+  SAVE_TASK_RECORD = 2;
+  CAS_TASK_RECORD = 3;
 }
 
 message RaftCommand {
@@ -12,6 +14,7 @@ message RaftCommand {
   oneof payload {
     SaveTaskPayload save_task = 2;
     UpdateStatePayload update_state = 3;
+    TaskRecordPayload task_record = 4;
   }
 }
 
@@ -23,4 +26,10 @@ message SaveTaskPayload {
 message UpdateStatePayload {
   string task_id = 1;
   int32 state_code = 2;
+}
+
+message TaskRecordPayload {
+  string task_id = 1;
+  bytes record = 2;
+  int64 expected_version = 3;
 }

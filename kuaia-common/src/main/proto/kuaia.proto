@@ -29,12 +29,73 @@ message HeartbeatResponse {
   bool ack = 1;
 }
 
+enum BackpressureLevel {
+  BACKPRESSURE_LEVEL_UNSPECIFIED = 0;
+  BACKPRESSURE_LOW = 1;
+  BACKPRESSURE_HIGH = 2;
+}
+
+enum AttemptStatus {
+  ATTEMPT_STATUS_UNSPECIFIED = 0;
+  ATTEMPT_SUCCESS = 1;
+  ATTEMPT_FAILED = 2;
+  ATTEMPT_CANCELLED = 3;
+}
+
+message WorkerHello {
+  string worker_id = 1;
+  string host = 2;
+  int32 port = 3;
+}
+
+message BackpressureSignal {
+  BackpressureLevel level = 1;
+}
+
+message RecordAck {
+  string task_id = 1;
+  string attempt_id = 2;
+  string worker_id = 3;
+  int64 seq_id = 4;
+  bool success = 5;
+  string error_message = 6;
+}
+
+message CheckpointAck {
+  string task_id = 1;
+  string attempt_id = 2;
+  string worker_id = 3;
+  int64 processed_seq = 4;
+}
+
+message TaskAttemptResult {
+  string task_id = 1;
+  string attempt_id = 2;
+  string worker_id = 3;
+  AttemptStatus status = 4;
+  string error_code = 5;
+  string error_message = 6;
+}
+
+message TaskAssignment {
+  string task_id = 1;
+  string attempt_id = 2;
+  bytes definition = 3;
+  int64 start_seq = 4;
+  int64 lease_until_millis = 5;
+}
+
 message WorkerMessage {
   string worker_id = 1;
   oneof payload {
     WorkerHeartbeat heartbeat = 2;
     TaskAck ack = 3;
     ControlSignal signal = 4;
+    WorkerHello hello = 5;
+    BackpressureSignal backpressure = 6;
+    RecordAck record_ack = 7;
+    CheckpointAck checkpoint_ack = 8;
+    TaskAttemptResult task_result = 9;
   }
 }
 
@@ -42,6 +103,7 @@ message CoordinatorMessage {
   oneof payload {
     TaskPayload task = 1;
     ControlCommand command = 2;
+    TaskAssignment assignment = 3;
   }
 }
 
@@ -54,6 +116,7 @@ message TaskPayload {
 message TaskAck {
   int64 seq_id = 1;
   bool success = 2;
+  string task_id = 3;
 }
 
 message ControlSignal {

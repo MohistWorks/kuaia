@@ -40,6 +40,10 @@ public class WorkerNode {
                     pendingSet.add(task.getSeqId());
                     int currentSize = memoryQueueSize.incrementAndGet();
 
+                    if (currentSize > THRESHOLD * 0.8) {
+                        sendSignal("BACKPRESSURE_HIGH");
+                    }
+
                     if (currentSize > THRESHOLD) {
                         try {
                             dbBuffer.put(task.getSeqId(), task.toByteArray());
@@ -58,6 +62,9 @@ public class WorkerNode {
             private void executeTask(TaskPayload task) {
                 executor.execute(task).thenAccept(success -> {
                     memoryQueueSize.decrementAndGet();
+                    if (memoryQueueSize.get() < THRESHOLD * 0.3) {
+                        sendSignal("BACKPRESSURE_LOW");
+                    }
                     pendingSet.remove(task.getSeqId());
 
                     WorkerMessage ackMsg = WorkerMessage.newBuilder()
@@ -65,6 +72,7 @@ public class WorkerNode {
                         .setAck(TaskAck.newBuilder()
                             .setSeqId(task.getSeqId())
                             .setSuccess(success)
+                            .setTaskId(task.getTaskId())
                             .build())
                         .build();
                     
@@ -87,5 +95,15 @@ public class WorkerNode {
         });
         
         // Initial registration via heartbeat or separate call (omitted for skeleton)
+    }
+
+    private void sendSignal(String type) {
+        WorkerMessage signal = WorkerMessage.newBuilder()
+            .setWorkerId(id)
+            .setSignal(ControlSignal.newBuilder().setType(type).build())
+            .build();
+        synchronized (requestObserver) {
+            requestObserver.onNext(signal);
+        }
     }
 }

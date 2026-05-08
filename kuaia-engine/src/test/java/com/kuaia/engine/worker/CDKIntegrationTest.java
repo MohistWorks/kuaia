@@ -4,6 +4,7 @@ import com.kuaia.common.api.Collector;
 import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.api.SourceReader;
 import com.kuaia.common.data.BinaryRow;
+import com.kuaia.engine.worker.transform.EmbeddingTransform;
 import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +14,7 @@ public class CDKIntegrationTest {
     @Test
     public void testFakeConnectorFlow() throws Exception {
         List<Long> results = new ArrayList<>();
-        
+
         // 1. Define Fake Source
         SourceReader source = new SourceReader() {
             @Override public void open() {}
@@ -50,5 +51,19 @@ public class CDKIntegrationTest {
         for (int i = 0; i < 10; i++) {
             assertEquals((long) i, (long) results.get(i));
         }
+    }
+
+    @Test
+    public void embeddingTransformWritesVectorToDedicatedField() throws Exception {
+        BinaryRow row = new BinaryRow(3);
+        row.setLong(0, 1L);
+        row.setString(1, "hello");
+
+        EmbeddingTransform transform = new EmbeddingTransform(1, 2, 1);
+        List<BinaryRow> emitted = new ArrayList<>();
+        transform.process(row, emitted::addAll);
+
+        assertEquals("hello", emitted.get(0).getString(1));
+        assertEquals(4, emitted.get(0).getVector(2).length);
     }
 }

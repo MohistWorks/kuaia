@@ -6,8 +6,23 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class EmbeddingTransform {
-    private final int batchSize = 5;
+    private final int textOrdinal;
+    private final int vectorOrdinal;
+    private final int batchSize;
     private final List<BinaryRow> buffer = new ArrayList<>();
+
+    public EmbeddingTransform() {
+        this(1, 2, 5);
+    }
+
+    public EmbeddingTransform(int textOrdinal, int vectorOrdinal, int batchSize) {
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize must be positive");
+        }
+        this.textOrdinal = textOrdinal;
+        this.vectorOrdinal = vectorOrdinal;
+        this.batchSize = batchSize;
+    }
 
     public void process(BinaryRow row, Consumer<List<BinaryRow>> output) {
         buffer.add(row);
@@ -22,17 +37,12 @@ public class EmbeddingTransform {
         // Simulated AI Embedding logic.
         // In a real scenario, this would use ArrowBridge to batch-call an LLM.
         for (BinaryRow row : batch) {
+            String text = row.getString(textOrdinal);
             float[] mockVector = new float[4]; // Dimension 4 for mock
             for (int i = 0; i < 4; i++) {
-                mockVector[i] = (float) Math.random();
+                mockVector[i] = text.length() + i;
             }
-            // Ordinal 0: ID (Long), Ordinal 1: Content (String), Ordinal 2: Vector (VECTOR)
-            // Let's assume Ordinal 1 is what we read, and Ordinal 2 is where we write.
-            // For simplicity in the demo, we'll write to ordinal 1 (overwriting string offset slot)
-            // or add a field. Let's assume the row was created with 2 fields (0: id, 1: vector).
-            // Wait, in Task 3 of previous plan, FakeSource used 2 fields (id, name).
-            // So let's use ordinal 1 for the vector in the AI demo.
-            row.setVector(1, mockVector);
+            row.setVector(vectorOrdinal, mockVector);
         }
     }
 }
