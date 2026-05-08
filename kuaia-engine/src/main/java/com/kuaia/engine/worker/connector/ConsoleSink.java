@@ -4,10 +4,20 @@ import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.data.BinaryRow;
 import com.kuaia.common.type.KuaiaRowType;
 
+import java.io.PrintStream;
+
 public class ConsoleSink implements SinkWriter {
     private final KuaiaRowType rowType;
+    private final PrintStream out;
 
-    public ConsoleSink(KuaiaRowType rowType) { this.rowType = rowType; }
+    public ConsoleSink(KuaiaRowType rowType) {
+        this(rowType, System.out);
+    }
+
+    public ConsoleSink(KuaiaRowType rowType, PrintStream out) {
+        this.rowType = rowType;
+        this.out = out;
+    }
 
     @Override public void open() {}
     @Override public void close() {}
@@ -22,6 +32,6 @@ public class ConsoleSink implements SinkWriter {
             }
             if (i < rowType.getFieldNames().length - 1) sb.append(", ");
         }
-        System.out.println(sb.toString());
+        out.println(sb.toString());
     }
 }
