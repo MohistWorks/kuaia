@@ -4,6 +4,7 @@ import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigException;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
+import com.kuaia.engine.pipeline.PipelineRunSummary;
 
 import java.io.PrintStream;
 import java.nio.file.Path;
@@ -44,7 +45,8 @@ public class KuaiaCli {
             }
             try {
                 PipelineConfig config = new PipelineConfigLoader().load(configPath);
-                new LocalPipelineRunner().run(config, out);
+                PipelineRunSummary summary = new LocalPipelineRunner().run(config, out);
+                out.println(summary.toCliLine());
                 return 0;
             } catch (PipelineConfigException | PipelineExecutionException e) {
                 out.println(e.getMessage());

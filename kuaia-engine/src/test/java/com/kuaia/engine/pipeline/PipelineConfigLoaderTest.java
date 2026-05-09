@@ -34,6 +34,29 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsFileSinkConfig() throws Exception {
+        Path configPath = tempDir.resolve("file-sink.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: file-sink",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: out/users.csv",
+                "  format: csv",
+                "  mode: overwrite").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("file", config.getSink().getType());
+        assertEquals(tempDir.resolve("out/users.csv").normalize().toString(), sinkValue(config, "getPath"));
+        assertEquals("csv", sinkValue(config, "getFormat"));
+        assertEquals("overwrite", sinkValue(config, "getMode"));
+    }
+
+    @Test
     void rejectsInvalidMockEmbeddingDimensions() throws Exception {
         Path data = tempDir.resolve("documents.csv");
         Files.write(data, "id,content\n1,Alpha".getBytes(StandardCharsets.UTF_8));
@@ -108,5 +131,9 @@ class PipelineConfigLoaderTest {
                 "sink:",
                 "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
         return configPath;
+    }
+
+    private String sinkValue(PipelineConfig config, String methodName) throws Exception {
+        return (String) config.getSink().getClass().getMethod(methodName).invoke(config.getSink());
     }
 }

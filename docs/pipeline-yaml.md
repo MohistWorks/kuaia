@@ -6,22 +6,18 @@ It is intentionally not a general YAML dialect or production job spec.
 ## Shape
 
 ```yaml
-name: local-file-to-vector
+name: local-file-to-file
 source:
   type: file
-  path: data/documents.csv
+  path: data/users.csv
   format: csv
-transforms:
-  - type: select
-    fields: [id, content]
-  - type: mock-embedding
-    input: content
-    output: embedding
-    dimensions: 4
 sink:
-  type: mock-vector
+  type: file
+  path: ../.kuaia/output/local-file-to-file.csv
+  format: csv
+  mode: overwrite
 checkpoint:
-  stateDir: .kuaia/state/local-file-to-vector
+  stateDir: .kuaia/state/local-file-to-file
 ```
 
 Required top-level fields:
@@ -134,6 +130,38 @@ sink:
 
 Prints all output row fields supported by the current console sink.
 
+### file
+
+```yaml
+sink:
+  type: file
+  path: ../.kuaia/output/local-file-to-file.csv
+  format: csv
+  mode: overwrite
+```
+
+Writes output rows as a local CSV file.
+
+Fields:
+
+- `type`: must be `file`
+- `path`: output path. Relative paths are resolved from the YAML file directory.
+- `format`: must be `csv`
+- `mode`: optional, defaults to `overwrite`; supported values are `overwrite`
+  and `append`
+
+CSV output rules:
+
+- a header row is written before data rows when the file is created or
+  overwritten,
+- `append` writes the header only when the target file does not exist or is
+  empty,
+- `LONG`, `STRING`, and `VECTOR` output fields are supported,
+- string fields containing commas or newlines are rejected because quoted CSV
+  fields are not part of this MVP contract,
+- vector fields are written as bracketed, space-delimited values such as
+  `[5.0000 6.0000 7.0000 8.0000]`.
+
 ### mock-vector
 
 ```yaml
@@ -170,6 +198,24 @@ completed rows again.
 The MVP guarantee is at-least-once style execution with idempotent sinks. Kuaia
 does not claim exactly-once semantics.
 
+## Run Summary
+
+Successful declarative runs print a stable summary line:
+
+```text
+Run Summary: rowsRead=2 rowsWritten=2 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED durationMs=12
+```
+
+Fields:
+
+- `rowsRead`: source rows read after checkpoint skips,
+- `rowsWritten`: output rows successfully written to the sink,
+- `rowsSkipped`: rows skipped because the checkpoint already covered them,
+- `checkpointSeq`: latest source sequence reached by this run or prior
+  checkpoint,
+- `taskState`: final task state for the local pipeline run,
+- `durationMs`: wall-clock runtime in milliseconds.
+
 ## Examples
 
 Run local CSV to console:
@@ -182,6 +228,13 @@ Run CSV through `select` and `rename`:
 
 ```bash
 bin/kuaia run -f examples/local-file-transform-to-console.yaml
+```
+
+Run CSV to a local output file:
+
+```bash
+bin/kuaia run -f examples/local-file-to-file.yaml
+cat .kuaia/output/local-file-to-file.csv
 ```
 
 Run CSV through mock embedding to mock vector sink:
@@ -200,12 +253,16 @@ Common examples:
 - `Unsupported source.type: <value>`
 - `Unsupported source.format: <value>`
 - `Unsupported sink.type: <value>`
+- `Unsupported sink.format: <value>`
+- `Unsupported sink.mode: <value>`
 - `Unsupported transform.type: <value>`
 - `Invalid transform.dimensions: <value>`
 - `Unknown transform field: <field>`
 - `Duplicate transform field: <field>`
 - `Transform field must be STRING: <field>`
 - `Mock vector sink requires VECTOR field: embedding`
+- `File sink does not support quoted CSV fields`
+- `File sink does not support field type: <type>`
 - `Invalid CSV row at line <line>: expected <n> columns but found <m>`
 
 ## Non-Goals

@@ -133,13 +133,35 @@ public class PipelineConfig {
 
     public static class SinkConfig {
         private final String type;
+        private final String path;
+        private final String format;
+        private final String mode;
 
         public SinkConfig(String type) {
+            this(type, null, null, null);
+        }
+
+        public SinkConfig(String type, String path, String format, String mode) {
             this.type = type;
+            this.path = path;
+            this.format = format;
+            this.mode = mode;
         }
 
         public String getType() {
             return type;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public String getFormat() {
+            return format;
+        }
+
+        public String getMode() {
+            return mode;
         }
     }
 

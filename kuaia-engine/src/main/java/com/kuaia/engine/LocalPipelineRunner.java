@@ -6,11 +6,13 @@ import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.engine.pipeline.LocalPipelineCheckpointStore;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
+import com.kuaia.engine.pipeline.PipelineRunSummary;
 import com.kuaia.engine.worker.connector.ConsoleSink;
 import com.kuaia.engine.worker.connector.FakeSource;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.FileSource;
+import com.kuaia.engine.worker.connector.FileSink;
 import com.kuaia.engine.worker.connector.MockVectorSink;
 
 import java.io.PrintStream;
@@ -38,14 +40,19 @@ public class LocalPipelineRunner {
         }
     }
 
-    public int run(PipelineConfig config, PrintStream out) throws Exception {
+    public PipelineRunSummary run(PipelineConfig config, PrintStream out) throws Exception {
+        long startedAt = System.nanoTime();
+        PipelineRunSummary summary;
         if (hasCheckpointStateDir(config)) {
-            return runWithCheckpoint(config, out);
+            summary = runWithCheckpoint(config, out);
+        } else {
+            summary = runWithoutCheckpoint(config, out);
         }
-        return runWithoutCheckpoint(config, out);
+        long durationMillis = (System.nanoTime() - startedAt) / 1_000_000L;
+        return summary.withDurationMillis(durationMillis);
     }
 
-    private int runWithoutCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
+    private PipelineRunSummary runWithoutCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
         FileSource source = new FileSource(Paths.get(config.getSource().getPath()));
         source.open();
         SinkWriter sink = null;
@@ -57,7 +64,7 @@ public class LocalPipelineRunner {
             SinkWriter openedSink = sink;
             int rows = source.readFrom(0L, (seqId, row) -> openedSink.write(transforms.apply(row)));
             out.println("Pipeline Finished. rows=" + rows);
-            return rows;
+            return new PipelineRunSummary(rows, rows, 0L, rows, TaskState.COMPLETED, 0L);
         } finally {
             source.close();
             if (sink != null) {
@@ -66,16 +73,13 @@ public class LocalPipelineRunner {
         }
     }
 
-    private int runWithCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
+    private PipelineRunSummary runWithCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
         FileSource source = new FileSource(Paths.get(config.getSource().getPath()));
         source.open();
         SinkWriter sink = null;
         try {
             TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
-            sink = createSink(config, transforms.getOutputType(), out);
-            sink.open();
             out.println("Starting pipeline: " + config.getName());
-            SinkWriter openedSink = sink;
             try (LocalPipelineCheckpointStore checkpointStore = new LocalPipelineCheckpointStore(
                     Paths.get(config.getCheckpoint().getStateDir()),
                     config.getName())) {
@@ -85,10 +89,20 @@ public class LocalPipelineRunner {
                             + task.getLastCheckpointSeq()
                             + " state="
                             + task.getState());
-                    return 0;
+                    return new PipelineRunSummary(
+                            0L,
+                            0L,
+                            task.getLastCheckpointSeq(),
+                            task.getLastCheckpointSeq(),
+                            task.getState(),
+                            0L);
                 }
 
+                sink = createSink(config, transforms.getOutputType(), out);
+                sink.open();
+                SinkWriter openedSink = sink;
                 final TaskRecord[] taskRef = new TaskRecord[]{task};
+                long rowsSkipped = task.getLastCheckpointSeq();
                 int rows = source.readFrom(task.getLastCheckpointSeq(), (seqId, row) -> {
                     openedSink.write(transforms.apply(row));
                     taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
@@ -100,7 +114,13 @@ public class LocalPipelineRunner {
                         + completed.getLastCheckpointSeq()
                         + " state="
                         + completed.getState());
-                return rows;
+                return new PipelineRunSummary(
+                        rows,
+                        rows,
+                        rowsSkipped,
+                        completed.getLastCheckpointSeq(),
+                        completed.getState(),
+                        0L);
             }
         } finally {
             source.close();
@@ -123,6 +143,12 @@ public class LocalPipelineRunner {
         }
         if ("mock-vector".equals(sinkType)) {
             return new MockVectorSink(rowType, out);
+        }
+        if ("file".equals(sinkType)) {
+            return new FileSink(
+                    rowType,
+                    Paths.get(config.getSink().getPath()),
+                    config.getSink().getMode());
         }
         throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
     }

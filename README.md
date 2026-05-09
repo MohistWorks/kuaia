@@ -10,6 +10,7 @@ Implemented today:
 - Connector interfaces for source, transform, and sink components.
 - Local demo pipelines for structured rows and mock AI vector output.
 - Declarative local YAML pipelines with checkpointed `select`, `rename`, and `mock-embedding` transforms.
+- Declarative `console`, `file`, and `mock-vector` local sinks with CLI run summaries.
 - Coordinator/Worker protocol models for task assignment, ack, checkpoint, backpressure, and attempt results.
 - In-memory and RocksDB-backed task/worker state stores.
 - Coordinator recovery planning for expired task leases.
@@ -89,6 +90,13 @@ Run a declarative pipeline with a simple transform chain:
 bin/kuaia run -f examples/local-file-transform-to-console.yaml
 ```
 
+Run a declarative pipeline that writes CSV output:
+
+```bash
+bin/kuaia run -f examples/local-file-to-file.yaml
+cat .kuaia/output/local-file-to-file.csv
+```
+
 Run a declarative AI-ready vector pipeline:
 
 ```bash
@@ -115,6 +123,10 @@ mvn -q -pl kuaia-engine exec:java \
   -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
   -Dexec.args="run -f examples/local-file-to-vector.yaml"
 ```
+
+Declarative runs print a stable summary line with rows read, rows written, rows
+skipped by checkpoint resume, latest checkpoint sequence, task state, and
+duration in milliseconds.
 
 ## Repository Layout
 

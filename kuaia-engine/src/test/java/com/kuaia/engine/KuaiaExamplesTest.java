@@ -20,7 +20,11 @@ class KuaiaExamplesTest {
         List<String> examples = Arrays.asList(
                 "examples/local-file-to-console.yaml",
                 "examples/local-file-transform-to-console.yaml",
-                "examples/local-file-to-vector.yaml");
+                "examples/local-file-to-vector.yaml",
+                "examples/local-file-to-file.yaml");
+
+        Path fileSinkOutput = repoRoot().resolve(".kuaia/output/local-file-to-file.csv");
+        Files.deleteIfExists(fileSinkOutput);
 
         for (String example : examples) {
             CliResult result = run("run", "-f", repoRoot().resolve(example).toString());
@@ -28,7 +32,12 @@ class KuaiaExamplesTest {
             assertEquals(0, result.exitCode, example + "\n" + result.output);
             assertTrue(result.output.contains("Starting pipeline:"), result.output);
             assertTrue(result.output.contains("Pipeline Finished."), result.output);
+            assertTrue(result.output.contains("Run Summary:"), result.output);
         }
+
+        assertEquals(
+                Arrays.asList("id,name", "1,Alice", "2,Bob"),
+                Files.readAllLines(fileSinkOutput, StandardCharsets.UTF_8));
     }
 
     private CliResult run(String... args) throws Exception {

@@ -89,6 +89,30 @@ class KuaiaCliTest {
     }
 
     @Test
+    void runWritesDeclarativePipelineToCsvFile() throws Exception {
+        Path data = tempDir.resolve("users-file-sink.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2,Bob").getBytes(StandardCharsets.UTF_8));
+        Path output = tempDir.resolve("out/users.csv");
+        Path config = writeFileSinkPipelineConfig("local-file-to-file", data, output, "overwrite");
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Starting pipeline: local-file-to-file"));
+        assertTrue(result.output.contains("Pipeline Finished. rows=2"));
+        assertTrue(result.output.contains(
+                "Run Summary: rowsRead=2 rowsWritten=2 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED durationMs="));
+        assertEquals(String.join("\n",
+                        "id,name",
+                        "1,Alice",
+                        "2,Bob"),
+                String.join("\n", Files.readAllLines(output, StandardCharsets.UTF_8)));
+    }
+
+    @Test
     void runPersistsCheckpointWhenConfigured() throws Exception {
         Path data = tempDir.resolve("checkpointed.csv");
         Files.write(data, String.join("\n",
@@ -108,6 +132,32 @@ class KuaiaCliTest {
             assertEquals(TaskState.COMPLETED, record.getState());
             assertEquals(2L, record.getLastCheckpointSeq());
         }
+    }
+
+    @Test
+    void runDoesNotOverwriteCompletedCheckpointedFileSink() throws Exception {
+        Path data = tempDir.resolve("checkpointed-file-sink.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2,Bob").getBytes(StandardCharsets.UTF_8));
+        Path output = tempDir.resolve("out/checkpointed-users.csv");
+        Path stateDir = tempDir.resolve("checkpointed-file-sink-state");
+        Path config = writeFileSinkPipelineConfig("checkpointed-file-sink", data, output, "overwrite", stateDir);
+
+        CliResult first = run("run", "-f", config.toString());
+        CliResult second = run("run", "-f", config.toString());
+
+        assertEquals(0, first.exitCode);
+        assertEquals(0, second.exitCode);
+        assertTrue(second.output.contains("Pipeline Finished. rows=0 checkpoint=2 state=COMPLETED"));
+        assertTrue(second.output.contains(
+                "Run Summary: rowsRead=0 rowsWritten=0 rowsSkipped=2 checkpointSeq=2 taskState=COMPLETED durationMs="));
+        assertEquals(String.join("\n",
+                        "id,name",
+                        "1,Alice",
+                        "2,Bob"),
+                String.join("\n", Files.readAllLines(output, StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -509,6 +559,39 @@ class KuaiaCliTest {
                 "  format: csv",
                 "sink:",
                 "  type: console").getBytes(StandardCharsets.UTF_8));
+        return config;
+    }
+
+    private Path writeFileSinkPipelineConfig(String name, Path data, Path output, String mode) throws Exception {
+        return writeFileSinkPipelineConfig(name, data, output, mode, null);
+    }
+
+    private Path writeFileSinkPipelineConfig(
+            String name,
+            Path data,
+            Path output,
+            String mode,
+            Path stateDir) throws Exception {
+        Path config = tempDir.resolve(name + ".yaml");
+        StringBuilder yaml = new StringBuilder();
+        yaml.append(String.join("\n",
+                "name: " + name,
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: " + output,
+                "  format: csv",
+                "  mode: " + mode));
+        if (stateDir != null) {
+            yaml.append("\n")
+                    .append("checkpoint:\n")
+                    .append("  stateDir: ")
+                    .append(stateDir);
+        }
+        Files.write(config, yaml.toString().getBytes(StandardCharsets.UTF_8));
         return config;
     }
 

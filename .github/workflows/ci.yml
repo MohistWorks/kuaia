@@ -25,3 +25,8 @@ jobs:
 
       - name: Run tests
         run: mvn -q test
+
+      - name: Smoke test CLI
+        run: |
+          bin/kuaia help
+          bin/kuaia run -f examples/local-file-to-file.yaml

@@ -30,20 +30,22 @@ public class PipelineConfigLoader {
         Map<String, String> checkpoint = sections.get("checkpoint");
 
         String sourceType = require(source, "source.type");
-        String sourcePath = resolveSourcePath(path, require(source, "source.path"));
+        String sourcePath = resolveLocalPath(path, require(source, "source.path"));
         String sourceFormat = require(source, "source.format");
         String sinkType = require(sink, "sink.type");
 
         requireSupported("source.type", sourceType, "file");
         requireSupported("source.format", sourceFormat, "csv");
-        requireSupported("sink.type", sinkType, "console", "mock-vector");
+        requireSupported("sink.type", sinkType, "console", "mock-vector", "file");
+
+        PipelineConfig.SinkConfig sinkConfig = loadSink(path, sinkType, sink);
 
         String stateDir = checkpoint == null ? null : checkpoint.get("stateDir");
         return new PipelineConfig(
                 name,
                 new PipelineConfig.SourceConfig(sourceType, sourcePath, sourceFormat),
                 loadTransforms(transforms),
-                new PipelineConfig.SinkConfig(sinkType),
+                sinkConfig,
                 new PipelineConfig.CheckpointConfig(stateDir));
     }
 
@@ -128,6 +130,25 @@ public class PipelineConfigLoader {
         return configs;
     }
 
+    private PipelineConfig.SinkConfig loadSink(Path configPath, String sinkType, Map<String, String> sink)
+            throws PipelineConfigException {
+        if (!"file".equals(sinkType)) {
+            return new PipelineConfig.SinkConfig(sinkType);
+        }
+
+        String sinkPath = resolveLocalPath(configPath, require(sink, "sink.path"));
+        String sinkFormat = require(sink, "sink.format");
+        requireSupported("sink.format", sinkFormat, "csv");
+
+        String mode = sink.get("mode");
+        if (mode == null || mode.trim().isEmpty()) {
+            mode = "overwrite";
+        }
+        requireSupported("sink.mode", mode, "overwrite", "append");
+
+        return new PipelineConfig.SinkConfig(sinkType, sinkPath, sinkFormat, mode);
+    }
+
     private List<String> parseInlineList(String value, String field) throws PipelineConfigException {
         String trimmed = value.trim();
         if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
@@ -205,8 +226,8 @@ public class PipelineConfigLoader {
         }
     }
 
-    private String resolveSourcePath(Path configPath, String sourcePath) {
-        Path path = java.nio.file.Paths.get(sourcePath);
+    private String resolveLocalPath(Path configPath, String localPath) {
+        Path path = java.nio.file.Paths.get(localPath);
         if (path.isAbsolute()) {
             return path.toString();
         }
