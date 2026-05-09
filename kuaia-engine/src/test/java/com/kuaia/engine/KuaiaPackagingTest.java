@@ -46,6 +46,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docker-compose.yml")).contains("examples/local-file-to-vector.yaml"));
         assertTrue(read(root.resolve(".dockerignore")).contains("dev/"));
         assertTrue(read(root.resolve(".dockerignore")).contains("daily_tasks.json"));
+        assertTrue(Files.exists(root.resolve("docs/pipeline-yaml.md")), "docs/pipeline-yaml.md should exist");
+        assertTrue(read(root.resolve("README.md")).contains("docs/pipeline-yaml.md"));
     }
 
     private Path repoRoot() {

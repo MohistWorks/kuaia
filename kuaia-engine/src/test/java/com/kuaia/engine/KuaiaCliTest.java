@@ -222,6 +222,56 @@ class KuaiaCliTest {
     }
 
     @Test
+    void runReportsDuplicateSelectedTransformField() throws Exception {
+        Path data = tempDir.resolve("duplicate-transform-field.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("duplicate-transform-field.yaml");
+        Files.write(config, String.join("\n",
+                "name: duplicate-transform-field",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: select",
+                "    fields: [id, id]",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Duplicate transform field: id"));
+    }
+
+    @Test
+    void runReportsMockVectorSinkWithoutEmbeddingField() throws Exception {
+        Path data = tempDir.resolve("vector-without-embedding.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("vector-without-embedding.yaml");
+        Files.write(config, String.join("\n",
+                "name: vector-without-embedding",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: select",
+                "    fields: [id, content]",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Mock vector sink requires VECTOR field: embedding"));
+    }
+
+    @Test
     void runResumesCheckpointedTransformPipelineAfterCsvFailure() throws Exception {
         Path data = tempDir.resolve("resume-transform.csv");
         Files.write(data, String.join("\n",

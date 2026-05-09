@@ -36,6 +36,9 @@ bin/kuaia help
 bin/kuaia run -f examples/local-file-to-vector.yaml
 ```
 
+The supported pipeline YAML contract is documented in
+[`docs/pipeline-yaml.md`](docs/pipeline-yaml.md).
+
 Or use Make aliases:
 
 ```bash
