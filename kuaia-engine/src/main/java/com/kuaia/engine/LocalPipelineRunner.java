@@ -62,9 +62,16 @@ public class LocalPipelineRunner {
             sink.open();
             out.println("Starting pipeline: " + config.getName());
             SinkWriter openedSink = sink;
-            int rows = source.readFrom(0L, (seqId, row) -> openedSink.write(transforms.apply(row)));
-            out.println("Pipeline Finished. rows=" + rows);
-            return new PipelineRunSummary(rows, rows, 0L, rows, TaskState.COMPLETED, 0L);
+            PipelineCounters counters = new PipelineCounters();
+            source.readFrom(
+                    0L,
+                    (seqId, row) -> {
+                        openedSink.write(transforms.apply(row));
+                        counters.recordWritten(seqId);
+                    },
+                    (seqId, error) -> handleRecordError(config, out, counters, seqId, error));
+            out.println("Pipeline Finished. rows=" + counters.rowsWritten);
+            return counters.toSummary(TaskState.COMPLETED);
         } finally {
             source.close();
             if (sink != null) {
@@ -92,6 +99,7 @@ public class LocalPipelineRunner {
                     return new PipelineRunSummary(
                             0L,
                             0L,
+                            0L,
                             task.getLastCheckpointSeq(),
                             task.getLastCheckpointSeq(),
                             task.getState(),
@@ -102,25 +110,32 @@ public class LocalPipelineRunner {
                 sink.open();
                 SinkWriter openedSink = sink;
                 final TaskRecord[] taskRef = new TaskRecord[]{task};
-                long rowsSkipped = task.getLastCheckpointSeq();
-                int rows = source.readFrom(task.getLastCheckpointSeq(), (seqId, row) -> {
-                    openedSink.write(transforms.apply(row));
-                    taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
-                });
+                PipelineCounters counters = new PipelineCounters();
+                counters.rowsSkipped = task.getLastCheckpointSeq();
+                counters.checkpointSeq = task.getLastCheckpointSeq();
+                source.readFrom(
+                        task.getLastCheckpointSeq(),
+                        (seqId, row) -> {
+                            openedSink.write(transforms.apply(row));
+                            taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
+                            counters.recordWritten(seqId);
+                        },
+                        (seqId, error) -> {
+                            boolean skipped = handleRecordError(config, out, counters, seqId, error);
+                            if (skipped) {
+                                taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
+                            }
+                            return skipped;
+                        });
                 TaskRecord completed = checkpointStore.complete(taskRef[0]);
                 out.println("Pipeline Finished. rows="
-                        + rows
+                        + counters.rowsWritten
                         + " checkpoint="
                         + completed.getLastCheckpointSeq()
                         + " state="
                         + completed.getState());
-                return new PipelineRunSummary(
-                        rows,
-                        rows,
-                        rowsSkipped,
-                        completed.getLastCheckpointSeq(),
-                        completed.getState(),
-                        0L);
+                counters.checkpointSeq = completed.getLastCheckpointSeq();
+                return counters.toSummary(completed.getState());
             }
         } finally {
             source.close();
@@ -151,5 +166,50 @@ public class LocalPipelineRunner {
                     config.getSink().getMode());
         }
         throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
+    }
+
+    private boolean handleRecordError(
+            PipelineConfig config,
+            PrintStream out,
+            PipelineCounters counters,
+            long seqId,
+            PipelineExecutionException error) {
+        if (!config.getErrorPolicy().shouldSkipBadRecords()) {
+            return false;
+        }
+        counters.recordFailed(seqId);
+        out.println("Skipped bad record seq=" + seqId + " error=" + error.getMessage());
+        return true;
+    }
+
+    private static class PipelineCounters {
+        private long rowsRead;
+        private long rowsWritten;
+        private long rowsFailed;
+        private long rowsSkipped;
+        private long checkpointSeq;
+
+        private void recordWritten(long seqId) {
+            rowsRead++;
+            rowsWritten++;
+            checkpointSeq = seqId;
+        }
+
+        private void recordFailed(long seqId) {
+            rowsRead++;
+            rowsFailed++;
+            checkpointSeq = seqId;
+        }
+
+        private PipelineRunSummary toSummary(TaskState taskState) {
+            return new PipelineRunSummary(
+                    rowsRead,
+                    rowsWritten,
+                    rowsFailed,
+                    rowsSkipped,
+                    checkpointSeq,
+                    taskState,
+                    0L);
+        }
     }
 }

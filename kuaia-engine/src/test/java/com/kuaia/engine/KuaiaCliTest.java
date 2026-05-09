@@ -104,7 +104,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("Starting pipeline: local-file-to-file"));
         assertTrue(result.output.contains("Pipeline Finished. rows=2"));
         assertTrue(result.output.contains(
-                "Run Summary: rowsRead=2 rowsWritten=2 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED durationMs="));
+                "Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED durationMs="));
         assertEquals(String.join("\n",
                         "id,name",
                         "1,Alice",
@@ -152,7 +152,7 @@ class KuaiaCliTest {
         assertEquals(0, second.exitCode);
         assertTrue(second.output.contains("Pipeline Finished. rows=0 checkpoint=2 state=COMPLETED"));
         assertTrue(second.output.contains(
-                "Run Summary: rowsRead=0 rowsWritten=0 rowsSkipped=2 checkpointSeq=2 taskState=COMPLETED durationMs="));
+                "Run Summary: rowsRead=0 rowsWritten=0 rowsFailed=0 rowsSkipped=2 checkpointSeq=2 taskState=COMPLETED durationMs="));
         assertEquals(String.join("\n",
                         "id,name",
                         "1,Alice",
@@ -269,6 +269,34 @@ class KuaiaCliTest {
 
         assertEquals(1, result.exitCode);
         assertTrue(result.output.contains("Unknown transform field: missing"));
+    }
+
+    @Test
+    void runKeepsTransformDefinitionErrorsFatalUnderSkipPolicy() throws Exception {
+        Path data = tempDir.resolve("skip-policy-unknown-transform-field.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("skip-policy-unknown-transform-field.yaml");
+        Files.write(config, String.join("\n",
+                "name: skip-policy-unknown-transform-field",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: select",
+                "    fields: [id, missing]",
+                "sink:",
+                "  type: console",
+                "errorPolicy:",
+                "  mode: skip-bad-records").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unknown transform field: missing"));
+        assertFalse(result.output.contains("Run Summary:"));
     }
 
     @Test
@@ -524,6 +552,104 @@ class KuaiaCliTest {
 
         assertEquals(1, result.exitCode);
         assertTrue(result.output.contains("Invalid CSV row at line 3: expected 2 columns but found 1"));
+    }
+
+    @Test
+    void runKeepsSinkIoErrorsFatalUnderSkipPolicy() throws Exception {
+        Path data = tempDir.resolve("sink-io-error.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice").getBytes(StandardCharsets.UTF_8));
+        Path outputDirectory = tempDir.resolve("existing-output-directory");
+        Files.createDirectories(outputDirectory);
+        Path config = tempDir.resolve("sink-io-error.yaml");
+        Files.write(config, String.join("\n",
+                "name: sink-io-error",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: " + outputDirectory,
+                "  format: csv",
+                "  mode: overwrite",
+                "errorPolicy:",
+                "  mode: skip-bad-records").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertFalse(result.output.contains("Run Summary:"));
+    }
+
+    @Test
+    void runSkipsMalformedCsvRowsWhenConfigured() throws Exception {
+        Path data = tempDir.resolve("skip-bad-records.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2",
+                "3,Carol").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("skip-bad-records.yaml");
+        Files.write(config, String.join("\n",
+                "name: skip-bad-records",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "sink:",
+                "  type: console",
+                "errorPolicy:",
+                "  mode: skip-bad-records").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("[Kuaia] Row: id=1, name=Alice"));
+        assertTrue(result.output.contains("[Kuaia] Row: id=3, name=Carol"));
+        assertTrue(result.output.contains(
+                "Skipped bad record seq=2 error=Invalid CSV row at line 3: expected 2 columns but found 1"));
+        assertTrue(result.output.contains(
+                "Run Summary: rowsRead=3 rowsWritten=2 rowsFailed=1 rowsSkipped=0 checkpointSeq=3 taskState=COMPLETED"));
+    }
+
+    @Test
+    void runCheckpointsSkippedMalformedCsvRows() throws Exception {
+        Path data = tempDir.resolve("checkpointed-skip-bad-records.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2",
+                "3,Carol").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("checkpointed-skip-state");
+        Path config = tempDir.resolve("checkpointed-skip-bad-records.yaml");
+        Files.write(config, String.join("\n",
+                "name: checkpointed-skip-bad-records",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "sink:",
+                "  type: console",
+                "errorPolicy:",
+                "  mode: skip-bad-records",
+                "checkpoint:",
+                "  stateDir: " + stateDir).getBytes(StandardCharsets.UTF_8));
+
+        CliResult first = run("run", "-f", config.toString());
+        CliResult second = run("run", "-f", config.toString());
+
+        assertEquals(0, first.exitCode);
+        assertTrue(first.output.contains("Skipped bad record seq=2 error=Invalid CSV row at line 3: expected 2 columns but found 1"));
+        assertTrue(first.output.contains(
+                "Run Summary: rowsRead=3 rowsWritten=2 rowsFailed=1 rowsSkipped=0 checkpointSeq=3 taskState=COMPLETED"));
+        assertEquals(0, second.exitCode);
+        assertTrue(second.output.contains("Pipeline Finished. rows=0 checkpoint=3 state=COMPLETED"));
+        assertTrue(second.output.contains(
+                "Run Summary: rowsRead=0 rowsWritten=0 rowsFailed=0 rowsSkipped=3 checkpointSeq=3 taskState=COMPLETED"));
+        assertFalse(second.output.contains("[Kuaia] Row: id=1, name=Alice"));
+        assertFalse(second.output.contains("[Kuaia] Row: id=3, name=Carol"));
     }
 
     private CliResult run(String... args) throws Exception {

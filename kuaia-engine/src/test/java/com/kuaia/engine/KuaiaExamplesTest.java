@@ -21,7 +21,8 @@ class KuaiaExamplesTest {
                 "examples/local-file-to-console.yaml",
                 "examples/local-file-transform-to-console.yaml",
                 "examples/local-file-to-vector.yaml",
-                "examples/local-file-to-file.yaml");
+                "examples/local-file-to-file.yaml",
+                "examples/local-file-skip-bad-records.yaml");
 
         Path fileSinkOutput = repoRoot().resolve(".kuaia/output/local-file-to-file.csv");
         Files.deleteIfExists(fileSinkOutput);

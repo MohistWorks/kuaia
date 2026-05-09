@@ -51,6 +51,9 @@ public class KuaiaCli {
             } catch (PipelineConfigException | PipelineExecutionException e) {
                 out.println(e.getMessage());
                 return 1;
+            } catch (Exception e) {
+                out.println(e.getMessage());
+                return 1;
             }
         }
 

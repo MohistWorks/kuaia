@@ -30,6 +30,7 @@ Optional top-level fields:
 
 - `transforms`
 - `checkpoint`
+- `errorPolicy`
 
 ## Source
 
@@ -180,6 +181,34 @@ Rules:
 - output row type must include `id` as `LONG`,
 - output row type must include `embedding` as `VECTOR`.
 
+## Error Policy
+
+```yaml
+errorPolicy:
+  mode: fail-fast
+```
+
+`errorPolicy` controls how local CSV pipelines handle malformed source rows.
+
+Fields:
+
+- `mode`: optional when `errorPolicy` is present, defaults to `fail-fast`
+
+Supported modes:
+
+- `fail-fast`: default behavior. The first malformed CSV row fails the run.
+- `skip-bad-records`: malformed CSV rows are counted, reported, and skipped.
+
+When `skip-bad-records` is enabled, Kuaia prints each skipped row:
+
+```text
+Skipped bad record seq=2 error=Invalid CSV row at line 3: expected 2 columns but found 1
+```
+
+For checkpointed local runs, skipped bad records count as consumed and advance
+the checkpoint sequence. Pipeline definition errors, transform schema errors,
+and sink IO errors remain fatal.
+
 ## Checkpoint
 
 ```yaml
@@ -189,7 +218,9 @@ checkpoint:
 
 When `checkpoint.stateDir` is set, Kuaia persists local task progress with
 RocksDB. CSV data rows use 1-based source `seqId` values. A checkpoint advances
-only after the transformed row is successfully written to the sink.
+after a transformed row is successfully written to the sink. With
+`errorPolicy.mode: skip-bad-records`, a skipped malformed source row also
+advances the checkpoint so reruns do not repeatedly process the same bad row.
 
 On rerun, Kuaia skips source rows at or before the last checkpoint. If the task is
 already `COMPLETED`, rerunning the same YAML prints `rows=0` and does not emit
@@ -203,13 +234,14 @@ does not claim exactly-once semantics.
 Successful declarative runs print a stable summary line:
 
 ```text
-Run Summary: rowsRead=2 rowsWritten=2 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED durationMs=12
+Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED durationMs=12
 ```
 
 Fields:
 
 - `rowsRead`: source rows read after checkpoint skips,
 - `rowsWritten`: output rows successfully written to the sink,
+- `rowsFailed`: malformed source rows skipped under `skip-bad-records`,
 - `rowsSkipped`: rows skipped because the checkpoint already covered them,
 - `checkpointSeq`: latest source sequence reached by this run or prior
   checkpoint,
@@ -237,6 +269,12 @@ bin/kuaia run -f examples/local-file-to-file.yaml
 cat .kuaia/output/local-file-to-file.csv
 ```
 
+Run CSV while skipping malformed rows:
+
+```bash
+bin/kuaia run -f examples/local-file-skip-bad-records.yaml
+```
+
 Run CSV through mock embedding to mock vector sink:
 
 ```bash
@@ -255,6 +293,7 @@ Common examples:
 - `Unsupported sink.type: <value>`
 - `Unsupported sink.format: <value>`
 - `Unsupported sink.mode: <value>`
+- `Unsupported errorPolicy.mode: <value>`
 - `Unsupported transform.type: <value>`
 - `Invalid transform.dimensions: <value>`
 - `Unknown transform field: <field>`

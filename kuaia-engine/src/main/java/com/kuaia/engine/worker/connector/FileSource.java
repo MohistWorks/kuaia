@@ -20,6 +20,10 @@ public class FileSource {
         void accept(long seqId, BinaryRow row) throws Exception;
     }
 
+    public interface RecordErrorConsumer {
+        boolean accept(long seqId, PipelineExecutionException error) throws Exception;
+    }
+
     public FileSource(Path path) {
         this.path = path;
     }
@@ -49,6 +53,11 @@ public class FileSource {
     }
 
     public int readFrom(long lastCheckpointSeq, RecordConsumer consumer) throws Exception {
+        return readFrom(lastCheckpointSeq, consumer, (seqId, error) -> false);
+    }
+
+    public int readFrom(long lastCheckpointSeq, RecordConsumer consumer, RecordErrorConsumer errorConsumer)
+            throws Exception {
         int count = 0;
         long seqId = 0L;
         for (int i = 1; i < lines.size(); i++) {
@@ -64,21 +73,14 @@ public class FileSource {
             String[] fieldNames = rowType.getFieldNames();
             DataType[] fieldTypes = rowType.getFieldTypes();
             int lineNumber = i + 1;
-            if (values.length != fieldNames.length) {
-                throw new PipelineExecutionException("Invalid CSV row at line "
-                        + lineNumber
-                        + ": expected "
-                        + fieldNames.length
-                        + " columns but found "
-                        + values.length);
-            }
-            BinaryRow row = new BinaryRow(fieldNames.length);
-            for (int field = 0; field < fieldNames.length; field++) {
-                if (fieldTypes[field] == DataType.LONG) {
-                    row.setLong(field, parseLong(values[field], lineNumber, fieldNames[field]));
-                } else {
-                    row.setString(field, values[field]);
+            BinaryRow row;
+            try {
+                row = parseRow(values, fieldNames, fieldTypes, lineNumber);
+            } catch (PipelineExecutionException e) {
+                if (errorConsumer.accept(seqId, e)) {
+                    continue;
                 }
+                throw e;
             }
             consumer.accept(seqId, row);
             count++;
@@ -92,6 +94,27 @@ public class FileSource {
 
     public KuaiaRowType getRowType() {
         return rowType;
+    }
+
+    private BinaryRow parseRow(String[] values, String[] fieldNames, DataType[] fieldTypes, int lineNumber)
+            throws PipelineExecutionException {
+        if (values.length != fieldNames.length) {
+            throw new PipelineExecutionException("Invalid CSV row at line "
+                    + lineNumber
+                    + ": expected "
+                    + fieldNames.length
+                    + " columns but found "
+                    + values.length);
+        }
+        BinaryRow row = new BinaryRow(fieldNames.length);
+        for (int field = 0; field < fieldNames.length; field++) {
+            if (fieldTypes[field] == DataType.LONG) {
+                row.setLong(field, parseLong(values[field], lineNumber, fieldNames[field]));
+            } else {
+                row.setString(field, values[field]);
+            }
+        }
+        return row;
     }
 
     private long parseLong(String value, int lineNumber, String fieldName) throws PipelineExecutionException {

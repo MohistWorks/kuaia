@@ -5,6 +5,7 @@ import com.kuaia.common.model.TaskState;
 public class PipelineRunSummary {
     private final long rowsRead;
     private final long rowsWritten;
+    private final long rowsFailed;
     private final long rowsSkipped;
     private final long checkpointSeq;
     private final TaskState taskState;
@@ -13,12 +14,14 @@ public class PipelineRunSummary {
     public PipelineRunSummary(
             long rowsRead,
             long rowsWritten,
+            long rowsFailed,
             long rowsSkipped,
             long checkpointSeq,
             TaskState taskState,
             long durationMillis) {
         this.rowsRead = rowsRead;
         this.rowsWritten = rowsWritten;
+        this.rowsFailed = rowsFailed;
         this.rowsSkipped = rowsSkipped;
         this.checkpointSeq = checkpointSeq;
         this.taskState = taskState;
@@ -31,6 +34,10 @@ public class PipelineRunSummary {
 
     public long getRowsWritten() {
         return rowsWritten;
+    }
+
+    public long getRowsFailed() {
+        return rowsFailed;
     }
 
     public long getRowsSkipped() {
@@ -53,6 +60,7 @@ public class PipelineRunSummary {
         return new PipelineRunSummary(
                 rowsRead,
                 rowsWritten,
+                rowsFailed,
                 rowsSkipped,
                 checkpointSeq,
                 taskState,
@@ -64,6 +72,8 @@ public class PipelineRunSummary {
                 + rowsRead
                 + " rowsWritten="
                 + rowsWritten
+                + " rowsFailed="
+                + rowsFailed
                 + " rowsSkipped="
                 + rowsSkipped
                 + " checkpointSeq="

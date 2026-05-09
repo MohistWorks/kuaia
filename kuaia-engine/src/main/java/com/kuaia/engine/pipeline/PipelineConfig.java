@@ -10,6 +10,7 @@ public class PipelineConfig {
     private final List<TransformConfig> transforms;
     private final SinkConfig sink;
     private final CheckpointConfig checkpoint;
+    private final ErrorPolicyConfig errorPolicy;
 
     public PipelineConfig(String name, SourceConfig source, SinkConfig sink, CheckpointConfig checkpoint) {
         this(name, source, Collections.emptyList(), sink, checkpoint);
@@ -21,11 +22,22 @@ public class PipelineConfig {
             List<TransformConfig> transforms,
             SinkConfig sink,
             CheckpointConfig checkpoint) {
+        this(name, source, transforms, sink, checkpoint, new ErrorPolicyConfig("fail-fast"));
+    }
+
+    public PipelineConfig(
+            String name,
+            SourceConfig source,
+            List<TransformConfig> transforms,
+            SinkConfig sink,
+            CheckpointConfig checkpoint,
+            ErrorPolicyConfig errorPolicy) {
         this.name = name;
         this.source = source;
         this.transforms = Collections.unmodifiableList(new ArrayList<>(transforms));
         this.sink = sink;
         this.checkpoint = checkpoint;
+        this.errorPolicy = errorPolicy;
     }
 
     public String getName() {
@@ -46,6 +58,10 @@ public class PipelineConfig {
 
     public CheckpointConfig getCheckpoint() {
         return checkpoint;
+    }
+
+    public ErrorPolicyConfig getErrorPolicy() {
+        return errorPolicy;
     }
 
     public static class SourceConfig {
@@ -174,6 +190,22 @@ public class PipelineConfig {
 
         public String getStateDir() {
             return stateDir;
+        }
+    }
+
+    public static class ErrorPolicyConfig {
+        private final String mode;
+
+        public ErrorPolicyConfig(String mode) {
+            this.mode = mode;
+        }
+
+        public String getMode() {
+            return mode;
+        }
+
+        public boolean shouldSkipBadRecords() {
+            return "skip-bad-records".equals(mode);
         }
     }
 }

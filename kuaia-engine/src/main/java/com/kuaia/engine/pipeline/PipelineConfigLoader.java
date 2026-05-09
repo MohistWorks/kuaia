@@ -28,6 +28,7 @@ public class PipelineConfigLoader {
         Map<String, String> source = section(sections, "source");
         Map<String, String> sink = section(sections, "sink");
         Map<String, String> checkpoint = sections.get("checkpoint");
+        Map<String, String> errorPolicy = sections.get("errorPolicy");
 
         String sourceType = require(source, "source.type");
         String sourcePath = resolveLocalPath(path, require(source, "source.path"));
@@ -39,6 +40,7 @@ public class PipelineConfigLoader {
         requireSupported("sink.type", sinkType, "console", "mock-vector", "file");
 
         PipelineConfig.SinkConfig sinkConfig = loadSink(path, sinkType, sink);
+        PipelineConfig.ErrorPolicyConfig errorPolicyConfig = loadErrorPolicy(errorPolicy);
 
         String stateDir = checkpoint == null ? null : checkpoint.get("stateDir");
         return new PipelineConfig(
@@ -46,7 +48,8 @@ public class PipelineConfigLoader {
                 new PipelineConfig.SourceConfig(sourceType, sourcePath, sourceFormat),
                 loadTransforms(transforms),
                 sinkConfig,
-                new PipelineConfig.CheckpointConfig(stateDir));
+                new PipelineConfig.CheckpointConfig(stateDir),
+                errorPolicyConfig);
     }
 
     private void parse(
@@ -147,6 +150,19 @@ public class PipelineConfigLoader {
         requireSupported("sink.mode", mode, "overwrite", "append");
 
         return new PipelineConfig.SinkConfig(sinkType, sinkPath, sinkFormat, mode);
+    }
+
+    private PipelineConfig.ErrorPolicyConfig loadErrorPolicy(Map<String, String> errorPolicy)
+            throws PipelineConfigException {
+        String mode = "fail-fast";
+        if (errorPolicy != null) {
+            String configuredMode = errorPolicy.get("mode");
+            if (configuredMode != null && !configuredMode.trim().isEmpty()) {
+                mode = configuredMode;
+            }
+        }
+        requireSupported("errorPolicy.mode", mode, "fail-fast", "skip-bad-records");
+        return new PipelineConfig.ErrorPolicyConfig(mode);
     }
 
     private List<String> parseInlineList(String value, String field) throws PipelineConfigException {

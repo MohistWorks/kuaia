@@ -57,6 +57,63 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsSkipBadRecordsErrorPolicy() throws Exception {
+        Path configPath = tempDir.resolve("skip-bad-records.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: skip-bad-records",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: console",
+                "errorPolicy:",
+                "  mode: skip-bad-records").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("skip-bad-records", config.getErrorPolicy().getMode());
+    }
+
+    @Test
+    void defaultsToFailFastErrorPolicy() throws Exception {
+        Path configPath = tempDir.resolve("default-error-policy.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: default-error-policy",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("fail-fast", config.getErrorPolicy().getMode());
+    }
+
+    @Test
+    void rejectsUnsupportedErrorPolicyMode() throws Exception {
+        Path configPath = tempDir.resolve("unsupported-error-policy.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: unsupported-error-policy",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: console",
+                "errorPolicy:",
+                "  mode: retry").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Unsupported errorPolicy.mode: retry", error.getMessage());
+    }
+
+    @Test
     void rejectsInvalidMockEmbeddingDimensions() throws Exception {
         Path data = tempDir.resolve("documents.csv");
         Files.write(data, "id,content\n1,Alpha".getBytes(StandardCharsets.UTF_8));
