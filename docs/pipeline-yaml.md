@@ -120,6 +120,11 @@ The mock vector is deterministic:
 vector[i] = inputText.length() + i
 ```
 
+Implementation note: `mock-embedding` is backed by Kuaia's local `mock`
+embedding provider. The provider registry is an internal extension point for
+future real embedding providers; this public YAML contract only exposes the
+documented mock behavior.
+
 ## Sink
 
 ### console
@@ -180,6 +185,10 @@ Rules:
 
 - output row type must include `id` as `LONG`,
 - output row type must include `embedding` as `VECTOR`.
+
+Implementation note: `mock-vector` is backed by Kuaia's local mock vector sink
+factory. The sink factory registry is an internal extension point for future
+vector database integrations; this MVP does not include real vector databases.
 
 ## Error Policy
 

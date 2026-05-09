@@ -13,12 +13,22 @@ import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.FileSource;
 import com.kuaia.engine.worker.connector.FileSink;
-import com.kuaia.engine.worker.connector.MockVectorSink;
+import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 
 import java.io.PrintStream;
 import java.nio.file.Paths;
 
 public class LocalPipelineRunner {
+    private final SinkFactoryRegistry sinkFactories;
+
+    public LocalPipelineRunner() {
+        this(SinkFactoryRegistry.defaultRegistry());
+    }
+
+    public LocalPipelineRunner(SinkFactoryRegistry sinkFactories) {
+        this.sinkFactories = sinkFactories;
+    }
+
     public int run(PrintStream out) throws Exception {
         FakeSource source = new FakeSource();
         ConsoleSink sink = new ConsoleSink(source.getRowType(), out);
@@ -157,7 +167,7 @@ public class LocalPipelineRunner {
             return new ConsoleSink(rowType, out);
         }
         if ("mock-vector".equals(sinkType)) {
-            return new MockVectorSink(rowType, out);
+            return sinkFactories.create(sinkType, rowType, out);
         }
         if ("file".equals(sinkType)) {
             return new FileSink(

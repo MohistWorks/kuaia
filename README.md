@@ -11,6 +11,7 @@ Implemented today:
 - Local demo pipelines for structured rows and mock AI vector output.
 - Declarative local YAML pipelines with checkpointed `select`, `rename`, and `mock-embedding` transforms.
 - Declarative `console`, `file`, and `mock-vector` local sinks with CLI run summaries and basic bad-record counts.
+- Local mock embedding provider and mock vector sink registries for future extension.
 - Coordinator/Worker protocol models for task assignment, ack, checkpoint, backpressure, and attempt results.
 - In-memory and RocksDB-backed task/worker state stores.
 - Coordinator recovery planning for expired task leases.

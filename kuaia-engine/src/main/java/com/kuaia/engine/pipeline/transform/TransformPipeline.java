@@ -4,6 +4,7 @@ import com.kuaia.common.data.BinaryRow;
 import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
+import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,9 +13,14 @@ import java.util.List;
 public class TransformPipeline {
     private final List<PipelineTransform> transforms;
     private final KuaiaRowType outputType;
+    private final EmbeddingProviderRegistry embeddingProviders;
 
-    private TransformPipeline(KuaiaRowType inputType, List<PipelineConfig.TransformConfig> configs)
+    private TransformPipeline(
+            KuaiaRowType inputType,
+            List<PipelineConfig.TransformConfig> configs,
+            EmbeddingProviderRegistry embeddingProviders)
             throws PipelineExecutionException {
+        this.embeddingProviders = embeddingProviders;
         List<PipelineTransform> builtTransforms = new ArrayList<>();
         KuaiaRowType currentType = inputType;
         for (PipelineConfig.TransformConfig config : configs) {
@@ -28,7 +34,14 @@ public class TransformPipeline {
 
     public static TransformPipeline from(KuaiaRowType inputType, List<PipelineConfig.TransformConfig> configs)
             throws PipelineExecutionException {
-        return new TransformPipeline(inputType, configs);
+        return new TransformPipeline(inputType, configs, EmbeddingProviderRegistry.defaultRegistry());
+    }
+
+    public static TransformPipeline from(
+            KuaiaRowType inputType,
+            List<PipelineConfig.TransformConfig> configs,
+            EmbeddingProviderRegistry embeddingProviders) throws PipelineExecutionException {
+        return new TransformPipeline(inputType, configs, embeddingProviders);
     }
 
     public KuaiaRowType getOutputType() {
@@ -51,7 +64,11 @@ public class TransformPipeline {
             return new RenameTransform(config.getFrom(), config.getTo());
         }
         if ("mock-embedding".equals(config.getType())) {
-            return new MockEmbeddingTransform(config.getInput(), config.getOutput(), config.getDimensions());
+            return new MockEmbeddingTransform(
+                    config.getInput(),
+                    config.getOutput(),
+                    config.getDimensions(),
+                    embeddingProviders.get("mock"));
         }
         throw new PipelineExecutionException("Unsupported transform.type: " + config.getType());
     }

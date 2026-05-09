@@ -3,21 +3,24 @@ package com.kuaia.engine.pipeline.transform;
 import com.kuaia.common.data.BinaryRow;
 import com.kuaia.common.type.DataType;
 import com.kuaia.common.type.KuaiaRowType;
+import com.kuaia.engine.pipeline.embedding.EmbeddingProvider;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 
 public class MockEmbeddingTransform implements PipelineTransform {
     private final String inputField;
     private final String outputField;
     private final int dimensions;
+    private final EmbeddingProvider provider;
     private KuaiaRowType inputType;
     private KuaiaRowType outputType;
     private int inputOrdinal;
     private int outputOrdinal;
 
-    public MockEmbeddingTransform(String inputField, String outputField, int dimensions) {
+    public MockEmbeddingTransform(String inputField, String outputField, int dimensions, EmbeddingProvider provider) {
         this.inputField = inputField;
         this.outputField = outputField;
         this.dimensions = dimensions;
+        this.provider = provider;
     }
 
     @Override
@@ -53,16 +56,8 @@ public class MockEmbeddingTransform implements PipelineTransform {
         for (int i = 0; i < inputType.getFieldNames().length; i++) {
             copyValue(input, i, output, i, inputType.getFieldTypes()[i]);
         }
-        output.setVector(outputOrdinal, vectorFor(input.getString(inputOrdinal)));
+        output.setVector(outputOrdinal, provider.embed(input.getString(inputOrdinal), dimensions));
         return output;
-    }
-
-    private float[] vectorFor(String value) {
-        float[] vector = new float[dimensions];
-        for (int i = 0; i < dimensions; i++) {
-            vector[i] = value.length() + i;
-        }
-        return vector;
     }
 
     private void copyValue(BinaryRow input, int inputOrdinal, BinaryRow output, int outputOrdinal, DataType type)
