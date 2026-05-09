@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+MAVEN_BIN=${MAVEN_BIN:-mvn}
+
+cd "$ROOT_DIR"
+exec "$MAVEN_BIN" -q -pl kuaia-engine exec:java \
+  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
+  -Dexec.args="$*"

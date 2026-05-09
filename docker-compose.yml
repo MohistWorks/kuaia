@@ -1,0 +1,9 @@
+services:
+  kuaia:
+    build: .
+    command: ["run", "-f", "examples/local-file-to-vector.yaml"]
+    volumes:
+      - kuaia-state:/workspace/.kuaia
+
+volumes:
+  kuaia-state:

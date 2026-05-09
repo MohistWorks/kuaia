@@ -27,6 +27,28 @@ Not implemented yet:
 
 - JDK 8 or newer
 - Maven 3.8+
+- Docker with Compose support, optional
+
+## Quick Start
+
+```bash
+bin/kuaia help
+bin/kuaia run -f examples/local-file-to-vector.yaml
+```
+
+Or use Make aliases:
+
+```bash
+make test
+make run-vector
+make clean-state
+```
+
+Or run the default vector example through Docker Compose:
+
+```bash
+docker compose up --build
+```
 
 ## Build And Test
 
@@ -34,36 +56,24 @@ Not implemented yet:
 mvn -q test
 ```
 
-Install the local module artifacts before running the CLI through Maven:
-
-```bash
-mvn -q install
-```
-
 ## Run The Demos
 
-Use the engine CLI through Maven's exec plugin:
+Use the short wrapper:
 
 ```bash
-mvn -q -pl kuaia-engine exec:java \
-  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
-  -Dexec.args=help
+bin/kuaia help
 ```
 
 Run the local row pipeline:
 
 ```bash
-mvn -q -pl kuaia-engine exec:java \
-  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
-  -Dexec.args=local-demo
+bin/kuaia local-demo
 ```
 
 Run a declarative local pipeline from YAML:
 
 ```bash
-mvn -q -pl kuaia-engine exec:java \
-  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
-  -Dexec.args="run -f examples/local-file-to-console.yaml"
+bin/kuaia run -f examples/local-file-to-console.yaml
 ```
 
 When the YAML includes `checkpoint.stateDir`, Kuaia persists local progress after
@@ -73,33 +83,34 @@ last committed row instead of re-emitting completed rows.
 Run a declarative pipeline with a simple transform chain:
 
 ```bash
-mvn -q -pl kuaia-engine exec:java \
-  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
-  -Dexec.args="run -f examples/local-file-transform-to-console.yaml"
+bin/kuaia run -f examples/local-file-transform-to-console.yaml
 ```
 
 Run a declarative AI-ready vector pipeline:
 
 ```bash
-mvn -q -pl kuaia-engine exec:java \
-  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
-  -Dexec.args="run -f examples/local-file-to-vector.yaml"
+bin/kuaia run -f examples/local-file-to-vector.yaml
 ```
 
 Run the mock AI vector pipeline:
 
 ```bash
-mvn -q -pl kuaia-engine exec:java \
-  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
-  -Dexec.args=ai-demo
+bin/kuaia ai-demo
 ```
 
 Run the recovery demo with a RocksDB state directory:
 
 ```bash
+bin/kuaia recover-demo --state-dir /tmp/kuaia-recover-demo
+```
+
+The wrapper delegates to Maven. The lower-level command is still available when
+you need to bypass the script:
+
+```bash
 mvn -q -pl kuaia-engine exec:java \
   -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
-  -Dexec.args="recover-demo --state-dir /tmp/kuaia-recover-demo"
+  -Dexec.args="run -f examples/local-file-to-vector.yaml"
 ```
 
 ## Repository Layout
