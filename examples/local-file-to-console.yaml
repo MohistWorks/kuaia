@@ -1,0 +1,9 @@
+name: local-file-to-console
+source:
+  type: file
+  path: data/users.csv
+  format: csv
+sink:
+  type: console
+checkpoint:
+  stateDir: .kuaia/state/local-file-to-console

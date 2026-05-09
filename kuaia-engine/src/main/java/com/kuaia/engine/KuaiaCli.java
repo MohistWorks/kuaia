@@ -1,5 +1,10 @@
 package com.kuaia.engine;
 
+import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.pipeline.PipelineConfigException;
+import com.kuaia.engine.pipeline.PipelineConfigLoader;
+import com.kuaia.engine.pipeline.PipelineExecutionException;
+
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,6 +37,20 @@ public class KuaiaCli {
             new RecoveryDemoRunner().run(stateDir, out);
             return 0;
         }
+        if ("run".equals(command)) {
+            Path configPath = parseRunConfigPath(args, out);
+            if (configPath == null) {
+                return 1;
+            }
+            try {
+                PipelineConfig config = new PipelineConfigLoader().load(configPath);
+                new LocalPipelineRunner().run(config, out);
+                return 0;
+            } catch (PipelineConfigException | PipelineExecutionException e) {
+                out.println(e.getMessage());
+                return 1;
+            }
+        }
 
         out.println("Unknown command: " + command);
         printUsage(out);
@@ -49,11 +68,23 @@ public class KuaiaCli {
         return null;
     }
 
+    private static Path parseRunConfigPath(String[] args, PrintStream out) {
+        for (int i = 1; i < args.length - 1; i++) {
+            if ("-f".equals(args[i]) || "--file".equals(args[i])) {
+                return Paths.get(args[i + 1]);
+            }
+        }
+        out.println("run requires -f <pipeline.yaml>");
+        printUsage(out);
+        return null;
+    }
+
     private static void printUsage(PrintStream out) {
         out.println("Usage: kuaia <command>");
         out.println();
         out.println("Commands:");
         out.println("  help                         Show this help message");
+        out.println("  run -f PIPELINE              Run a declarative local pipeline");
         out.println("  local-demo                   Run FakeSource -> BinaryRow -> ConsoleSink");
         out.println("  ai-demo                      Run mock embedding -> mock vector sink");
         out.println("  recover-demo --state-dir DIR Demonstrate RocksDB task recovery");

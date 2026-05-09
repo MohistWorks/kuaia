@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +22,7 @@ class KuaiaCliTest {
 
         assertEquals(0, result.exitCode);
         assertTrue(result.output.contains("Usage: kuaia <command>"));
+        assertTrue(result.output.contains("run -f PIPELINE"));
         assertTrue(result.output.contains("local-demo"));
         assertTrue(result.output.contains("ai-demo"));
         assertTrue(result.output.contains("recover-demo"));
@@ -63,12 +65,87 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("task-recovering state=RETRYING checkpoint=7"));
     }
 
+    @Test
+    void runExecutesDeclarativeLocalPipeline() throws Exception {
+        CliResult result = run("run", "-f", exampleConfigPath().toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Starting pipeline: local-file-to-console"));
+        assertTrue(result.output.contains("[Kuaia] Row: id=1, name=Alice"));
+        assertTrue(result.output.contains("[Kuaia] Row: id=2, name=Bob"));
+        assertTrue(result.output.contains("Pipeline Finished. rows=2"));
+    }
+
+    @Test
+    void runRequiresConfigPath() throws Exception {
+        CliResult result = run("run");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("run requires -f <pipeline.yaml>"));
+    }
+
+    @Test
+    void runReportsMissingConfigFile() throws Exception {
+        CliResult result = run("run", "-f", tempDir.resolve("missing.yaml").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Pipeline config not found:"));
+    }
+
+    @Test
+    void runReportsMissingRequiredConfigField() throws Exception {
+        Path config = tempDir.resolve("missing-source-path.yaml");
+        Files.write(config, String.join("\n",
+                "name: broken",
+                "source:",
+                "  type: file",
+                "  format: csv",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Missing required field: source.path"));
+    }
+
+    @Test
+    void runReportsMalformedCsvRows() throws Exception {
+        Path data = tempDir.resolve("bad.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("bad.yaml");
+        Files.write(config, String.join("\n",
+                "name: bad",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Invalid CSV row at line 3: expected 2 columns but found 1"));
+    }
+
     private CliResult run(String... args) throws Exception {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         PrintStream out = new PrintStream(bytes, true, StandardCharsets.UTF_8.name());
         int exitCode = KuaiaCli.run(args, out);
         out.flush();
         return new CliResult(exitCode, bytes.toString(StandardCharsets.UTF_8.name()));
+    }
+
+    private Path exampleConfigPath() {
+        Path rootPath = java.nio.file.Paths.get("examples/local-file-to-console.yaml");
+        if (Files.exists(rootPath)) {
+            return rootPath;
+        }
+        return java.nio.file.Paths.get("../examples/local-file-to-console.yaml").normalize();
     }
 
     private static class CliResult {

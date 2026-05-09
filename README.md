@@ -57,6 +57,14 @@ mvn -q -pl kuaia-engine exec:java \
   -Dexec.args=local-demo
 ```
 
+Run a declarative local pipeline from YAML:
+
+```bash
+mvn -q -pl kuaia-engine exec:java \
+  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
+  -Dexec.args="run -f examples/local-file-to-console.yaml"
+```
+
 Run the mock AI vector pipeline:
 
 ```bash
