@@ -2,23 +2,24 @@ package com.kuaia.engine.worker.connector;
 
 import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.data.BinaryRow;
+import com.kuaia.common.type.DataType;
 import com.kuaia.common.type.KuaiaRowType;
+import com.kuaia.engine.pipeline.PipelineExecutionException;
 
 import java.io.PrintStream;
 
 public class MockVectorSink implements SinkWriter {
-    private final KuaiaRowType rowType;
+    private final int idOrdinal;
     private final int vectorOrdinal;
     private final PrintStream out;
 
-    public MockVectorSink(KuaiaRowType rowType) {
+    public MockVectorSink(KuaiaRowType rowType) throws PipelineExecutionException {
         this(rowType, System.out);
     }
 
-    public MockVectorSink(KuaiaRowType rowType, PrintStream out) {
-        this.rowType = rowType;
-        int embeddingIndex = rowType.getIndex("embedding");
-        this.vectorOrdinal = embeddingIndex >= 0 ? embeddingIndex : 1;
+    public MockVectorSink(KuaiaRowType rowType, PrintStream out) throws PipelineExecutionException {
+        this.idOrdinal = requireField(rowType, "id", DataType.LONG);
+        this.vectorOrdinal = requireField(rowType, "embedding", DataType.VECTOR);
         this.out = out;
     }
 
@@ -27,6 +28,14 @@ public class MockVectorSink implements SinkWriter {
     @Override public void write(BinaryRow row) {
         float[] vector = row.getVector(vectorOrdinal);
         out.printf("[AI Sink] Row ID: %d, Vector Dim: %d, First Val: %.4f%n",
-                row.getLong(0), vector.length, vector[0]);
+                row.getLong(idOrdinal), vector.length, vector[0]);
+    }
+
+    private int requireField(KuaiaRowType rowType, String field, DataType type) throws PipelineExecutionException {
+        int ordinal = rowType.getIndex(field);
+        if (ordinal < 0 || rowType.getFieldTypes()[ordinal] != type) {
+            throw new PipelineExecutionException("Mock vector sink requires " + type.name() + " field: " + field);
+        }
+        return ordinal;
     }
 }

@@ -77,12 +77,29 @@ public class PipelineConfig {
         private final List<String> fields;
         private final String from;
         private final String to;
+        private final String input;
+        private final String output;
+        private final int dimensions;
 
         public TransformConfig(String type, List<String> fields, String from, String to) {
+            this(type, fields, from, to, null, null, 4);
+        }
+
+        public TransformConfig(
+                String type,
+                List<String> fields,
+                String from,
+                String to,
+                String input,
+                String output,
+                int dimensions) {
             this.type = type;
             this.fields = Collections.unmodifiableList(new ArrayList<>(fields));
             this.from = from;
             this.to = to;
+            this.input = input;
+            this.output = output;
+            this.dimensions = dimensions;
         }
 
         public String getType() {
@@ -99,6 +116,18 @@ public class PipelineConfig {
 
         public String getTo() {
             return to;
+        }
+
+        public String getInput() {
+            return input;
+        }
+
+        public String getOutput() {
+            return output;
+        }
+
+        public int getDimensions() {
+            return dimensions;
         }
     }
 

@@ -50,6 +50,9 @@ public class TransformPipeline {
         if ("rename".equals(config.getType())) {
             return new RenameTransform(config.getFrom(), config.getTo());
         }
+        if ("mock-embedding".equals(config.getType())) {
+            return new MockEmbeddingTransform(config.getInput(), config.getOutput(), config.getDimensions());
+        }
         throw new PipelineExecutionException("Unsupported transform.type: " + config.getType());
     }
 }

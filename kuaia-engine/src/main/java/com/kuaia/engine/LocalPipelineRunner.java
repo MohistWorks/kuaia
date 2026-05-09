@@ -1,13 +1,17 @@
 package com.kuaia.engine;
 
+import com.kuaia.common.api.SinkWriter;
+import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.engine.pipeline.LocalPipelineCheckpointStore;
+import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.worker.connector.ConsoleSink;
 import com.kuaia.engine.worker.connector.FakeSource;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.FileSource;
+import com.kuaia.engine.worker.connector.MockVectorSink;
 
 import java.io.PrintStream;
 import java.nio.file.Paths;
@@ -44,13 +48,13 @@ public class LocalPipelineRunner {
     private int runWithoutCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
         FileSource source = new FileSource(Paths.get(config.getSource().getPath()));
         source.open();
-        ConsoleSink sink = null;
+        SinkWriter sink = null;
         try {
             TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
-            sink = new ConsoleSink(transforms.getOutputType(), out);
+            sink = createSink(config, transforms.getOutputType(), out);
             sink.open();
             out.println("Starting pipeline: " + config.getName());
-            ConsoleSink openedSink = sink;
+            SinkWriter openedSink = sink;
             int rows = source.readFrom(0L, (seqId, row) -> openedSink.write(transforms.apply(row)));
             out.println("Pipeline Finished. rows=" + rows);
             return rows;
@@ -65,13 +69,13 @@ public class LocalPipelineRunner {
     private int runWithCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
         FileSource source = new FileSource(Paths.get(config.getSource().getPath()));
         source.open();
-        ConsoleSink sink = null;
+        SinkWriter sink = null;
         try {
             TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
-            sink = new ConsoleSink(transforms.getOutputType(), out);
+            sink = createSink(config, transforms.getOutputType(), out);
             sink.open();
             out.println("Starting pipeline: " + config.getName());
-            ConsoleSink openedSink = sink;
+            SinkWriter openedSink = sink;
             try (LocalPipelineCheckpointStore checkpointStore = new LocalPipelineCheckpointStore(
                     Paths.get(config.getCheckpoint().getStateDir()),
                     config.getName())) {
@@ -109,5 +113,17 @@ public class LocalPipelineRunner {
     private boolean hasCheckpointStateDir(PipelineConfig config) {
         String stateDir = config.getCheckpoint().getStateDir();
         return stateDir != null && !stateDir.trim().isEmpty();
+    }
+
+    private SinkWriter createSink(PipelineConfig config, KuaiaRowType rowType, PrintStream out)
+            throws PipelineExecutionException {
+        String sinkType = config.getSink().getType();
+        if ("console".equals(sinkType)) {
+            return new ConsoleSink(rowType, out);
+        }
+        if ("mock-vector".equals(sinkType)) {
+            return new MockVectorSink(rowType, out);
+        }
+        throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
     }
 }

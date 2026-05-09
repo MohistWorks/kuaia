@@ -1,0 +1,16 @@
+name: local-file-to-vector
+source:
+  type: file
+  path: data/documents.csv
+  format: csv
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+sink:
+  type: mock-vector
+checkpoint:
+  stateDir: .kuaia/state/local-file-to-vector

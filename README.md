@@ -9,7 +9,7 @@ Implemented today:
 - `BinaryRow` with primitive, string, and vector fields.
 - Connector interfaces for source, transform, and sink components.
 - Local demo pipelines for structured rows and mock AI vector output.
-- Declarative local YAML pipelines with checkpointed `select` and `rename` transforms.
+- Declarative local YAML pipelines with checkpointed `select`, `rename`, and `mock-embedding` transforms.
 - Coordinator/Worker protocol models for task assignment, ack, checkpoint, backpressure, and attempt results.
 - In-memory and RocksDB-backed task/worker state stores.
 - Coordinator recovery planning for expired task leases.
@@ -76,6 +76,14 @@ Run a declarative pipeline with a simple transform chain:
 mvn -q -pl kuaia-engine exec:java \
   -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
   -Dexec.args="run -f examples/local-file-transform-to-console.yaml"
+```
+
+Run a declarative AI-ready vector pipeline:
+
+```bash
+mvn -q -pl kuaia-engine exec:java \
+  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
+  -Dexec.args="run -f examples/local-file-to-vector.yaml"
 ```
 
 Run the mock AI vector pipeline:

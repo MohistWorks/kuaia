@@ -268,6 +268,109 @@ class KuaiaCliTest {
     }
 
     @Test
+    void runExecutesDeclarativeAiVectorPipeline() throws Exception {
+        Path data = tempDir.resolve("documents.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta").getBytes(StandardCharsets.UTF_8));
+        Path config = writeAiVectorPipelineConfig("vector-documents", data, null, "content", "embedding");
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("[AI Sink] Row ID: 1, Vector Dim: 4, First Val: 5.0000"));
+        assertTrue(result.output.contains("[AI Sink] Row ID: 2, Vector Dim: 4, First Val: 4.0000"));
+    }
+
+    @Test
+    void runResumesCheckpointedAiVectorPipelineAfterCsvFailure() throws Exception {
+        Path data = tempDir.resolve("resume-vector.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta",
+                "3").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("resume-vector-state");
+        Path config = writeAiVectorPipelineConfig("resume-vector", data, stateDir, "content", "embedding");
+
+        CliResult first = run("run", "-f", config.toString());
+
+        assertEquals(1, first.exitCode);
+        assertTrue(first.output.contains("[AI Sink] Row ID: 1, Vector Dim: 4, First Val: 5.0000"));
+        assertTrue(first.output.contains("[AI Sink] Row ID: 2, Vector Dim: 4, First Val: 4.0000"));
+        assertTrue(first.output.contains("Invalid CSV row at line 4: expected 2 columns but found 1"));
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-resume-vector");
+            assertNotNull(record);
+            assertEquals(TaskState.RUNNING, record.getState());
+            assertEquals(2L, record.getLastCheckpointSeq());
+        }
+
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta",
+                "3,Gamma").getBytes(StandardCharsets.UTF_8));
+
+        CliResult second = run("run", "-f", config.toString());
+
+        assertEquals(0, second.exitCode);
+        assertFalse(second.output.contains("[AI Sink] Row ID: 1"));
+        assertFalse(second.output.contains("[AI Sink] Row ID: 2"));
+        assertTrue(second.output.contains("[AI Sink] Row ID: 3, Vector Dim: 4, First Val: 5.0000"));
+        assertTrue(second.output.contains("Pipeline Finished. rows=1"));
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-resume-vector");
+            assertNotNull(record);
+            assertEquals(TaskState.COMPLETED, record.getState());
+            assertEquals(3L, record.getLastCheckpointSeq());
+        }
+    }
+
+    @Test
+    void runReportsUnknownMockEmbeddingInputField() throws Exception {
+        Path data = tempDir.resolve("missing-embedding-input.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha").getBytes(StandardCharsets.UTF_8));
+        Path config = writeAiVectorPipelineConfig("missing-embedding-input", data, null, "missing", "embedding");
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unknown transform field: missing"));
+    }
+
+    @Test
+    void runReportsNonStringMockEmbeddingInputField() throws Exception {
+        Path data = tempDir.resolve("non-string-embedding-input.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha").getBytes(StandardCharsets.UTF_8));
+        Path config = writeAiVectorPipelineConfig("non-string-embedding-input", data, null, "id", "embedding");
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Transform field must be STRING: id"));
+    }
+
+    @Test
+    void runReportsDuplicateMockEmbeddingOutputField() throws Exception {
+        Path data = tempDir.resolve("duplicate-embedding-output.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha").getBytes(StandardCharsets.UTF_8));
+        Path config = writeAiVectorPipelineConfig("duplicate-embedding-output", data, null, "content", "content");
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Duplicate transform field: content"));
+    }
+
+    @Test
     void runRequiresConfigPath() throws Exception {
         CliResult result = run("run");
 
@@ -376,6 +479,39 @@ class KuaiaCliTest {
                 "    to: user_name",
                 "sink:",
                 "  type: console"));
+        if (stateDir != null) {
+            yaml.append("\n")
+                    .append("checkpoint:\n")
+                    .append("  stateDir: ")
+                    .append(stateDir);
+        }
+        Files.write(config, yaml.toString().getBytes(StandardCharsets.UTF_8));
+        return config;
+    }
+
+    private Path writeAiVectorPipelineConfig(
+            String name,
+            Path data,
+            Path stateDir,
+            String input,
+            String output) throws Exception {
+        Path config = tempDir.resolve(name + ".yaml");
+        StringBuilder yaml = new StringBuilder();
+        yaml.append(String.join("\n",
+                "name: " + name,
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: select",
+                "    fields: [id, content]",
+                "  - type: mock-embedding",
+                "    input: " + input,
+                "    output: " + output,
+                "    dimensions: 4",
+                "sink:",
+                "  type: mock-vector"));
         if (stateDir != null) {
             yaml.append("\n")
                     .append("checkpoint:\n")

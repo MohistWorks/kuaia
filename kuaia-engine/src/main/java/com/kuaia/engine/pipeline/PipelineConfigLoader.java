@@ -36,7 +36,7 @@ public class PipelineConfigLoader {
 
         requireSupported("source.type", sourceType, "file");
         requireSupported("source.format", sourceFormat, "csv");
-        requireSupported("sink.type", sinkType, "console");
+        requireSupported("sink.type", sinkType, "console", "mock-vector");
 
         String stateDir = checkpoint == null ? null : checkpoint.get("stateDir");
         return new PipelineConfig(
@@ -112,6 +112,15 @@ public class PipelineConfigLoader {
                         new ArrayList<>(),
                         require(transform, fieldPrefix + ".from"),
                         require(transform, fieldPrefix + ".to")));
+            } else if ("mock-embedding".equals(type)) {
+                configs.add(new PipelineConfig.TransformConfig(
+                        type,
+                        new ArrayList<>(),
+                        null,
+                        null,
+                        require(transform, fieldPrefix + ".input"),
+                        require(transform, fieldPrefix + ".output"),
+                        parseDimensions(transform.get("dimensions"))));
             } else {
                 throw new PipelineConfigException("Unsupported transform.type: " + type);
             }
@@ -167,8 +176,31 @@ public class PipelineConfigLoader {
         return value;
     }
 
-    private void requireSupported(String field, String value, String supported) throws PipelineConfigException {
-        if (!supported.equals(value)) {
+    private int parseDimensions(String value) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return 4;
+        }
+        try {
+            int dimensions = Integer.parseInt(value.trim());
+            if (dimensions <= 0) {
+                throw new PipelineConfigException("Invalid transform.dimensions: " + value);
+            }
+            return dimensions;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid transform.dimensions: " + value, e);
+        }
+    }
+
+    private void requireSupported(String field, String value, String... supported) throws PipelineConfigException {
+        for (String candidate : supported) {
+            if (candidate.equals(value)) {
+                return;
+            }
+        }
+        if (field.endsWith(".type")) {
+            throw new PipelineConfigException("Unsupported " + field + ": " + value);
+        }
+        if (!supported[0].equals(value)) {
             throw new PipelineConfigException("Unsupported " + field + ": " + value);
         }
     }
