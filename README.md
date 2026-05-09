@@ -65,6 +65,10 @@ mvn -q -pl kuaia-engine exec:java \
   -Dexec.args="run -f examples/local-file-to-console.yaml"
 ```
 
+When the YAML includes `checkpoint.stateDir`, Kuaia persists local progress after
+each successfully written CSV row. Re-running the same pipeline resumes after the
+last committed row instead of re-emitting completed rows.
+
 Run the mock AI vector pipeline:
 
 ```bash

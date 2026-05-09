@@ -1,5 +1,8 @@
 package com.kuaia.engine;
 
+import com.kuaia.common.model.TaskRecord;
+import com.kuaia.common.model.TaskState;
+import com.kuaia.engine.coordinator.state.RocksDbStateStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KuaiaCliTest {
@@ -67,13 +72,87 @@ class KuaiaCliTest {
 
     @Test
     void runExecutesDeclarativeLocalPipeline() throws Exception {
-        CliResult result = run("run", "-f", exampleConfigPath().toString());
+        Path data = tempDir.resolve("users.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2,Bob").getBytes(StandardCharsets.UTF_8));
+        Path config = writePipelineConfigWithoutCheckpoint("local-file-to-console", data);
+
+        CliResult result = run("run", "-f", config.toString());
 
         assertEquals(0, result.exitCode);
         assertTrue(result.output.contains("Starting pipeline: local-file-to-console"));
         assertTrue(result.output.contains("[Kuaia] Row: id=1, name=Alice"));
         assertTrue(result.output.contains("[Kuaia] Row: id=2, name=Bob"));
         assertTrue(result.output.contains("Pipeline Finished. rows=2"));
+    }
+
+    @Test
+    void runPersistsCheckpointWhenConfigured() throws Exception {
+        Path data = tempDir.resolve("checkpointed.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2,Bob").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("checkpoint-state");
+        Path config = writePipelineConfig("checkpointed", data, stateDir);
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Pipeline Finished. rows=2"));
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-checkpointed");
+            assertNotNull(record);
+            assertEquals(TaskState.COMPLETED, record.getState());
+            assertEquals(2L, record.getLastCheckpointSeq());
+        }
+    }
+
+    @Test
+    void runResumesFromCheckpointAfterCsvFailure() throws Exception {
+        Path data = tempDir.resolve("resume.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2,Bob",
+                "3").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("resume-state");
+        Path config = writePipelineConfig("resume", data, stateDir);
+
+        CliResult first = run("run", "-f", config.toString());
+
+        assertEquals(1, first.exitCode);
+        assertTrue(first.output.contains("[Kuaia] Row: id=1, name=Alice"));
+        assertTrue(first.output.contains("[Kuaia] Row: id=2, name=Bob"));
+        assertTrue(first.output.contains("Invalid CSV row at line 4: expected 2 columns but found 1"));
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-resume");
+            assertNotNull(record);
+            assertEquals(TaskState.RUNNING, record.getState());
+            assertEquals(2L, record.getLastCheckpointSeq());
+        }
+
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2,Bob",
+                "3,Carol").getBytes(StandardCharsets.UTF_8));
+
+        CliResult second = run("run", "-f", config.toString());
+
+        assertEquals(0, second.exitCode);
+        assertFalse(second.output.contains("[Kuaia] Row: id=1, name=Alice"));
+        assertFalse(second.output.contains("[Kuaia] Row: id=2, name=Bob"));
+        assertTrue(second.output.contains("[Kuaia] Row: id=3, name=Carol"));
+        assertTrue(second.output.contains("Pipeline Finished. rows=1"));
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-resume");
+            assertNotNull(record);
+            assertEquals(TaskState.COMPLETED, record.getState());
+            assertEquals(3L, record.getLastCheckpointSeq());
+        }
     }
 
     @Test
@@ -140,12 +219,32 @@ class KuaiaCliTest {
         return new CliResult(exitCode, bytes.toString(StandardCharsets.UTF_8.name()));
     }
 
-    private Path exampleConfigPath() {
-        Path rootPath = java.nio.file.Paths.get("examples/local-file-to-console.yaml");
-        if (Files.exists(rootPath)) {
-            return rootPath;
-        }
-        return java.nio.file.Paths.get("../examples/local-file-to-console.yaml").normalize();
+    private Path writePipelineConfig(String name, Path data, Path stateDir) throws Exception {
+        Path config = tempDir.resolve(name + ".yaml");
+        Files.write(config, String.join("\n",
+                "name: " + name,
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "sink:",
+                "  type: console",
+                "checkpoint:",
+                "  stateDir: " + stateDir).getBytes(StandardCharsets.UTF_8));
+        return config;
+    }
+
+    private Path writePipelineConfigWithoutCheckpoint(String name, Path data) throws Exception {
+        Path config = tempDir.resolve(name + ".yaml");
+        Files.write(config, String.join("\n",
+                "name: " + name,
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+        return config;
     }
 
     private static class CliResult {

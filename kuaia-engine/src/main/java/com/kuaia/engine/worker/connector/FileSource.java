@@ -16,6 +16,10 @@ public class FileSource {
     private KuaiaRowType rowType;
     private List<String> lines;
 
+    public interface RecordConsumer {
+        void accept(long seqId, BinaryRow row) throws Exception;
+    }
+
     public FileSource(Path path) {
         this.path = path;
     }
@@ -41,10 +45,19 @@ public class FileSource {
     }
 
     public int readAll(SinkWriter sink) throws Exception {
+        return readFrom(0L, (seqId, row) -> sink.write(row));
+    }
+
+    public int readFrom(long lastCheckpointSeq, RecordConsumer consumer) throws Exception {
         int count = 0;
+        long seqId = 0L;
         for (int i = 1; i < lines.size(); i++) {
             String line = lines.get(i);
             if (line.trim().isEmpty()) {
+                continue;
+            }
+            seqId++;
+            if (seqId <= lastCheckpointSeq) {
                 continue;
             }
             String[] values = split(line);
@@ -67,7 +80,7 @@ public class FileSource {
                     row.setString(field, values[field]);
                 }
             }
-            sink.write(row);
+            consumer.accept(seqId, row);
             count++;
         }
         return count;
