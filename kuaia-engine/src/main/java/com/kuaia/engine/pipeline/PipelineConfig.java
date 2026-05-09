@@ -96,6 +96,10 @@ public class PipelineConfig {
         private final String input;
         private final String output;
         private final int dimensions;
+        private final String provider;
+        private final String baseUrl;
+        private final String model;
+        private final String apiKeyEnv;
 
         public TransformConfig(String type, List<String> fields, String from, String to) {
             this(type, fields, from, to, null, null, 4);
@@ -109,6 +113,21 @@ public class PipelineConfig {
                 String input,
                 String output,
                 int dimensions) {
+            this(type, fields, from, to, input, output, dimensions, null, null, null, null);
+        }
+
+        public TransformConfig(
+                String type,
+                List<String> fields,
+                String from,
+                String to,
+                String input,
+                String output,
+                int dimensions,
+                String provider,
+                String baseUrl,
+                String model,
+                String apiKeyEnv) {
             this.type = type;
             this.fields = Collections.unmodifiableList(new ArrayList<>(fields));
             this.from = from;
@@ -116,6 +135,10 @@ public class PipelineConfig {
             this.input = input;
             this.output = output;
             this.dimensions = dimensions;
+            this.provider = provider;
+            this.baseUrl = baseUrl;
+            this.model = model;
+            this.apiKeyEnv = apiKeyEnv;
         }
 
         public String getType() {
@@ -144,6 +167,22 @@ public class PipelineConfig {
 
         public int getDimensions() {
             return dimensions;
+        }
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public String getModel() {
+            return model;
+        }
+
+        public String getApiKeyEnv() {
+            return apiKeyEnv;
         }
     }
 

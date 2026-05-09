@@ -70,6 +70,13 @@ public class TransformPipeline {
                     config.getDimensions(),
                     embeddingProviders.get("mock"));
         }
+        if ("embedding".equals(config.getType())) {
+            return new EmbeddingTransform(
+                    config.getInput(),
+                    config.getOutput(),
+                    config.getDimensions(),
+                    embeddingProviders.create(config));
+        }
         throw new PipelineExecutionException("Unsupported transform.type: " + config.getType());
     }
 }

@@ -1,5 +1,6 @@
 package com.kuaia.engine.pipeline.embedding;
 
+import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 
 import java.util.Collections;
@@ -25,5 +26,15 @@ public class EmbeddingProviderRegistry {
             throw new PipelineExecutionException("Unsupported embedding provider: " + name);
         }
         return provider;
+    }
+
+    public EmbeddingProvider create(PipelineConfig.TransformConfig config) throws PipelineExecutionException {
+        if ("openai-compatible".equals(config.getProvider())) {
+            return new OpenAICompatibleEmbeddingProvider(
+                    config.getBaseUrl(),
+                    config.getModel(),
+                    config.getApiKeyEnv());
+        }
+        return get(config.getProvider());
     }
 }

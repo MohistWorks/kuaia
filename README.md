@@ -11,7 +11,7 @@ Implemented today:
 - Local demo pipelines for structured rows and mock AI vector output.
 - Declarative local YAML pipelines with checkpointed `select`, `rename`, and `mock-embedding` transforms.
 - Declarative `console`, `file`, and `mock-vector` local sinks with CLI run summaries and basic bad-record counts.
-- Local mock embedding provider and mock vector sink registries for future extension.
+- Local mock embedding provider, OpenAI-compatible embedding provider, and mock vector sink registries for future extension.
 - Coordinator/Worker protocol models for task assignment, ack, checkpoint, backpressure, and attempt results.
 - In-memory and RocksDB-backed task/worker state stores.
 - Coordinator recovery planning for expired task leases.
@@ -21,7 +21,7 @@ Not implemented yet:
 
 - Production deployment packaging.
 - Real external connectors.
-- Real embedding providers or vector databases.
+- Vector database integrations.
 - Web UI, RBAC, audit, lineage, or Kubernetes operator support.
 - Exactly-once guarantees. The MVP target is at-least-once with idempotent sinks.
 
@@ -108,6 +108,13 @@ Run a declarative AI-ready vector pipeline:
 
 ```bash
 bin/kuaia run -f examples/local-file-to-vector.yaml
+```
+
+Run a declarative vector pipeline against an OpenAI-compatible embeddings API:
+
+```bash
+export OPENAI_API_KEY=...
+bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
 ```
 
 Run the mock AI vector pipeline:

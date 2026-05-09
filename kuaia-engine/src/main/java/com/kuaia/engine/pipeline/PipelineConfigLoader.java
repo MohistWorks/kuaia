@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 public class PipelineConfigLoader {
+    private static final String DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
+
     public PipelineConfig load(Path path) throws PipelineConfigException {
         if (!Files.exists(path)) {
             throw new PipelineConfigException("Pipeline config not found: " + path);
@@ -125,12 +127,61 @@ public class PipelineConfigLoader {
                         null,
                         require(transform, fieldPrefix + ".input"),
                         require(transform, fieldPrefix + ".output"),
-                        parseDimensions(transform.get("dimensions"))));
+                        parseDimensions(transform.get("dimensions"), 4),
+                        "mock",
+                        null,
+                        null,
+                        null));
+            } else if ("embedding".equals(type)) {
+                configs.add(loadEmbeddingTransform(transform, fieldPrefix));
             } else {
                 throw new PipelineConfigException("Unsupported transform.type: " + type);
             }
         }
         return configs;
+    }
+
+    private PipelineConfig.TransformConfig loadEmbeddingTransform(Map<String, String> transform, String fieldPrefix)
+            throws PipelineConfigException {
+        String provider = require(transform, fieldPrefix + ".provider");
+        requireSupported(fieldPrefix + ".provider", provider, "mock", "openai-compatible");
+
+        String input = require(transform, fieldPrefix + ".input");
+        String output = require(transform, fieldPrefix + ".output");
+        int defaultDimensions = "mock".equals(provider) ? 4 : 0;
+        int dimensions = parseDimensions(transform.get("dimensions"), defaultDimensions);
+
+        if ("mock".equals(provider)) {
+            return new PipelineConfig.TransformConfig(
+                    "embedding",
+                    new ArrayList<>(),
+                    null,
+                    null,
+                    input,
+                    output,
+                    dimensions,
+                    provider,
+                    null,
+                    null,
+                    null);
+        }
+
+        String baseUrl = transform.get("baseUrl");
+        if (baseUrl == null || baseUrl.trim().isEmpty()) {
+            baseUrl = DEFAULT_OPENAI_COMPATIBLE_BASE_URL;
+        }
+        return new PipelineConfig.TransformConfig(
+                "embedding",
+                new ArrayList<>(),
+                null,
+                null,
+                input,
+                output,
+                dimensions,
+                provider,
+                baseUrl,
+                require(transform, fieldPrefix + ".model"),
+                require(transform, fieldPrefix + ".apiKeyEnv"));
     }
 
     private PipelineConfig.SinkConfig loadSink(Path configPath, String sinkType, Map<String, String> sink)
@@ -214,8 +265,12 @@ public class PipelineConfigLoader {
     }
 
     private int parseDimensions(String value) throws PipelineConfigException {
+        return parseDimensions(value, 4);
+    }
+
+    private int parseDimensions(String value, int defaultDimensions) throws PipelineConfigException {
         if (value == null || value.trim().isEmpty()) {
-            return 4;
+            return defaultDimensions;
         }
         try {
             int dimensions = Integer.parseInt(value.trim());

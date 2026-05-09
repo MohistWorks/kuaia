@@ -121,9 +121,51 @@ vector[i] = inputText.length() + i
 ```
 
 Implementation note: `mock-embedding` is backed by Kuaia's local `mock`
-embedding provider. The provider registry is an internal extension point for
-future real embedding providers; this public YAML contract only exposes the
-documented mock behavior.
+embedding provider. It remains as a stable offline shortcut; new provider-backed
+flows should use the generic `embedding` transform.
+
+### embedding
+
+```yaml
+transforms:
+  - type: embedding
+    provider: openai-compatible
+    input: content
+    output: embedding
+    model: text-embedding-3-small
+    apiKeyEnv: OPENAI_API_KEY
+    baseUrl: https://api.openai.com/v1
+    dimensions: 1536
+```
+
+`embedding` appends a `VECTOR` field using a configured embedding provider.
+
+Supported providers:
+
+- `mock`: local deterministic provider, useful for offline tests. It follows the
+  same vector rule as `mock-embedding`.
+- `openai-compatible`: HTTP provider for APIs that implement the
+  OpenAI-compatible `POST /v1/embeddings` contract.
+
+Fields:
+
+- `provider`: required. Supported values are `mock` and `openai-compatible`.
+- `input`: required string field to embed.
+- `output`: required output vector field name.
+- `dimensions`: optional. For `mock`, defaults to `4`. For
+  `openai-compatible`, it is omitted from the HTTP request unless configured.
+
+Additional `openai-compatible` fields:
+
+- `model`: required model id, for example `text-embedding-3-small`.
+- `apiKeyEnv`: required environment variable name that contains the bearer token.
+- `baseUrl`: optional, defaults to `https://api.openai.com/v1`. Set it to the
+  `/v1` base URL of another OpenAI-compatible service when needed.
+
+Kuaia sends one embedding request per input row. The request body contains
+`input`, `model`, and `encoding_format: float`; when `dimensions` is configured,
+it is included as a positive integer. The API key is read at runtime from
+`apiKeyEnv` and is never stored in YAML.
 
 ## Sink
 
@@ -290,6 +332,13 @@ Run CSV through mock embedding to mock vector sink:
 bin/kuaia run -f examples/local-file-to-vector.yaml
 ```
 
+Run CSV through an OpenAI-compatible embedding provider:
+
+```bash
+export OPENAI_API_KEY=...
+bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
+```
+
 ## Error Messages
 
 Expected user errors return exit code `1` and print a deterministic message.
@@ -304,7 +353,11 @@ Common examples:
 - `Unsupported sink.mode: <value>`
 - `Unsupported errorPolicy.mode: <value>`
 - `Unsupported transform.type: <value>`
+- `Unsupported transforms[0].provider: <value>`
 - `Invalid transform.dimensions: <value>`
+- `Missing API key environment variable: <name>`
+- `Embedding request failed with status <code>: <response>`
+- `Embedding response did not contain an embedding vector`
 - `Unknown transform field: <field>`
 - `Duplicate transform field: <field>`
 - `Transform field must be STRING: <field>`
@@ -323,7 +376,7 @@ The current YAML contract does not support:
 - filters, joins, casts, or aggregations,
 - CDC offsets,
 - real external connectors,
-- real embedding providers,
 - real vector databases,
+- provider-specific SDK integrations,
 - production deployment settings,
 - exactly-once guarantees.

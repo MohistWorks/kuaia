@@ -412,6 +412,38 @@ class KuaiaCliTest {
     }
 
     @Test
+    void runExecutesGenericMockEmbeddingPipeline() throws Exception {
+        Path data = tempDir.resolve("generic-embedding-documents.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("generic-embedding-documents.yaml");
+        Files.write(config, String.join("\n",
+                "name: generic-embedding-documents",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: select",
+                "    fields: [id, content]",
+                "  - type: embedding",
+                "    provider: mock",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("[AI Sink] Row ID: 1, Vector Dim: 4, First Val: 5.0000"));
+        assertTrue(result.output.contains("[AI Sink] Row ID: 2, Vector Dim: 4, First Val: 4.0000"));
+    }
+
+    @Test
     void runResumesCheckpointedAiVectorPipelineAfterCsvFailure() throws Exception {
         Path data = tempDir.resolve("resume-vector.csv");
         Files.write(data, String.join("\n",

@@ -34,6 +34,139 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsOpenAICompatibleEmbeddingConfig() throws Exception {
+        Path configPath = tempDir.resolve("openai-compatible.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: openai-compatible",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: embedding",
+                "    provider: openai-compatible",
+                "    input: content",
+                "    output: embedding",
+                "    model: text-embedding-3-small",
+                "    apiKeyEnv: OPENAI_API_KEY",
+                "    baseUrl: https://api.openai.com/v1",
+                "    dimensions: 8",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig embedding = config.getTransforms().get(0);
+        assertEquals("embedding", embedding.getType());
+        assertEquals("openai-compatible", embedding.getProvider());
+        assertEquals("content", embedding.getInput());
+        assertEquals("embedding", embedding.getOutput());
+        assertEquals("text-embedding-3-small", embedding.getModel());
+        assertEquals("OPENAI_API_KEY", embedding.getApiKeyEnv());
+        assertEquals("https://api.openai.com/v1", embedding.getBaseUrl());
+        assertEquals(8, embedding.getDimensions());
+    }
+
+    @Test
+    void defaultsOpenAICompatibleEmbeddingBaseUrl() throws Exception {
+        Path configPath = tempDir.resolve("default-openai-compatible-base-url.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: default-openai-compatible-base-url",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: embedding",
+                "    provider: openai-compatible",
+                "    input: content",
+                "    output: embedding",
+                "    model: text-embedding-3-small",
+                "    apiKeyEnv: OPENAI_API_KEY",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("https://api.openai.com/v1", config.getTransforms().get(0).getBaseUrl());
+        assertEquals(0, config.getTransforms().get(0).getDimensions());
+    }
+
+    @Test
+    void rejectsMissingOpenAICompatibleEmbeddingModel() throws Exception {
+        Path configPath = tempDir.resolve("missing-openai-model.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-openai-model",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: embedding",
+                "    provider: openai-compatible",
+                "    input: content",
+                "    output: embedding",
+                "    apiKeyEnv: OPENAI_API_KEY",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].model", error.getMessage());
+    }
+
+    @Test
+    void rejectsMissingOpenAICompatibleEmbeddingApiKeyEnv() throws Exception {
+        Path configPath = tempDir.resolve("missing-openai-api-key-env.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-openai-api-key-env",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: embedding",
+                "    provider: openai-compatible",
+                "    input: content",
+                "    output: embedding",
+                "    model: text-embedding-3-small",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].apiKeyEnv", error.getMessage());
+    }
+
+    @Test
+    void rejectsUnsupportedEmbeddingProvider() throws Exception {
+        Path configPath = tempDir.resolve("unsupported-embedding-provider.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: unsupported-embedding-provider",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: embedding",
+                "    provider: missing",
+                "    input: content",
+                "    output: embedding",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Unsupported transforms[0].provider: missing", error.getMessage());
+    }
+
+    @Test
     void loadsFileSinkConfig() throws Exception {
         Path configPath = tempDir.resolve("file-sink.yaml");
         Files.write(configPath, String.join("\n",
