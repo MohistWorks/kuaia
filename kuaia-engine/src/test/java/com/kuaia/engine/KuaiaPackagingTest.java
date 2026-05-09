@@ -50,6 +50,19 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("docs/pipeline-yaml.md"));
     }
 
+    @Test
+    void ciWorkflowCoversOpenSourceSmokePaths() throws Exception {
+        Path root = repoRoot();
+        String workflow = read(root.resolve(".github/workflows/ci.yml"));
+
+        assertTrue(workflow.contains("workflow_dispatch:"), workflow);
+        assertTrue(workflow.contains("mvn -q test"), workflow);
+        assertTrue(workflow.contains("bin/kuaia help"), workflow);
+        assertTrue(workflow.contains("bin/kuaia run -f examples/local-file-to-file.yaml"), workflow);
+        assertTrue(workflow.contains("bin/kuaia run -f examples/local-file-skip-bad-records.yaml"), workflow);
+        assertTrue(workflow.contains("docker compose config"), workflow);
+    }
+
     private Path repoRoot() {
         Path cwd = Paths.get("").toAbsolutePath();
         if (Files.exists(cwd.resolve("pom.xml")) && Files.exists(cwd.resolve("kuaia-engine"))) {
