@@ -156,6 +156,118 @@ class KuaiaCliTest {
     }
 
     @Test
+    void runAppliesSelectAndRenameTransforms() throws Exception {
+        Path data = tempDir.resolve("users-transform.csv");
+        Files.write(data, String.join("\n",
+                "id,name,email",
+                "1,Alice,alice@example.test",
+                "2,Bob,bob@example.test").getBytes(StandardCharsets.UTF_8));
+        Path config = writeTransformPipelineConfig("transform-users", data, null);
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("[Kuaia] Row: id=1, user_name=Alice"));
+        assertTrue(result.output.contains("[Kuaia] Row: id=2, user_name=Bob"));
+        assertFalse(result.output.contains("email="));
+    }
+
+    @Test
+    void runReportsUnsupportedTransformType() throws Exception {
+        Path data = tempDir.resolve("unsupported-transform.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("unsupported-transform.yaml");
+        Files.write(config, String.join("\n",
+                "name: unsupported-transform",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: missing",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unsupported transform.type: missing"));
+    }
+
+    @Test
+    void runReportsUnknownSelectedTransformField() throws Exception {
+        Path data = tempDir.resolve("unknown-transform-field.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("unknown-transform-field.yaml");
+        Files.write(config, String.join("\n",
+                "name: unknown-transform-field",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: select",
+                "    fields: [id, missing]",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unknown transform field: missing"));
+    }
+
+    @Test
+    void runResumesCheckpointedTransformPipelineAfterCsvFailure() throws Exception {
+        Path data = tempDir.resolve("resume-transform.csv");
+        Files.write(data, String.join("\n",
+                "id,name,email",
+                "1,Alice,alice@example.test",
+                "2,Bob,bob@example.test",
+                "3,Carol").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("resume-transform-state");
+        Path config = writeTransformPipelineConfig("resume-transform", data, stateDir);
+
+        CliResult first = run("run", "-f", config.toString());
+
+        assertEquals(1, first.exitCode);
+        assertTrue(first.output.contains("[Kuaia] Row: id=1, user_name=Alice"));
+        assertTrue(first.output.contains("[Kuaia] Row: id=2, user_name=Bob"));
+        assertTrue(first.output.contains("Invalid CSV row at line 4: expected 3 columns but found 2"));
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-resume-transform");
+            assertNotNull(record);
+            assertEquals(TaskState.RUNNING, record.getState());
+            assertEquals(2L, record.getLastCheckpointSeq());
+        }
+
+        Files.write(data, String.join("\n",
+                "id,name,email",
+                "1,Alice,alice@example.test",
+                "2,Bob,bob@example.test",
+                "3,Carol,carol@example.test").getBytes(StandardCharsets.UTF_8));
+
+        CliResult second = run("run", "-f", config.toString());
+
+        assertEquals(0, second.exitCode);
+        assertFalse(second.output.contains("[Kuaia] Row: id=1, user_name=Alice"));
+        assertFalse(second.output.contains("[Kuaia] Row: id=2, user_name=Bob"));
+        assertTrue(second.output.contains("[Kuaia] Row: id=3, user_name=Carol"));
+        assertFalse(second.output.contains("email="));
+        assertTrue(second.output.contains("Pipeline Finished. rows=1"));
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-resume-transform");
+            assertNotNull(record);
+            assertEquals(TaskState.COMPLETED, record.getState());
+            assertEquals(3L, record.getLastCheckpointSeq());
+        }
+    }
+
+    @Test
     void runRequiresConfigPath() throws Exception {
         CliResult result = run("run");
 
@@ -244,6 +356,33 @@ class KuaiaCliTest {
                 "  format: csv",
                 "sink:",
                 "  type: console").getBytes(StandardCharsets.UTF_8));
+        return config;
+    }
+
+    private Path writeTransformPipelineConfig(String name, Path data, Path stateDir) throws Exception {
+        Path config = tempDir.resolve(name + ".yaml");
+        StringBuilder yaml = new StringBuilder();
+        yaml.append(String.join("\n",
+                "name: " + name,
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: select",
+                "    fields: [id, name]",
+                "  - type: rename",
+                "    from: name",
+                "    to: user_name",
+                "sink:",
+                "  type: console"));
+        if (stateDir != null) {
+            yaml.append("\n")
+                    .append("checkpoint:\n")
+                    .append("  stateDir: ")
+                    .append(stateDir);
+        }
+        Files.write(config, yaml.toString().getBytes(StandardCharsets.UTF_8));
         return config;
     }
 

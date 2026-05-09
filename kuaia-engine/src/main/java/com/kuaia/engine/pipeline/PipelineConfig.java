@@ -1,14 +1,29 @@
 package com.kuaia.engine.pipeline;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class PipelineConfig {
     private final String name;
     private final SourceConfig source;
+    private final List<TransformConfig> transforms;
     private final SinkConfig sink;
     private final CheckpointConfig checkpoint;
 
     public PipelineConfig(String name, SourceConfig source, SinkConfig sink, CheckpointConfig checkpoint) {
+        this(name, source, Collections.emptyList(), sink, checkpoint);
+    }
+
+    public PipelineConfig(
+            String name,
+            SourceConfig source,
+            List<TransformConfig> transforms,
+            SinkConfig sink,
+            CheckpointConfig checkpoint) {
         this.name = name;
         this.source = source;
+        this.transforms = Collections.unmodifiableList(new ArrayList<>(transforms));
         this.sink = sink;
         this.checkpoint = checkpoint;
     }
@@ -19,6 +34,10 @@ public class PipelineConfig {
 
     public SourceConfig getSource() {
         return source;
+    }
+
+    public List<TransformConfig> getTransforms() {
+        return transforms;
     }
 
     public SinkConfig getSink() {
@@ -50,6 +69,36 @@ public class PipelineConfig {
 
         public String getFormat() {
             return format;
+        }
+    }
+
+    public static class TransformConfig {
+        private final String type;
+        private final List<String> fields;
+        private final String from;
+        private final String to;
+
+        public TransformConfig(String type, List<String> fields, String from, String to) {
+            this.type = type;
+            this.fields = Collections.unmodifiableList(new ArrayList<>(fields));
+            this.from = from;
+            this.to = to;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public List<String> getFields() {
+            return fields;
+        }
+
+        public String getFrom() {
+            return from;
+        }
+
+        public String getTo() {
+            return to;
         }
     }
 

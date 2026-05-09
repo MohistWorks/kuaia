@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,8 +17,9 @@ public class PipelineConfigLoader {
 
         Map<String, String> topLevel = new HashMap<>();
         Map<String, Map<String, String>> sections = new HashMap<>();
+        List<Map<String, String>> transforms = new ArrayList<>();
         try {
-            parse(Files.readAllLines(path, StandardCharsets.UTF_8), topLevel, sections);
+            parse(Files.readAllLines(path, StandardCharsets.UTF_8), topLevel, sections, transforms);
         } catch (IOException e) {
             throw new PipelineConfigException("Failed to read pipeline config: " + path, e);
         }
@@ -40,6 +42,7 @@ public class PipelineConfigLoader {
         return new PipelineConfig(
                 name,
                 new PipelineConfig.SourceConfig(sourceType, sourcePath, sourceFormat),
+                loadTransforms(transforms),
                 new PipelineConfig.SinkConfig(sinkType),
                 new PipelineConfig.CheckpointConfig(stateDir));
     }
@@ -47,8 +50,10 @@ public class PipelineConfigLoader {
     private void parse(
             List<String> lines,
             Map<String, String> topLevel,
-            Map<String, Map<String, String>> sections) {
+            Map<String, Map<String, String>> sections,
+            List<Map<String, String>> transforms) {
         String currentSection = null;
+        Map<String, String> currentTransform = null;
         for (String rawLine : lines) {
             if (rawLine.trim().isEmpty() || rawLine.trim().startsWith("#")) {
                 continue;
@@ -57,10 +62,29 @@ public class PipelineConfigLoader {
                 String[] entry = splitKeyValue(rawLine.trim());
                 if (entry[1].isEmpty()) {
                     currentSection = entry[0];
-                    sections.put(currentSection, new HashMap<>());
+                    currentTransform = null;
+                    if (!"transforms".equals(currentSection)) {
+                        sections.put(currentSection, new HashMap<>());
+                    }
                 } else {
                     currentSection = null;
+                    currentTransform = null;
                     topLevel.put(entry[0], stripQuotes(entry[1]));
+                }
+                continue;
+            }
+
+            if ("transforms".equals(currentSection)) {
+                if (rawLine.startsWith("  - ")) {
+                    currentTransform = new HashMap<>();
+                    transforms.add(currentTransform);
+                    String[] entry = splitKeyValue(rawLine.substring(4).trim());
+                    if (!entry[0].isEmpty()) {
+                        currentTransform.put(entry[0], stripQuotes(entry[1]));
+                    }
+                } else if (currentTransform != null && rawLine.startsWith("    ")) {
+                    String[] entry = splitKeyValue(rawLine.trim());
+                    currentTransform.put(entry[0], stripQuotes(entry[1]));
                 }
                 continue;
             }
@@ -70,6 +94,49 @@ public class PipelineConfigLoader {
                 sections.get(currentSection).put(entry[0], stripQuotes(entry[1]));
             }
         }
+    }
+
+    private List<PipelineConfig.TransformConfig> loadTransforms(List<Map<String, String>> transforms)
+            throws PipelineConfigException {
+        List<PipelineConfig.TransformConfig> configs = new ArrayList<>();
+        for (int i = 0; i < transforms.size(); i++) {
+            Map<String, String> transform = transforms.get(i);
+            String fieldPrefix = "transforms[" + i + "]";
+            String type = require(transform, fieldPrefix + ".type");
+            if ("select".equals(type)) {
+                List<String> fields = parseInlineList(require(transform, fieldPrefix + ".fields"), fieldPrefix + ".fields");
+                configs.add(new PipelineConfig.TransformConfig(type, fields, null, null));
+            } else if ("rename".equals(type)) {
+                configs.add(new PipelineConfig.TransformConfig(
+                        type,
+                        new ArrayList<>(),
+                        require(transform, fieldPrefix + ".from"),
+                        require(transform, fieldPrefix + ".to")));
+            } else {
+                throw new PipelineConfigException("Unsupported transform.type: " + type);
+            }
+        }
+        return configs;
+    }
+
+    private List<String> parseInlineList(String value, String field) throws PipelineConfigException {
+        String trimmed = value.trim();
+        if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
+            throw new PipelineConfigException("Missing required field: " + field);
+        }
+        String body = trimmed.substring(1, trimmed.length() - 1).trim();
+        if (body.isEmpty()) {
+            throw new PipelineConfigException("Missing required field: " + field);
+        }
+        List<String> values = new ArrayList<>();
+        for (String rawItem : body.split(",")) {
+            String item = stripQuotes(rawItem.trim());
+            if (item.isEmpty()) {
+                throw new PipelineConfigException("Missing required field: " + field);
+            }
+            values.add(item);
+        }
+        return values;
     }
 
     private String[] splitKeyValue(String line) {

@@ -6,6 +6,7 @@ import com.kuaia.engine.pipeline.LocalPipelineCheckpointStore;
 import com.kuaia.engine.worker.connector.ConsoleSink;
 import com.kuaia.engine.worker.connector.FakeSource;
 import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.FileSource;
 
 import java.io.PrintStream;
@@ -43,53 +44,65 @@ public class LocalPipelineRunner {
     private int runWithoutCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
         FileSource source = new FileSource(Paths.get(config.getSource().getPath()));
         source.open();
-        ConsoleSink sink = new ConsoleSink(source.getRowType(), out);
-        sink.open();
+        ConsoleSink sink = null;
         try {
+            TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
+            sink = new ConsoleSink(transforms.getOutputType(), out);
+            sink.open();
             out.println("Starting pipeline: " + config.getName());
-            int rows = source.readAll(sink);
+            ConsoleSink openedSink = sink;
+            int rows = source.readFrom(0L, (seqId, row) -> openedSink.write(transforms.apply(row)));
             out.println("Pipeline Finished. rows=" + rows);
             return rows;
         } finally {
             source.close();
-            sink.close();
+            if (sink != null) {
+                sink.close();
+            }
         }
     }
 
     private int runWithCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
         FileSource source = new FileSource(Paths.get(config.getSource().getPath()));
         source.open();
-        ConsoleSink sink = new ConsoleSink(source.getRowType(), out);
-        sink.open();
-        try (LocalPipelineCheckpointStore checkpointStore = new LocalPipelineCheckpointStore(
-                Paths.get(config.getCheckpoint().getStateDir()),
-                config.getName())) {
+        ConsoleSink sink = null;
+        try {
+            TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
+            sink = new ConsoleSink(transforms.getOutputType(), out);
+            sink.open();
             out.println("Starting pipeline: " + config.getName());
-            TaskRecord task = checkpointStore.startOrResume();
-            if (task.getState() == TaskState.COMPLETED) {
-                out.println("Pipeline Finished. rows=0 checkpoint="
-                        + task.getLastCheckpointSeq()
-                        + " state="
-                        + task.getState());
-                return 0;
-            }
+            ConsoleSink openedSink = sink;
+            try (LocalPipelineCheckpointStore checkpointStore = new LocalPipelineCheckpointStore(
+                    Paths.get(config.getCheckpoint().getStateDir()),
+                    config.getName())) {
+                TaskRecord task = checkpointStore.startOrResume();
+                if (task.getState() == TaskState.COMPLETED) {
+                    out.println("Pipeline Finished. rows=0 checkpoint="
+                            + task.getLastCheckpointSeq()
+                            + " state="
+                            + task.getState());
+                    return 0;
+                }
 
-            final TaskRecord[] taskRef = new TaskRecord[]{task};
-            int rows = source.readFrom(task.getLastCheckpointSeq(), (seqId, row) -> {
-                sink.write(row);
-                taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
-            });
-            TaskRecord completed = checkpointStore.complete(taskRef[0]);
-            out.println("Pipeline Finished. rows="
-                    + rows
-                    + " checkpoint="
-                    + completed.getLastCheckpointSeq()
-                    + " state="
-                    + completed.getState());
-            return rows;
+                final TaskRecord[] taskRef = new TaskRecord[]{task};
+                int rows = source.readFrom(task.getLastCheckpointSeq(), (seqId, row) -> {
+                    openedSink.write(transforms.apply(row));
+                    taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
+                });
+                TaskRecord completed = checkpointStore.complete(taskRef[0]);
+                out.println("Pipeline Finished. rows="
+                        + rows
+                        + " checkpoint="
+                        + completed.getLastCheckpointSeq()
+                        + " state="
+                        + completed.getState());
+                return rows;
+            }
         } finally {
             source.close();
-            sink.close();
+            if (sink != null) {
+                sink.close();
+            }
         }
     }
 
