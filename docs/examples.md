@@ -1,0 +1,168 @@
+# Examples
+
+These examples are small local pipelines for the public MVP contract. Run them
+from the repository root with `bin/kuaia`. For the current product boundary,
+read [`product-scope.md`](product-scope.md) first.
+
+## Recommended MVP Path
+
+Run the no-service smoke check first:
+
+```bash
+bin/kuaia examples
+make public-mvp-smoke
+```
+
+It validates three public MVP paths in an isolated `.kuaia/public-mvp-smoke`
+work directory:
+
+- CSV source through `select` and `rename` transforms into a local CSV file,
+- CSV source through `mock-embedding` into the mock vector sink,
+- malformed CSV handling with `errorPolicy.mode: skip-bad-records`.
+
+After that, run individual examples below when you want to inspect one pipeline
+at a time. Qdrant, Postgres, and OpenAI-compatible examples require external
+services or credentials and are not part of the default smoke.
+
+## Local File To Console
+
+```bash
+bin/kuaia run -f examples/local-file-to-console.yaml
+```
+
+Reads `examples/data/users.csv` and prints each row to stdout. This is the
+smallest source-to-sink smoke test.
+
+## Local Transform To Console
+
+```bash
+bin/kuaia run -f examples/local-file-transform-to-console.yaml
+```
+
+Reads the same CSV input, applies the documented `select` and `rename`
+transforms, and prints transformed rows.
+
+## Local File To File
+
+```bash
+bin/kuaia run -f examples/local-file-to-file.yaml
+cat .kuaia/output/local-file-to-file.csv
+```
+
+Writes a deterministic CSV file:
+
+```text
+id,name
+1,Alice
+2,Bob
+```
+
+This is the default Docker quickstart example because the output is easy to
+inspect.
+
+## Skip Bad Records
+
+```bash
+bin/kuaia run -f examples/local-file-skip-bad-records.yaml
+```
+
+Reads `examples/data/users-with-bad-row.csv` with
+`errorPolicy.mode: skip-bad-records`. Malformed rows are reported, counted as
+failed records in the run summary, and consumed by the checkpoint so reruns do
+not process the same bad records again.
+
+## Mock Vector Pipeline
+
+```bash
+bin/kuaia run -f examples/local-file-to-vector.yaml
+```
+
+Reads `examples/data/documents.csv`, creates a deterministic local embedding
+with `mock-embedding`, and prints mock vector sink summaries. It does not call an
+external model or vector database.
+
+## OpenAI-Compatible Embedding Pipeline
+
+```bash
+export OPENAI_API_KEY=...
+bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
+```
+
+Reads `examples/data/documents.csv`, calls an OpenAI-compatible embeddings API,
+and writes the resulting vectors to the mock vector sink. The example requires a
+real API key in `OPENAI_API_KEY`; it is not part of the default automated smoke
+tests.
+
+## Qdrant Vector Sink
+
+Start Qdrant:
+
+```bash
+docker compose -f docker-compose.qdrant.yml up -d
+```
+
+Create the example collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Run the local file-to-Qdrant pipeline:
+
+```bash
+bin/kuaia run -f examples/local-file-to-qdrant.yaml
+```
+
+The example reads `examples/data/documents.csv`, creates deterministic mock
+embeddings, and upserts points into Qdrant collection `kuaia_docs`. It is not
+part of default automated tests because it requires a running Qdrant service.
+
+## Postgres To Qdrant
+
+Start Postgres and Qdrant:
+
+```bash
+docker compose -f docker-compose.postgres.yml -f docker-compose.qdrant.yml up -d
+```
+
+Create the example Qdrant collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_pg_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Run the batch Postgres-to-Qdrant pipeline:
+
+```bash
+export KUAIA_POSTGRES_USER=kuaia
+export KUAIA_POSTGRES_PASSWORD=kuaia
+bin/kuaia run -f examples/postgres-to-qdrant.yaml
+```
+
+The example reads rows from the `documents` table initialized by
+`examples/postgres/init/01-documents.sql`, creates deterministic mock
+embeddings, and upserts points into Qdrant collection `kuaia_pg_docs`. It is not
+part of default automated tests because it requires running Postgres and Qdrant
+services.
+
+## Docker Quickstart
+
+```bash
+docker compose up --build
+```
+
+Compose builds the packaged runtime and runs `examples/local-file-to-file.yaml`
+inside the container. The pipeline writes `.kuaia/output/local-file-to-file.csv`
+inside `/opt/kuaia`, backed by the `kuaia-state` volume.
+
+## Cleanup
+
+Local runs may create `.kuaia/` state and output directories:
+
+```bash
+make clean-state
+```

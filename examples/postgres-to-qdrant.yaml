@@ -1,0 +1,23 @@
+name: postgres-to-qdrant
+source:
+  type: postgres
+  url: jdbc:postgresql://localhost:5432/kuaia
+  userEnv: KUAIA_POSTGRES_USER
+  passwordEnv: KUAIA_POSTGRES_PASSWORD
+  query: select id, content from documents order by id
+  fetchSize: 1000
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+sink:
+  type: qdrant
+  url: http://localhost:6333
+  collection: kuaia_pg_docs
+  idField: id
+  vectorField: embedding
+  wait: true
+  timeoutMs: 30000
+checkpoint:
+  stateDir: .kuaia/state/postgres-to-qdrant

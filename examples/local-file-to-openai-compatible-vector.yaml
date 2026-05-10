@@ -1,0 +1,18 @@
+name: local-file-to-openai-compatible-vector
+source:
+  type: file
+  path: data/documents.csv
+  format: csv
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: embedding
+    provider: openai-compatible
+    input: content
+    output: embedding
+    model: text-embedding-3-small
+    apiKeyEnv: OPENAI_API_KEY
+    timeoutMs: 30000
+    batchSize: 32
+sink:
+  type: mock-vector

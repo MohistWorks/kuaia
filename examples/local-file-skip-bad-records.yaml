@@ -1,0 +1,11 @@
+name: local-file-skip-bad-records
+source:
+  type: file
+  path: data/users-with-bad-row.csv
+  format: csv
+sink:
+  type: console
+errorPolicy:
+  mode: skip-bad-records
+checkpoint:
+  stateDir: .kuaia/state/local-file-skip-bad-records

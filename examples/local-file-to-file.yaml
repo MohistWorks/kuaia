@@ -1,0 +1,10 @@
+name: local-file-to-file
+source:
+  type: file
+  path: data/users.csv
+  format: csv
+sink:
+  type: file
+  path: ../.kuaia/output/local-file-to-file.csv
+  format: csv
+  mode: overwrite

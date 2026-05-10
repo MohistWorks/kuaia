@@ -1,0 +1,15 @@
+name: local-file-transform-to-console
+source:
+  type: file
+  path: data/users.csv
+  format: csv
+transforms:
+  - type: select
+    fields: [id, name]
+  - type: rename
+    from: name
+    to: user_name
+sink:
+  type: console
+checkpoint:
+  stateDir: .kuaia/state/local-file-transform-to-console

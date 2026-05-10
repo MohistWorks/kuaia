@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: kuaia
+      POSTGRES_USER: kuaia
+      POSTGRES_PASSWORD: kuaia
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./examples/postgres/init:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:

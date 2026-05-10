@@ -6,11 +6,18 @@ import java.io.File;
 
 public class RocksDBBuffer {
     private RocksDB db;
+    private Options options;
 
     public void open(String path) throws Exception {
         RocksDB.loadLibrary();
-        Options options = new Options().setCreateIfMissing(true);
-        db = RocksDB.open(options, path);
+        Options newOptions = new Options().setCreateIfMissing(true);
+        try {
+            db = RocksDB.open(newOptions, path);
+            options = newOptions;
+        } catch (Exception e) {
+            newOptions.close();
+            throw e;
+        }
     }
 
     public void put(long seqId, byte[] data) throws Exception {
@@ -22,6 +29,35 @@ public class RocksDBBuffer {
     }
 
     public void close() {
-        if (db != null) db.close();
+        RuntimeException failure = null;
+        if (db != null) {
+            try {
+                db.close();
+            } catch (RuntimeException e) {
+                failure = e;
+            } finally {
+                db = null;
+            }
+        }
+        if (options != null) {
+            try {
+                options.close();
+            } catch (RuntimeException e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            } finally {
+                options = null;
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    boolean isOptionsOwningHandleForTesting() {
+        return options != null && options.isOwningHandle();
     }
 }

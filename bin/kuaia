@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+MAVEN_BIN=${MAVEN_BIN:-mvn}
+JAR_PATH=${KUAIA_JAR:-"$ROOT_DIR/kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar"}
+
+cd "$ROOT_DIR"
+if [ -f "$JAR_PATH" ]; then
+  exec java -jar "$JAR_PATH" "$@"
+fi
+
+"$MAVEN_BIN" -q -N -DskipTests install
+"$MAVEN_BIN" -q -pl kuaia-common -DskipTests install
+exec "$MAVEN_BIN" -q -pl kuaia-engine exec:java \
+  -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
+  -Dexec.args="$*"
