@@ -8,6 +8,7 @@ import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.coordinator.state.RocksDbStateStore;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
+import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import com.kuaia.engine.worker.connector.VectorSinkFactory;
 import org.junit.jupiter.api.Test;
@@ -110,6 +111,57 @@ class LocalPipelineRunnerTest {
             assertEquals(3L, record.getLastCheckpointSeq());
             assertEquals(5L, record.getVersion());
         }
+    }
+
+    @Test
+    void processesFileSourceAcrossMultipleInternalSplits() throws Exception {
+        Path data = tempDir.resolve("split-documents.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta",
+                "3,Gamma",
+                "4,Delta",
+                "5,Epsilon").getBytes(StandardCharsets.UTF_8));
+        Path configPath = tempDir.resolve("split-vector.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: split-vector",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "    batchSize: 10",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+        CapturingSink sink = new CapturingSink();
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+        SinkFactoryRegistry registry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        new LocalPipelineRunner(registry, EmbeddingProviderRegistry.defaultRegistry(), 2)
+                .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(0, sink.singleWrites);
+        assertEquals(java.util.Arrays.asList(2, 2, 1), sink.batchSizes);
+    }
+
+    @Test
+    void rejectsNonPositiveFileRowsPerSplit() {
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> new LocalPipelineRunner(
+                        SinkFactoryRegistry.defaultRegistry(),
+                        EmbeddingProviderRegistry.defaultRegistry(),
+                        0));
+
+        assertEquals("fileRowsPerSplit must be greater than zero", error.getMessage());
     }
 
     @Test

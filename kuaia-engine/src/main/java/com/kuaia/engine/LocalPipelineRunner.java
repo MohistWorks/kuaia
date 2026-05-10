@@ -37,6 +37,7 @@ public class LocalPipelineRunner {
 
     private final SinkFactoryRegistry sinkFactories;
     private final EmbeddingProviderRegistry embeddingProviders;
+    private final int fileRowsPerSplit;
 
     public LocalPipelineRunner() {
         this(SinkFactoryRegistry.defaultRegistry());
@@ -47,8 +48,19 @@ public class LocalPipelineRunner {
     }
 
     public LocalPipelineRunner(SinkFactoryRegistry sinkFactories, EmbeddingProviderRegistry embeddingProviders) {
+        this(sinkFactories, embeddingProviders, DEFAULT_FILE_ROWS_PER_SPLIT);
+    }
+
+    LocalPipelineRunner(
+            SinkFactoryRegistry sinkFactories,
+            EmbeddingProviderRegistry embeddingProviders,
+            int fileRowsPerSplit) {
+        if (fileRowsPerSplit <= 0) {
+            throw new IllegalArgumentException("fileRowsPerSplit must be greater than zero");
+        }
         this.sinkFactories = sinkFactories;
         this.embeddingProviders = embeddingProviders;
+        this.fileRowsPerSplit = fileRowsPerSplit;
     }
 
     public int run(PrintStream out) throws Exception {
@@ -230,7 +242,7 @@ public class LocalPipelineRunner {
             return new FileSourceAdapter(
                     new FileSource(Paths.get(config.getSource().getPath())),
                     "file-0",
-                    DEFAULT_FILE_ROWS_PER_SPLIT);
+                    fileRowsPerSplit);
         }
         if ("postgres".equals(sourceType)) {
             return new LocalSourceAdapter(new PostgresSource(config.getSource()), "postgres-0");
