@@ -60,6 +60,7 @@ Not implemented yet:
 
 ```bash
 bin/kuaia help
+bin/kuaia examples
 bin/kuaia run -f examples/local-file-to-file.yaml
 cat .kuaia/output/local-file-to-file.csv
 ```
@@ -119,6 +120,7 @@ Use the short wrapper:
 
 ```bash
 bin/kuaia help
+bin/kuaia examples
 ```
 
 Run the local row pipeline:

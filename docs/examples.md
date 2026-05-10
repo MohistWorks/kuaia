@@ -9,6 +9,7 @@ read [`product-scope.md`](product-scope.md) first.
 Run the no-service smoke check first:
 
 ```bash
+bin/kuaia examples
 make public-mvp-smoke
 ```
 

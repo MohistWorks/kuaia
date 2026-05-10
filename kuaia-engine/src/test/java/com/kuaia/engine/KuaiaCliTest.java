@@ -31,9 +31,27 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("local-demo"));
         assertTrue(result.output.contains("ai-demo"));
         assertTrue(result.output.contains("recover-demo"));
+        assertTrue(result.output.contains("examples"));
         assertTrue(result.output.contains("Examples:"));
         assertTrue(result.output.contains("kuaia run -f examples/local-file-to-file.yaml"));
         assertTrue(result.output.contains("kuaia run -f examples/local-file-to-vector.yaml"));
+    }
+
+    @Test
+    void examplesPrintsRecommendedPublicMvpPaths() throws Exception {
+        CliResult result = run("examples");
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Recommended no-service smoke:"));
+        assertTrue(result.output.contains("make public-mvp-smoke"));
+        assertTrue(result.output.contains("No external services:"));
+        assertTrue(result.output.contains("examples/local-file-to-file.yaml"));
+        assertTrue(result.output.contains("examples/local-file-to-vector.yaml"));
+        assertTrue(result.output.contains("examples/local-file-skip-bad-records.yaml"));
+        assertTrue(result.output.contains("External service examples:"));
+        assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));
+        assertTrue(result.output.contains("examples/local-file-to-qdrant.yaml"));
+        assertTrue(result.output.contains("examples/postgres-to-qdrant.yaml"));
     }
 
     @Test
