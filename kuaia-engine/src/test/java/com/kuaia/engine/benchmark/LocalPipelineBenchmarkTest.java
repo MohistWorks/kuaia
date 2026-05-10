@@ -85,7 +85,9 @@ class LocalPipelineBenchmarkTest {
                     sink.batchWrites,
                     sink.rowsWritten,
                     checkpointUpdates,
-                    summary.getRowsWritten());
+                    summary.getRowsWritten(),
+                    summary.getSourceSplits(),
+                    summary.getSinkBatches());
             results.add(result);
 
             assertEquals(TaskState.COMPLETED, record.getState());
@@ -97,14 +99,18 @@ class LocalPipelineBenchmarkTest {
             assertEquals(rowCount, sink.rowsWritten);
             assertEquals(expectedBatches, checkpointUpdates);
             assertEquals(rowCount, summary.getRowsWritten());
+            assertEquals(1L, summary.getSourceSplits());
+            assertEquals(expectedBatches, summary.getSinkBatches());
             assertTrue(result.rowsPerSecond() > 0.0d);
         }
 
         Path output = Paths.get("target", "kuaia-benchmark", "local-pipeline-batch.json");
         writeResults(output, results);
         assertTrue(Files.exists(output));
-        assertTrue(new String(Files.readAllBytes(output), StandardCharsets.UTF_8)
-                .contains("\"batchSize\":32"));
+        String json = new String(Files.readAllBytes(output), StandardCharsets.UTF_8);
+        assertTrue(json.contains("\"batchSize\":32"));
+        assertTrue(json.contains("\"sourceSplits\":1"));
+        assertTrue(json.contains("\"sinkBatches\":4"));
     }
 
     private PipelineConfig benchmarkConfig(Path data, Path stateDir, int batchSize) {
@@ -221,6 +227,8 @@ class LocalPipelineBenchmarkTest {
         private final int rowsWritten;
         private final long checkpointUpdates;
         private final long summaryRowsWritten;
+        private final long sourceSplits;
+        private final long sinkBatches;
 
         private BenchmarkResult(
                 int rowCount,
@@ -232,7 +240,9 @@ class LocalPipelineBenchmarkTest {
                 int sinkBatchWrites,
                 int rowsWritten,
                 long checkpointUpdates,
-                long summaryRowsWritten) {
+                long summaryRowsWritten,
+                long sourceSplits,
+                long sinkBatches) {
             this.rowCount = rowCount;
             this.batchSize = batchSize;
             this.elapsedNanos = elapsedNanos;
@@ -243,6 +253,8 @@ class LocalPipelineBenchmarkTest {
             this.rowsWritten = rowsWritten;
             this.checkpointUpdates = checkpointUpdates;
             this.summaryRowsWritten = summaryRowsWritten;
+            this.sourceSplits = sourceSplits;
+            this.sinkBatches = sinkBatches;
         }
 
         private double rowsPerSecond() {
@@ -255,7 +267,8 @@ class LocalPipelineBenchmarkTest {
                             + "\"rowsPerSecond\":%.3f,\"embeddingBatchCalls\":%d,"
                             + "\"embeddingSingleCalls\":%d,\"rowsEmbedded\":%d,"
                             + "\"sinkBatchWrites\":%d,\"rowsWritten\":%d,"
-                            + "\"checkpointUpdates\":%d,\"summaryRowsWritten\":%d}",
+                            + "\"checkpointUpdates\":%d,\"summaryRowsWritten\":%d,"
+                            + "\"sourceSplits\":%d,\"sinkBatches\":%d}",
                     rowCount,
                     batchSize,
                     elapsedNanos / 1_000_000.0d,
@@ -266,7 +279,9 @@ class LocalPipelineBenchmarkTest {
                     sinkBatchWrites,
                     rowsWritten,
                     checkpointUpdates,
-                    summaryRowsWritten);
+                    summaryRowsWritten,
+                    sourceSplits,
+                    sinkBatches);
         }
     }
 }

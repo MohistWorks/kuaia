@@ -470,6 +470,8 @@ bin/kuaia run -f examples/postgres-to-qdrant.yaml
 Kuaia's benchmark smoke is a developer check for the local batch path. It
 generates CSV input, runs batch sizes `1`, `8`, `32`, and `128`, and writes
 counter output to `kuaia-engine/target/kuaia-benchmark/local-pipeline-batch.json`.
+The JSON includes row, embedding, checkpoint, source split, and sink batch
+counters.
 
 ```bash
 mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dsurefire.failIfNoSpecifiedTests=false test
