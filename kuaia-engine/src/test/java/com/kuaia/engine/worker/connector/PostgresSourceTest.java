@@ -90,6 +90,20 @@ class PostgresSourceTest {
     }
 
     @Test
+    void appliesConfiguredFetchSizeToPreparedStatement() throws Exception {
+        driver = new FakeJdbcDriver();
+        DriverManager.registerDriver(driver);
+        PostgresSource source = new PostgresSource(sourceConfigWithFetchSize(128), env(
+                "KUAIA_POSTGRES_USER", "kuaia",
+                "KUAIA_POSTGRES_PASSWORD", "secret"));
+
+        source.open();
+        source.close();
+
+        assertEquals(128, driver.fetchSize);
+    }
+
+    @Test
     void rejectsMissingPasswordEnvironmentVariable() {
         PipelineExecutionException error = assertThrows(
                 PipelineExecutionException.class,
@@ -124,6 +138,19 @@ class PostgresSourceTest {
                 "select id, content from documents order by id");
     }
 
+    private PipelineConfig.SourceConfig sourceConfigWithFetchSize(int fetchSize) {
+        return new PipelineConfig.SourceConfig(
+                "postgres",
+                null,
+                null,
+                "jdbc:kuaia-postgres-test:documents",
+                "KUAIA_POSTGRES_USER",
+                "KUAIA_POSTGRES_PASSWORD",
+                "select id, content from documents order by id",
+                0,
+                fetchSize);
+    }
+
     private Map<String, String> env(String... keyValues) {
         Map<String, String> env = new HashMap<>();
         for (int i = 0; i < keyValues.length; i += 2) {
@@ -141,6 +168,7 @@ class PostgresSourceTest {
         private String user;
         private String password;
         private String query;
+        private int fetchSize;
         private SQLException queryFailure;
 
         @Override
@@ -192,6 +220,10 @@ class PostgresSourceTest {
 
         private PreparedStatement preparedStatement() {
             return proxy(PreparedStatement.class, (proxy, method, args) -> {
+                if ("setFetchSize".equals(method.getName())) {
+                    fetchSize = (Integer) args[0];
+                    return null;
+                }
                 if ("executeQuery".equals(method.getName())) {
                     if (queryFailure != null) {
                         throw queryFailure;

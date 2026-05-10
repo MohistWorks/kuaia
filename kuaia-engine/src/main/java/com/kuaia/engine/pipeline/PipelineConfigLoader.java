@@ -158,7 +158,7 @@ public class PipelineConfigLoader {
     private PipelineConfig.SourceConfig loadSource(Path configPath, String sourceType, Map<String, String> source)
             throws PipelineConfigException {
         if ("postgres".equals(sourceType)) {
-            if (source.get("maxRowsPerSplit") != null && !source.get("maxRowsPerSplit").trim().isEmpty()) {
+            if (hasText(source.get("maxRowsPerSplit"))) {
                 throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
             }
             return new PipelineConfig.SourceConfig(
@@ -168,9 +168,14 @@ public class PipelineConfigLoader {
                     require(source, "source.url"),
                     require(source, "source.userEnv"),
                     require(source, "source.passwordEnv"),
-                    require(source, "source.query"));
+                    require(source, "source.query"),
+                    0,
+                    parseSourceFetchSize(source.get("fetchSize")));
         }
 
+        if (hasText(source.get("fetchSize"))) {
+            throw new PipelineConfigException("source.fetchSize is only supported for source.type: postgres");
+        }
         String sourcePath = resolveLocalPath(configPath, require(source, "source.path"), "source.path");
         String sourceFormat = require(source, "source.format");
         requireSupported("source.format", sourceFormat, "csv");
@@ -397,6 +402,21 @@ public class PipelineConfigLoader {
         }
     }
 
+    private int parseSourceFetchSize(String value) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return 0;
+        }
+        try {
+            int fetchSize = Integer.parseInt(value.trim());
+            if (fetchSize <= 0) {
+                throw new PipelineConfigException("Invalid source.fetchSize: " + value);
+            }
+            return fetchSize;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid source.fetchSize: " + value, e);
+        }
+    }
+
     private void requireSupported(String field, String value, String... supported) throws PipelineConfigException {
         for (String candidate : supported) {
             if (candidate.equals(value)) {
@@ -481,6 +501,10 @@ public class PipelineConfigLoader {
     private static boolean isRestrictedLocalPathsEnabled() {
         String value = System.getenv(RESTRICT_LOCAL_PATHS_ENV);
         return value != null && "true".equalsIgnoreCase(value.trim());
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private String stripQuotes(String value) {

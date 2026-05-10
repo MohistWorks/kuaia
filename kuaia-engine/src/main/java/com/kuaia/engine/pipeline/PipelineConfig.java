@@ -73,13 +73,14 @@ public class PipelineConfig {
         private final String passwordEnv;
         private final String query;
         private final int maxRowsPerSplit;
+        private final int fetchSize;
 
         public SourceConfig(String type, String path, String format) {
             this(type, path, format, 0);
         }
 
         public SourceConfig(String type, String path, String format, int maxRowsPerSplit) {
-            this(type, path, format, null, null, null, null, maxRowsPerSplit);
+            this(type, path, format, null, null, null, null, maxRowsPerSplit, 0);
         }
 
         public SourceConfig(
@@ -90,7 +91,7 @@ public class PipelineConfig {
                 String userEnv,
                 String passwordEnv,
                 String query) {
-            this(type, path, format, url, userEnv, passwordEnv, query, 0);
+            this(type, path, format, url, userEnv, passwordEnv, query, 0, 0);
         }
 
         public SourceConfig(
@@ -102,8 +103,24 @@ public class PipelineConfig {
                 String passwordEnv,
                 String query,
                 int maxRowsPerSplit) {
+            this(type, path, format, url, userEnv, passwordEnv, query, maxRowsPerSplit, 0);
+        }
+
+        public SourceConfig(
+                String type,
+                String path,
+                String format,
+                String url,
+                String userEnv,
+                String passwordEnv,
+                String query,
+                int maxRowsPerSplit,
+                int fetchSize) {
             if (maxRowsPerSplit < 0) {
                 throw new IllegalArgumentException("maxRowsPerSplit must not be negative");
+            }
+            if (fetchSize < 0) {
+                throw new IllegalArgumentException("fetchSize must not be negative");
             }
             this.type = type;
             this.path = path;
@@ -113,6 +130,7 @@ public class PipelineConfig {
             this.passwordEnv = passwordEnv;
             this.query = query;
             this.maxRowsPerSplit = maxRowsPerSplit;
+            this.fetchSize = fetchSize;
         }
 
         public String getType() {
@@ -145,6 +163,10 @@ public class PipelineConfig {
 
         public int getMaxRowsPerSplit() {
             return maxRowsPerSplit;
+        }
+
+        public int getFetchSize() {
+            return fetchSize;
         }
     }
 

@@ -21,4 +21,22 @@ class PipelineConfigTest {
 
         assertEquals("maxRowsPerSplit must not be negative", error.getMessage());
     }
+
+    @Test
+    void sourceConfigRejectsNegativeFetchSize() {
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineConfig.SourceConfig(
+                        "postgres",
+                        null,
+                        null,
+                        "jdbc:postgresql://localhost:5432/kuaia",
+                        "PGUSER",
+                        "PGPASSWORD",
+                        "SELECT id FROM documents",
+                        0,
+                        -1));
+
+        assertEquals("fetchSize must not be negative", error.getMessage());
+    }
 }

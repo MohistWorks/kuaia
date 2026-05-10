@@ -45,6 +45,9 @@ public class PostgresSource implements LocalSource {
             properties.setProperty("password", password);
             connection = DriverManager.getConnection(config.getUrl(), properties);
             statement = connection.prepareStatement(config.getQuery());
+            if (config.getFetchSize() > 0) {
+                statement.setFetchSize(config.getFetchSize());
+            }
             resultSet = statement.executeQuery();
             rowType = buildRowType(resultSet.getMetaData());
         } catch (SQLException e) {

@@ -95,6 +95,68 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsPostgresSourceFetchSize() throws Exception {
+        Path configPath = tempDir.resolve("postgres-fetch-size.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: postgres-fetch-size",
+                "source:",
+                "  type: postgres",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: PGUSER",
+                "  passwordEnv: PGPASSWORD",
+                "  query: SELECT id, content FROM documents",
+                "  fetchSize: 128",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals(128, config.getSource().getFetchSize());
+    }
+
+    @Test
+    void rejectsInvalidPostgresSourceFetchSize() throws Exception {
+        Path configPath = tempDir.resolve("invalid-postgres-fetch-size.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-postgres-fetch-size",
+                "source:",
+                "  type: postgres",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: PGUSER",
+                "  passwordEnv: PGPASSWORD",
+                "  query: SELECT id, content FROM documents",
+                "  fetchSize: zero",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid source.fetchSize: zero", error.getMessage());
+    }
+
+    @Test
+    void rejectsPostgresFetchSizeForFileSource() throws Exception {
+        Path configPath = tempDir.resolve("file-source-fetch-size.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: file-source-fetch-size",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "  fetchSize: 128",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.fetchSize is only supported for source.type: postgres", error.getMessage());
+    }
+
+    @Test
     void loadsOpenAICompatibleEmbeddingConfig() throws Exception {
         Path configPath = tempDir.resolve("openai-compatible.yaml");
         Files.write(configPath, String.join("\n",

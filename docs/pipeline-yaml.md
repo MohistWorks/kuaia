@@ -70,6 +70,7 @@ source:
   userEnv: KUAIA_POSTGRES_USER
   passwordEnv: KUAIA_POSTGRES_PASSWORD
   query: select id, content from documents order by id
+  fetchSize: 1000
 ```
 
 `source.type: postgres` runs one batch JDBC query and streams the result rows
@@ -82,6 +83,8 @@ Fields:
 - `userEnv`: environment variable containing the database user
 - `passwordEnv`: environment variable containing the database password
 - `query`: SQL query to execute
+- `fetchSize`: optional JDBC fetch size. Defaults to driver behavior and must
+  be a positive integer when configured.
 
 Postgres type rules:
 
@@ -506,6 +509,8 @@ Common examples:
 - `Unsupported transform.type: <value>`
 - `Unsupported transforms[0].provider: <value>`
 - `source.maxRowsPerSplit is only supported for source.type: file`
+- `source.fetchSize is only supported for source.type: postgres`
+- `Invalid source.fetchSize: <value>`
 - `Invalid transform.dimensions: <value>`
 - `Invalid transform.timeoutMs: <value>`
 - `Invalid transform.batchSize: <value>`
