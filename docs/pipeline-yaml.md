@@ -534,6 +534,7 @@ Common examples:
 - `Qdrant sink requires VECTOR field: <field>`
 - `Missing Qdrant API key environment variable: <name>`
 - `Qdrant upsert failed with status <code>: <response>`
+- `Qdrant upsert failed: <message>`
 - `File sink does not support quoted CSV fields`
 - `File sink does not support field type: <type>`
 - `Invalid CSV row at line <line>: expected <n> columns but found <m>`

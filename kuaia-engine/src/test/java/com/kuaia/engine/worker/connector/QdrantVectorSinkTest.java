@@ -147,6 +147,28 @@ class QdrantVectorSinkTest {
     }
 
     @Test
+    void wrapsQdrantIoFailures() throws Exception {
+        PipelineConfig.SinkConfig config = config(
+                "http://localhost:6333",
+                "docs",
+                null,
+                "id",
+                "embedding",
+                true);
+        QdrantVectorSink sink = new QdrantVectorSink(
+                rowType(),
+                config,
+                Collections.emptyMap(),
+                url -> {
+                    throw new IOException("connect timed out");
+                });
+
+        PipelineExecutionException error = assertThrows(PipelineExecutionException.class, () -> sink.write(row()));
+
+        assertEquals("Qdrant upsert failed: connect timed out", error.getMessage());
+    }
+
+    @Test
     void requiresLongIdField() {
         KuaiaRowType rowType = new KuaiaRowType(
                 new String[]{"doc_id", "embedding"},

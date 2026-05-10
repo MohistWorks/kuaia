@@ -72,25 +72,31 @@ public class QdrantVectorSink implements SinkWriter {
             return;
         }
         byte[] body = buildRequestBody(rows).getBytes(StandardCharsets.UTF_8);
-        HttpURLConnection connection = connectionFactory.open(new URL(upsertUrl));
-        connection.setConnectTimeout(timeoutMillis);
-        connection.setReadTimeout(timeoutMillis);
-        connection.setRequestMethod("PUT");
-        connection.setDoOutput(true);
-        connection.setRequestProperty("Content-Type", "application/json");
-        if (apiKey != null) {
-            connection.setRequestProperty("api-key", apiKey);
-        }
-        try (OutputStream out = connection.getOutputStream()) {
-            out.write(body);
-        }
+        try {
+            HttpURLConnection connection = connectionFactory.open(new URL(upsertUrl));
+            connection.setConnectTimeout(timeoutMillis);
+            connection.setReadTimeout(timeoutMillis);
+            connection.setRequestMethod("PUT");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+            if (apiKey != null) {
+                connection.setRequestProperty("api-key", apiKey);
+            }
+            try (OutputStream out = connection.getOutputStream()) {
+                out.write(body);
+            }
 
-        int status = connection.getResponseCode();
-        if (status < 200 || status >= 300) {
-            throw new PipelineExecutionException(
-                    "Qdrant upsert failed with status " + status + ": " + readResponse(connection));
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new PipelineExecutionException(
+                        "Qdrant upsert failed with status " + status + ": " + readResponse(connection));
+            }
+            readResponse(connection);
+        } catch (PipelineExecutionException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new PipelineExecutionException("Qdrant upsert failed: " + e.getMessage(), e);
         }
-        readResponse(connection);
     }
 
     private String buildUpsertUrl(PipelineConfig.SinkConfig config) throws PipelineExecutionException {
@@ -194,7 +200,7 @@ public class QdrantVectorSink implements SinkWriter {
         return ordinal;
     }
 
-    private String readResponse(HttpURLConnection connection) throws Exception {
+    private String readResponse(HttpURLConnection connection) throws IOException {
         InputStream stream = connection.getErrorStream();
         if (stream == null) {
             stream = connection.getInputStream();
