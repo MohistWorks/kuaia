@@ -21,6 +21,7 @@ import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import com.kuaia.engine.worker.connector.v2.BatchCommit;
 import com.kuaia.engine.worker.connector.v2.BatchSinkWriter;
 import com.kuaia.engine.worker.connector.v2.BatchSourceReader;
+import com.kuaia.engine.worker.connector.v2.FileSourceAdapter;
 import com.kuaia.engine.worker.connector.v2.LocalSourceAdapter;
 import com.kuaia.engine.worker.connector.v2.SinkWriterBatchAdapter;
 import com.kuaia.engine.worker.connector.v2.SourceEnumerator;
@@ -32,6 +33,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class LocalPipelineRunner {
+    private static final int DEFAULT_FILE_ROWS_PER_SPLIT = 10_000;
+
     private final SinkFactoryRegistry sinkFactories;
     private final EmbeddingProviderRegistry embeddingProviders;
 
@@ -224,7 +227,10 @@ public class LocalPipelineRunner {
     private SourceEnumerator createSource(PipelineConfig config) throws PipelineExecutionException {
         String sourceType = config.getSource().getType();
         if ("file".equals(sourceType)) {
-            return new LocalSourceAdapter(new FileSource(Paths.get(config.getSource().getPath())), "file-0");
+            return new FileSourceAdapter(
+                    new FileSource(Paths.get(config.getSource().getPath())),
+                    "file-0",
+                    DEFAULT_FILE_ROWS_PER_SPLIT);
         }
         if ("postgres".equals(sourceType)) {
             return new LocalSourceAdapter(new PostgresSource(config.getSource()), "postgres-0");

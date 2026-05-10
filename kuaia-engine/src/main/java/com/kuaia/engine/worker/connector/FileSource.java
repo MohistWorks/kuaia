@@ -49,6 +49,16 @@ public class FileSource implements LocalSource {
         return readFrom(lastCheckpointSeq, consumer, (seqId, error) -> false);
     }
 
+    public long getRecordCount() {
+        long count = 0L;
+        for (int i = 1; i < lines.size(); i++) {
+            if (!lines.get(i).trim().isEmpty()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     @Override
     public int readFrom(long lastCheckpointSeq, RecordConsumer consumer, RecordErrorConsumer errorConsumer)
             throws Exception {
