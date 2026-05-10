@@ -63,6 +63,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("docs/pipeline-yaml.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/examples.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/connector-development.md"));
+        assertTrue(read(root.resolve("README.md")).contains("docs/release-checklist.md"));
         assertTrue(read(root.resolve("README.md")).contains("make public-mvp-smoke"));
         assertTrue(read(root.resolve("README.md")).contains("mvn -q package"));
         assertTrue(read(root.resolve("README.md")).contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help"));
@@ -82,6 +83,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
         assertTrue(Files.exists(root.resolve("docs/connector-development.md")),
                 "docs/connector-development.md should exist");
+        assertTrue(Files.exists(root.resolve("docs/release-checklist.md")),
+                "docs/release-checklist.md should exist");
         assertTrue(read(root.resolve("docs/product-scope.md")).contains("connector-development.md"));
         assertTrue(read(root.resolve("CONTRIBUTING.md")).contains("make public-mvp-smoke"));
         assertTrue(Files.exists(root.resolve("examples/local-file-to-qdrant.yaml")), "Qdrant example should exist");

@@ -74,7 +74,9 @@ make public-mvp-smoke
 The supported pipeline YAML contract is documented in
 [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md). The public examples are
 listed in [`docs/examples.md`](docs/examples.md). Connector extension notes are
-in [`docs/connector-development.md`](docs/connector-development.md).
+in [`docs/connector-development.md`](docs/connector-development.md). Open-source
+release candidate checks are listed in
+[`docs/release-checklist.md`](docs/release-checklist.md).
 
 To build a packaged runtime:
 
