@@ -488,6 +488,8 @@ For larger local runs, override the row count:
 mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dkuaia.benchmark.rows=10000 -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
+To stress source split behavior, add `-Dkuaia.benchmark.maxRowsPerSplit=<rows>`.
+
 ## Error Messages
 
 Expected user errors return exit code `1` and print a deterministic message.

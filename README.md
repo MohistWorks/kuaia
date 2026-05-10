@@ -211,6 +211,8 @@ The default smoke uses 128 rows so CI stays fast. For a larger local run:
 mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dkuaia.benchmark.rows=10000 -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
+To stress source split behavior, add `-Dkuaia.benchmark.maxRowsPerSplit=<rows>`.
+
 ## Repository Layout
 
 - `kuaia-common`: shared data model, connector APIs, protobuf contracts, and common utilities.

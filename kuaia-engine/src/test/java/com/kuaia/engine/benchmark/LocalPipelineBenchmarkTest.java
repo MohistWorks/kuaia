@@ -32,10 +32,12 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocalPipelineBenchmarkTest {
     private static final int[] BATCH_SIZES = new int[]{1, 8, 32, 128};
+    private static final int DEFAULT_FILE_ROWS_PER_SPLIT = 10_000;
 
     @TempDir
     Path tempDir;
@@ -43,6 +45,7 @@ class LocalPipelineBenchmarkTest {
     @Test
     void measuresLocalBatchPipelineCounters() throws Exception {
         int rowCount = Integer.getInteger("kuaia.benchmark.rows", 128);
+        int maxRowsPerSplit = benchmarkMaxRowsPerSplit();
         Path data = tempDir.resolve("benchmark-documents.csv");
         writeCsv(data, rowCount);
         List<BenchmarkResult> results = new ArrayList<>();
@@ -59,7 +62,7 @@ class LocalPipelineBenchmarkTest {
                     sinkFactories,
                     new EmbeddingProviderRegistry(providers));
             Path stateDir = tempDir.resolve("state-" + batchSize);
-            PipelineConfig config = benchmarkConfig(data, stateDir, batchSize);
+            PipelineConfig config = benchmarkConfig(data, stateDir, batchSize, maxRowsPerSplit);
 
             long startedAt = System.nanoTime();
             PipelineRunSummary summary = runner.run(
@@ -73,7 +76,8 @@ class LocalPipelineBenchmarkTest {
             }
             assertNotNull(record);
 
-            int expectedBatches = expectedBatches(rowCount, batchSize);
+            int expectedBatches = expectedSinkBatches(rowCount, batchSize, maxRowsPerSplit);
+            int expectedSourceSplits = expectedSourceSplits(rowCount, maxRowsPerSplit);
             long checkpointUpdates = record.getVersion() - 3L;
             BenchmarkResult result = new BenchmarkResult(
                     rowCount,
@@ -99,7 +103,7 @@ class LocalPipelineBenchmarkTest {
             assertEquals(rowCount, sink.rowsWritten);
             assertEquals(expectedBatches, checkpointUpdates);
             assertEquals(rowCount, summary.getRowsWritten());
-            assertEquals(1L, summary.getSourceSplits());
+            assertEquals(expectedSourceSplits, summary.getSourceSplits());
             assertEquals(expectedBatches, summary.getSinkBatches());
             assertTrue(result.rowsPerSecond() > 0.0d);
         }
@@ -109,14 +113,43 @@ class LocalPipelineBenchmarkTest {
         assertTrue(Files.exists(output));
         String json = new String(Files.readAllBytes(output), StandardCharsets.UTF_8);
         assertTrue(json.contains("\"batchSize\":32"));
-        assertTrue(json.contains("\"sourceSplits\":1"));
-        assertTrue(json.contains("\"sinkBatches\":4"));
+        assertTrue(json.contains("\"sourceSplits\":" + expectedSourceSplits(rowCount, maxRowsPerSplit)));
+        assertTrue(json.contains("\"sinkBatches\":"
+                + expectedSinkBatches(rowCount, 32, maxRowsPerSplit)));
     }
 
-    private PipelineConfig benchmarkConfig(Path data, Path stateDir, int batchSize) {
+    @Test
+    void parsesBenchmarkMaxRowsPerSplitProperty() {
+        String previous = System.getProperty("kuaia.benchmark.maxRowsPerSplit");
+        try {
+            System.setProperty("kuaia.benchmark.maxRowsPerSplit", "2");
+
+            assertEquals(2, benchmarkMaxRowsPerSplit());
+        } finally {
+            restoreProperty("kuaia.benchmark.maxRowsPerSplit", previous);
+        }
+    }
+
+    @Test
+    void rejectsInvalidBenchmarkMaxRowsPerSplitProperty() {
+        String previous = System.getProperty("kuaia.benchmark.maxRowsPerSplit");
+        try {
+            System.setProperty("kuaia.benchmark.maxRowsPerSplit", "zero");
+
+            IllegalArgumentException error = assertThrows(
+                    IllegalArgumentException.class,
+                    this::benchmarkMaxRowsPerSplit);
+
+            assertEquals("Invalid kuaia.benchmark.maxRowsPerSplit: zero", error.getMessage());
+        } finally {
+            restoreProperty("kuaia.benchmark.maxRowsPerSplit", previous);
+        }
+    }
+
+    private PipelineConfig benchmarkConfig(Path data, Path stateDir, int batchSize, int maxRowsPerSplit) {
         return new PipelineConfig(
                 "benchmark-" + batchSize,
-                new PipelineConfig.SourceConfig("file", data.toString(), "csv"),
+                new PipelineConfig.SourceConfig("file", data.toString(), "csv", maxRowsPerSplit),
                 Collections.singletonList(new PipelineConfig.TransformConfig(
                         "embedding",
                         Collections.emptyList(),
@@ -146,6 +179,51 @@ class LocalPipelineBenchmarkTest {
 
     private int expectedBatches(int rowCount, int batchSize) {
         return (rowCount + batchSize - 1) / batchSize;
+    }
+
+    private int expectedSinkBatches(int rowCount, int batchSize, int maxRowsPerSplit) {
+        int effectiveRowsPerSplit = effectiveRowsPerSplit(maxRowsPerSplit);
+        int batches = 0;
+        int rowsRemaining = rowCount;
+        while (rowsRemaining > 0) {
+            int splitRows = Math.min(rowsRemaining, effectiveRowsPerSplit);
+            batches += expectedBatches(splitRows, batchSize);
+            rowsRemaining -= splitRows;
+        }
+        return batches;
+    }
+
+    private int expectedSourceSplits(int rowCount, int maxRowsPerSplit) {
+        int effectiveRowsPerSplit = effectiveRowsPerSplit(maxRowsPerSplit);
+        return expectedBatches(rowCount, effectiveRowsPerSplit);
+    }
+
+    private int effectiveRowsPerSplit(int maxRowsPerSplit) {
+        return maxRowsPerSplit > 0 ? maxRowsPerSplit : DEFAULT_FILE_ROWS_PER_SPLIT;
+    }
+
+    private int benchmarkMaxRowsPerSplit() {
+        String value = System.getProperty("kuaia.benchmark.maxRowsPerSplit");
+        if (value == null || value.trim().isEmpty()) {
+            return 0;
+        }
+        try {
+            int maxRowsPerSplit = Integer.parseInt(value.trim());
+            if (maxRowsPerSplit <= 0) {
+                throw new IllegalArgumentException("Invalid kuaia.benchmark.maxRowsPerSplit: " + value);
+            }
+            return maxRowsPerSplit;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid kuaia.benchmark.maxRowsPerSplit: " + value, e);
+        }
+    }
+
+    private void restoreProperty(String name, String previous) {
+        if (previous == null) {
+            System.clearProperty(name);
+        } else {
+            System.setProperty(name, previous);
+        }
     }
 
     private void writeResults(Path output, List<BenchmarkResult> results) throws Exception {
