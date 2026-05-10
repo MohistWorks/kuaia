@@ -505,6 +505,7 @@ Common examples:
 - `Unsupported errorPolicy.mode: <value>`
 - `Unsupported transform.type: <value>`
 - `Unsupported transforms[0].provider: <value>`
+- `source.maxRowsPerSplit is only supported for source.type: file`
 - `Invalid transform.dimensions: <value>`
 - `Invalid transform.timeoutMs: <value>`
 - `Invalid transform.batchSize: <value>`

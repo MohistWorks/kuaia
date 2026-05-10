@@ -158,6 +158,9 @@ public class PipelineConfigLoader {
     private PipelineConfig.SourceConfig loadSource(Path configPath, String sourceType, Map<String, String> source)
             throws PipelineConfigException {
         if ("postgres".equals(sourceType)) {
+            if (source.get("maxRowsPerSplit") != null && !source.get("maxRowsPerSplit").trim().isEmpty()) {
+                throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
+            }
             return new PipelineConfig.SourceConfig(
                     "postgres",
                     null,

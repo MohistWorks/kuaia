@@ -73,6 +73,28 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void rejectsFileSourceSplitConfigForPostgresSource() throws Exception {
+        Path configPath = tempDir.resolve("postgres-source-split.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: postgres-source-split",
+                "source:",
+                "  type: postgres",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: PGUSER",
+                "  passwordEnv: PGPASSWORD",
+                "  query: SELECT id, content FROM documents",
+                "  maxRowsPerSplit: 2",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.maxRowsPerSplit is only supported for source.type: file", error.getMessage());
+    }
+
+    @Test
     void loadsOpenAICompatibleEmbeddingConfig() throws Exception {
         Path configPath = tempDir.resolve("openai-compatible.yaml");
         Files.write(configPath, String.join("\n",

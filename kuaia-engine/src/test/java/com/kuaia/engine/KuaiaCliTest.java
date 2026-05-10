@@ -564,6 +564,28 @@ class KuaiaCliTest {
     }
 
     @Test
+    void runReportsPostgresSourceSplitConfigAsUnsupported() throws Exception {
+        Path config = tempDir.resolve("postgres-source-split.yaml");
+        Files.write(config, String.join("\n",
+                "name: postgres-source-split",
+                "source:",
+                "  type: postgres",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: PGUSER",
+                "  passwordEnv: PGPASSWORD",
+                "  query: SELECT id, content FROM documents",
+                "  maxRowsPerSplit: 2",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("source.maxRowsPerSplit is only supported for source.type: file"));
+        assertFalse(result.output.contains("Run Summary:"));
+    }
+
+    @Test
     void runReportsMalformedCsvRows() throws Exception {
         Path data = tempDir.resolve("bad.csv");
         Files.write(data, String.join("\n",
