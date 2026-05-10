@@ -59,26 +59,30 @@ public class PostgresSource implements LocalSource {
     @Override
     public int readFrom(long lastCheckpointSeq, RecordConsumer consumer, RecordErrorConsumer errorConsumer)
             throws Exception {
-        int count = 0;
-        long seqId = 0L;
-        while (resultSet.next()) {
-            seqId++;
-            if (seqId <= lastCheckpointSeq) {
-                continue;
-            }
-            BinaryRow row;
-            try {
-                row = readRow(seqId);
-            } catch (PipelineExecutionException e) {
-                if (errorConsumer.accept(seqId, e)) {
+        try {
+            int count = 0;
+            long seqId = 0L;
+            while (resultSet.next()) {
+                seqId++;
+                if (seqId <= lastCheckpointSeq) {
                     continue;
                 }
-                throw e;
+                BinaryRow row;
+                try {
+                    row = readRow(seqId);
+                } catch (PipelineExecutionException e) {
+                    if (errorConsumer.accept(seqId, e)) {
+                        continue;
+                    }
+                    throw e;
+                }
+                consumer.accept(seqId, row);
+                count++;
             }
-            consumer.accept(seqId, row);
-            count++;
+            return count;
+        } catch (SQLException e) {
+            throw new PipelineExecutionException("Postgres source read failed: " + e.getMessage(), e);
         }
-        return count;
     }
 
     @Override

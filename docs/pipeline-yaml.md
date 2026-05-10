@@ -523,6 +523,7 @@ Common examples:
 - `Missing API key environment variable: <name>`
 - `Missing Postgres environment variable: <name>`
 - `Postgres source query failed: <message>`
+- `Postgres source read failed: <message>`
 - `Invalid Postgres row seq=<seq>: field <field> is null`
 - `Embedding request failed with status <code>: <response>`
 - `Embedding response did not contain an embedding vector`

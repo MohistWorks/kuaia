@@ -127,6 +127,24 @@ class PostgresSourceTest {
         assertEquals("Postgres source query failed: boom", error.getMessage());
     }
 
+    @Test
+    void wrapsResultSetReadFailures() throws Exception {
+        driver = new FakeJdbcDriver();
+        driver.readFailure = new SQLException("stream reset");
+        DriverManager.registerDriver(driver);
+        PostgresSource source = new PostgresSource(sourceConfig(), env(
+                "KUAIA_POSTGRES_USER", "kuaia",
+                "KUAIA_POSTGRES_PASSWORD", "secret"));
+
+        source.open();
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> source.readFrom(0L, (seqId, row) -> {}, (seqId, err) -> false));
+        source.close();
+
+        assertEquals("Postgres source read failed: stream reset", error.getMessage());
+    }
+
     private PipelineConfig.SourceConfig sourceConfig() {
         return new PipelineConfig.SourceConfig(
                 "postgres",
@@ -170,6 +188,7 @@ class PostgresSourceTest {
         private String query;
         private int fetchSize;
         private SQLException queryFailure;
+        private SQLException readFailure;
 
         @Override
         public Connection connect(String url, Properties info) throws SQLException {
@@ -240,8 +259,11 @@ class PostgresSourceTest {
                 private int index = -1;
 
                 @Override
-                public Object invoke(Object proxy, Method method, Object[] args) {
+                public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
                     if ("next".equals(method.getName())) {
+                        if (readFailure != null) {
+                            throw readFailure;
+                        }
                         index++;
                         return index < rows.length;
                     }
