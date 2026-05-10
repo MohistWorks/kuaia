@@ -19,7 +19,7 @@ Implemented today:
 
 Not implemented yet:
 
-- Production deployment packaging.
+- Production-grade installers or release artifacts.
 - Real external connectors.
 - Vector database integrations.
 - Web UI, RBAC, audit, lineage, or Kubernetes operator support.
@@ -35,11 +35,24 @@ Not implemented yet:
 
 ```bash
 bin/kuaia help
-bin/kuaia run -f examples/local-file-to-vector.yaml
+bin/kuaia run -f examples/local-file-to-file.yaml
+cat .kuaia/output/local-file-to-file.csv
 ```
 
 The supported pipeline YAML contract is documented in
-[`docs/pipeline-yaml.md`](docs/pipeline-yaml.md).
+[`docs/pipeline-yaml.md`](docs/pipeline-yaml.md). The public examples are
+listed in [`docs/examples.md`](docs/examples.md).
+
+To build a packaged runtime:
+
+```bash
+mvn -q package
+java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help
+```
+
+After `mvn -q package`, `bin/kuaia` uses the packaged jar automatically. In a
+fresh checkout before packaging, the script falls back to Maven so examples can
+still be run directly.
 
 Or use Make aliases:
 
@@ -49,16 +62,22 @@ make run-vector
 make clean-state
 ```
 
-Or run the default vector example through Docker Compose:
+Or run the deterministic file-output example through Docker Compose:
 
 ```bash
 docker compose up --build
 ```
 
+The Docker quickstart runs `examples/local-file-to-file.yaml`. Its output is
+written inside the container at `.kuaia/output/local-file-to-file.csv`, backed by
+the `kuaia-state` Compose volume. For local host output, run the same example
+with `bin/kuaia`.
+
 ## Build And Test
 
 ```bash
 mvn -q test
+mvn -q package
 ```
 
 ## Run The Demos
@@ -129,8 +148,8 @@ Run the recovery demo with a RocksDB state directory:
 bin/kuaia recover-demo --state-dir /tmp/kuaia-recover-demo
 ```
 
-The wrapper delegates to Maven. The lower-level command is still available when
-you need to bypass the script:
+Before packaging, the wrapper falls back to Maven. The lower-level command is
+still available when you need to bypass the script:
 
 ```bash
 mvn -q -pl kuaia-engine exec:java \

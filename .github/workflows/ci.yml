@@ -27,8 +27,12 @@ jobs:
       - name: Run tests
         run: mvn -q test
 
+      - name: Package runtime
+        run: mvn -q package
+
       - name: Smoke test CLI
         run: |
+          java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help
           bin/kuaia help
           bin/kuaia run -f examples/local-file-to-file.yaml
           bin/kuaia run -f examples/local-file-skip-bad-records.yaml

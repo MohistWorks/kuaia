@@ -39,17 +39,39 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(script), "bin/kuaia should exist");
         assertTrue(Files.isExecutable(script), "bin/kuaia should be executable");
         assertTrue(read(script).contains("com.kuaia.engine.KuaiaCli"));
+        assertTrue(read(script).contains("kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar"));
+        assertTrue(read(script).contains("exec java -jar"));
         assertTrue(read(script).contains("-N -DskipTests install"));
         assertTrue(read(script).contains("-pl kuaia-common -DskipTests install"));
 
         assertTrue(read(root.resolve("Makefile")).contains("run-vector"));
         assertTrue(read(root.resolve("Makefile")).contains("clean-state"));
-        assertTrue(read(root.resolve("Dockerfile")).contains("ENTRYPOINT [\"./bin/kuaia\"]"));
-        assertTrue(read(root.resolve("docker-compose.yml")).contains("examples/local-file-to-vector.yaml"));
+        String dockerfile = read(root.resolve("Dockerfile"));
+        assertTrue(dockerfile.contains("AS build"), dockerfile);
+        assertTrue(dockerfile.contains("COPY --from=build /workspace/kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar /opt/kuaia/kuaia.jar"), dockerfile);
+        assertTrue(dockerfile.contains("ENTRYPOINT [\"java\", \"-jar\", \"/opt/kuaia/kuaia.jar\"]"), dockerfile);
+        String compose = read(root.resolve("docker-compose.yml"));
+        assertTrue(compose.contains("examples/local-file-to-file.yaml"), compose);
+        assertTrue(compose.contains("/opt/kuaia/.kuaia"), compose);
         assertTrue(read(root.resolve(".dockerignore")).contains("dev/"));
         assertTrue(read(root.resolve(".dockerignore")).contains("daily_tasks.json"));
         assertTrue(Files.exists(root.resolve("docs/pipeline-yaml.md")), "docs/pipeline-yaml.md should exist");
         assertTrue(read(root.resolve("README.md")).contains("docs/pipeline-yaml.md"));
+        assertTrue(read(root.resolve("README.md")).contains("docs/examples.md"));
+        assertTrue(read(root.resolve("README.md")).contains("mvn -q package"));
+        assertTrue(read(root.resolve("README.md")).contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help"));
+        assertTrue(read(root.resolve("README.md")).contains("docker compose up --build"));
+        assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
+        assertTrue(Files.exists(root.resolve("docs/examples.md")), "docs/examples.md should exist");
+        assertTrue(read(root.resolve("docs/examples.md")).contains("local-file-to-openai-compatible-vector.yaml"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
+
+        String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
+        assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);
+        assertTrue(enginePom.contains("com.kuaia.engine.KuaiaCli"), enginePom);
+        assertTrue(enginePom.contains("<createDependencyReducedPom>false</createDependencyReducedPom>"), enginePom);
+        assertTrue(enginePom.contains("<shadedArtifactAttached>true</shadedArtifactAttached>"), enginePom);
+        assertTrue(enginePom.contains("<shadedClassifierName>cli</shadedClassifierName>"), enginePom);
     }
 
     @Test
@@ -59,6 +81,8 @@ class KuaiaPackagingTest {
 
         assertTrue(workflow.contains("workflow_dispatch:"), workflow);
         assertTrue(workflow.contains("mvn -q test"), workflow);
+        assertTrue(workflow.contains("mvn -q package"), workflow);
+        assertTrue(workflow.contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help"), workflow);
         assertTrue(workflow.contains("bin/kuaia help"), workflow);
         assertTrue(workflow.contains("bin/kuaia run -f examples/local-file-to-file.yaml"), workflow);
         assertTrue(workflow.contains("bin/kuaia run -f examples/local-file-skip-bad-records.yaml"), workflow);

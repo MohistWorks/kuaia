@@ -301,6 +301,9 @@ Fields:
 
 ## Examples
 
+For the full list of public examples, expected output, Docker quickstart, and
+cleanup notes, see [`docs/examples.md`](examples.md).
+
 Run local CSV to console:
 
 ```bash

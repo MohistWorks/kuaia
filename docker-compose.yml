@@ -1,9 +1,9 @@
 services:
   kuaia:
     build: .
-    command: ["run", "-f", "examples/local-file-to-vector.yaml"]
+    command: ["run", "-f", "examples/local-file-to-file.yaml"]
     volumes:
-      - kuaia-state:/workspace/.kuaia
+      - kuaia-state:/opt/kuaia/.kuaia
 
 volumes:
   kuaia-state:
