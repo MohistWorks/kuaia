@@ -350,9 +350,12 @@ checkpoint:
 ```
 
 When `checkpoint.stateDir` is set, Kuaia persists local task progress with
-RocksDB. CSV data rows use 1-based source `seqId` values. A checkpoint advances
-after a transformed row is successfully written to the sink. With
-`errorPolicy.mode: skip-bad-records`, a skipped malformed source row also
+RocksDB. CSV data rows use 1-based source `seqId` values. For non-batched
+pipelines, a checkpoint advances after a transformed row is successfully written
+to the sink. For batch-aware vector pipelines, a successful sink batch advances
+the checkpoint once to the highest source `seqId` in that batch. If the batch
+write fails, the checkpoint does not advance and a rerun may replay that batch.
+With `errorPolicy.mode: skip-bad-records`, a skipped malformed source row also
 advances the checkpoint so reruns do not repeatedly process the same bad row.
 
 On rerun, Kuaia skips source rows at or before the last checkpoint. If the task is

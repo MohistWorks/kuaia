@@ -2,7 +2,10 @@ package com.kuaia.engine;
 
 import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.data.BinaryRow;
+import com.kuaia.common.model.TaskRecord;
+import com.kuaia.common.model.TaskState;
 import com.kuaia.common.type.KuaiaRowType;
+import com.kuaia.engine.coordinator.state.RocksDbStateStore;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
@@ -20,6 +23,8 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LocalPipelineRunnerTest {
     @TempDir
@@ -62,6 +67,99 @@ class LocalPipelineRunnerTest {
         assertEquals(java.util.Arrays.asList(2, 1), sink.batchSizes);
     }
 
+    @Test
+    void checkpointsOncePerSuccessfulSinkBatch() throws Exception {
+        Path data = tempDir.resolve("checkpointed-documents.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta",
+                "3,Gamma").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("checkpointed-batch-state");
+        Path configPath = tempDir.resolve("checkpointed-batch-vector.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: checkpointed-batch-vector",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "    batchSize: 2",
+                "sink:",
+                "  type: mock-vector",
+                "checkpoint:",
+                "  stateDir: " + stateDir).getBytes(StandardCharsets.UTF_8));
+        CapturingSink sink = new CapturingSink();
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+        SinkFactoryRegistry registry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        new LocalPipelineRunner(registry).run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(java.util.Arrays.asList(2, 1), sink.batchSizes);
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-checkpointed-batch-vector");
+            assertNotNull(record);
+            assertEquals(TaskState.COMPLETED, record.getState());
+            assertEquals(3L, record.getLastCheckpointSeq());
+            assertEquals(5L, record.getVersion());
+        }
+    }
+
+    @Test
+    void doesNotCheckpointFailedSinkBatch() throws Exception {
+        Path data = tempDir.resolve("failed-batch-documents.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("failed-batch-state");
+        Path configPath = tempDir.resolve("failed-batch-vector.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: failed-batch-vector",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "    batchSize: 2",
+                "sink:",
+                "  type: mock-vector",
+                "checkpoint:",
+                "  stateDir: " + stateDir).getBytes(StandardCharsets.UTF_8));
+        FailingSink sink = new FailingSink();
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+        SinkFactoryRegistry registry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> new LocalPipelineRunner(registry)
+                        .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name())));
+
+        assertEquals("sink batch failed", error.getMessage());
+        assertEquals(1, sink.batchWrites());
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-failed-batch-vector");
+            assertNotNull(record);
+            assertEquals(TaskState.RUNNING, record.getState());
+            assertEquals(0L, record.getLastCheckpointSeq());
+            assertEquals(2L, record.getVersion());
+        }
+    }
+
     private static class CapturingSink implements SinkWriter {
         private int singleWrites;
         private int batchWrites;
@@ -81,7 +179,19 @@ class LocalPipelineRunnerTest {
             batchSizes.add(rows.size());
         }
 
+        int batchWrites() {
+            return batchWrites;
+        }
+
         @Override
         public void close() {}
+    }
+
+    private static class FailingSink extends CapturingSink {
+        @Override
+        public void writeBatch(List<BinaryRow> rows) {
+            super.writeBatch(rows);
+            throw new IllegalStateException("sink batch failed");
+        }
     }
 }

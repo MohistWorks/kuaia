@@ -146,9 +146,9 @@ public class LocalPipelineRunner {
                                         transforms,
                                         openedSink,
                                         counters,
-                                        committedSeqId -> taskRef[0] = checkpointStore.checkpoint(
+                                        maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
                                                 taskRef[0],
-                                                committedSeqId));
+                                                maxCommittedSeqId));
                             }
                         },
                         (seqId, error) -> {
@@ -157,9 +157,9 @@ public class LocalPipelineRunner {
                                     transforms,
                                     openedSink,
                                     counters,
-                                    committedSeqId -> taskRef[0] = checkpointStore.checkpoint(
+                                    maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
                                             taskRef[0],
-                                            committedSeqId));
+                                            maxCommittedSeqId));
                             boolean skipped = handleRecordError(config, out, counters, seqId, error);
                             if (skipped) {
                                 taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
@@ -171,7 +171,9 @@ public class LocalPipelineRunner {
                         transforms,
                         openedSink,
                         counters,
-                        committedSeqId -> taskRef[0] = checkpointStore.checkpoint(taskRef[0], committedSeqId));
+                        maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
+                                taskRef[0],
+                                maxCommittedSeqId));
                 TaskRecord completed = checkpointStore.complete(taskRef[0]);
                 out.println("Pipeline Finished. rows="
                         + counters.rowsWritten
@@ -243,24 +245,34 @@ public class LocalPipelineRunner {
             TransformPipeline transforms,
             SinkWriter sink,
             PipelineCounters counters,
-            SeqIdCommitter committer) throws Exception {
+            BatchSeqIdCommitter committer) throws Exception {
         if (batch.isEmpty()) {
             return;
         }
         List<Long> seqIds = batch.seqIds();
         List<BinaryRow> outputs = transforms.applyBatch(batch.rows());
         sink.writeBatch(outputs);
+        if (committer != null) {
+            committer.commit(maxSeqId(seqIds));
+        }
         for (Long seqId : seqIds) {
-            if (committer != null) {
-                committer.commit(seqId);
-            }
             counters.recordWritten(seqId);
         }
         batch.clear();
     }
 
-    private interface SeqIdCommitter {
-        void commit(long seqId) throws Exception;
+    private long maxSeqId(List<Long> seqIds) {
+        long max = 0L;
+        for (Long seqId : seqIds) {
+            if (seqId > max) {
+                max = seqId;
+            }
+        }
+        return max;
+    }
+
+    private interface BatchSeqIdCommitter {
+        void commit(long maxSeqId) throws Exception;
     }
 
     private static class BatchBuffer {

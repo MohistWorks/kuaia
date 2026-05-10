@@ -57,7 +57,11 @@ public class LocalPipelineCheckpointStore implements Closeable {
     }
 
     public TaskRecord checkpoint(TaskRecord record, long processedSeq) {
-        TaskRecord updated = record.checkpoint(record.getAttemptId(), processedSeq);
+        return checkpointBatch(record, processedSeq);
+    }
+
+    public TaskRecord checkpointBatch(TaskRecord record, long maxProcessedSeq) {
+        TaskRecord updated = record.checkpoint(record.getAttemptId(), maxProcessedSeq);
         if (updated != record) {
             stateStore.saveTask(updated);
         }

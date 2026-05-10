@@ -101,8 +101,10 @@ bin/kuaia run -f examples/local-file-to-console.yaml
 ```
 
 When the YAML includes `checkpoint.stateDir`, Kuaia persists local progress after
-each successfully written CSV row. Re-running the same pipeline resumes after the
-last committed row instead of re-emitting completed rows.
+successful sink writes. Batch-aware vector pipelines advance the checkpoint once
+per successful sink batch to the highest source sequence id in that batch.
+Re-running the same pipeline resumes after the last committed row instead of
+re-emitting completed rows.
 
 Run a declarative pipeline with a simple transform chain:
 
