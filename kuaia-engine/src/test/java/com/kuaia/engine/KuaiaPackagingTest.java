@@ -39,6 +39,7 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(script), "bin/kuaia should exist");
         assertTrue(Files.isExecutable(script), "bin/kuaia should be executable");
         assertTrue(read(script).contains("com.kuaia.engine.KuaiaCli"));
+        assertTrue(read(script).contains("-N -DskipTests install"));
         assertTrue(read(script).contains("-pl kuaia-common -DskipTests install"));
 
         assertTrue(read(root.resolve("Makefile")).contains("run-vector"));

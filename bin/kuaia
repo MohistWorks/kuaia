@@ -6,6 +6,7 @@ ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 MAVEN_BIN=${MAVEN_BIN:-mvn}
 
 cd "$ROOT_DIR"
+"$MAVEN_BIN" -q -N -DskipTests install
 "$MAVEN_BIN" -q -pl kuaia-common -DskipTests install
 exec "$MAVEN_BIN" -q -pl kuaia-engine exec:java \
   -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
