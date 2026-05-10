@@ -166,8 +166,8 @@ public class LocalPipelineRunner {
         if ("console".equals(sinkType)) {
             return new ConsoleSink(rowType, out);
         }
-        if ("mock-vector".equals(sinkType)) {
-            return sinkFactories.create(sinkType, rowType, out);
+        if ("mock-vector".equals(sinkType) || "qdrant".equals(sinkType)) {
+            return sinkFactories.create(sinkType, rowType, out, config.getSink());
         }
         if ("file".equals(sinkType)) {
             return new FileSink(

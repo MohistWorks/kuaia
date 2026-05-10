@@ -39,7 +39,7 @@ public class PipelineConfigLoader {
 
         requireSupported("source.type", sourceType, "file");
         requireSupported("source.format", sourceFormat, "csv");
-        requireSupported("sink.type", sinkType, "console", "mock-vector", "file");
+        requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant");
 
         PipelineConfig.SinkConfig sinkConfig = loadSink(path, sinkType, sink);
         PipelineConfig.ErrorPolicyConfig errorPolicyConfig = loadErrorPolicy(errorPolicy);
@@ -186,6 +186,9 @@ public class PipelineConfigLoader {
 
     private PipelineConfig.SinkConfig loadSink(Path configPath, String sinkType, Map<String, String> sink)
             throws PipelineConfigException {
+        if ("qdrant".equals(sinkType)) {
+            return loadQdrantSink(sink);
+        }
         if (!"file".equals(sinkType)) {
             return new PipelineConfig.SinkConfig(sinkType);
         }
@@ -201,6 +204,26 @@ public class PipelineConfigLoader {
         requireSupported("sink.mode", mode, "overwrite", "append");
 
         return new PipelineConfig.SinkConfig(sinkType, sinkPath, sinkFormat, mode);
+    }
+
+    private PipelineConfig.SinkConfig loadQdrantSink(Map<String, String> sink) throws PipelineConfigException {
+        String wait = sink.get("wait");
+        boolean waitForCommit = true;
+        if (wait != null && !wait.trim().isEmpty()) {
+            requireSupported("sink.wait", wait, "true", "false");
+            waitForCommit = Boolean.parseBoolean(wait);
+        }
+        return new PipelineConfig.SinkConfig(
+                "qdrant",
+                null,
+                null,
+                null,
+                require(sink, "sink.url"),
+                require(sink, "sink.collection"),
+                sink.get("apiKeyEnv"),
+                require(sink, "sink.idField"),
+                require(sink, "sink.vectorField"),
+                waitForCommit);
     }
 
     private PipelineConfig.ErrorPolicyConfig loadErrorPolicy(Map<String, String> errorPolicy)

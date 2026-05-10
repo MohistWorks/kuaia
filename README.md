@@ -21,7 +21,7 @@ Not implemented yet:
 
 - Production-grade installers or release artifacts.
 - Real external connectors.
-- Vector database integrations.
+- Additional vector database integrations beyond Qdrant.
 - Web UI, RBAC, audit, lineage, or Kubernetes operator support.
 - Exactly-once guarantees. The MVP target is at-least-once with idempotent sinks.
 
@@ -134,6 +134,16 @@ Run a declarative vector pipeline against an OpenAI-compatible embeddings API:
 ```bash
 export OPENAI_API_KEY=...
 bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
+```
+
+Run a declarative vector pipeline into Qdrant:
+
+```bash
+docker compose -f docker-compose.qdrant.yml up -d
+curl -X PUT http://localhost:6333/collections/kuaia_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+bin/kuaia run -f examples/local-file-to-qdrant.yaml
 ```
 
 Run the mock AI vector pipeline:

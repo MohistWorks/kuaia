@@ -190,6 +190,87 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsQdrantSinkConfig() throws Exception {
+        Path configPath = tempDir.resolve("qdrant-sink.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: qdrant-sink",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_docs",
+                "  apiKeyEnv: QDRANT_API_KEY",
+                "  idField: id",
+                "  vectorField: embedding").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("qdrant", config.getSink().getType());
+        assertEquals("http://localhost:6333", config.getSink().getUrl());
+        assertEquals("kuaia_docs", config.getSink().getCollection());
+        assertEquals("QDRANT_API_KEY", config.getSink().getApiKeyEnv());
+        assertEquals("id", config.getSink().getIdField());
+        assertEquals("embedding", config.getSink().getVectorField());
+        assertEquals(true, config.getSink().isWait());
+    }
+
+    @Test
+    void loadsQdrantSinkWaitFlag() throws Exception {
+        Path configPath = tempDir.resolve("qdrant-sink-nowait.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: qdrant-sink-nowait",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_docs",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  wait: false").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals(false, config.getSink().isWait());
+    }
+
+    @Test
+    void rejectsMissingQdrantCollection() throws Exception {
+        Path configPath = tempDir.resolve("missing-qdrant-collection.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-qdrant-collection",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  idField: id",
+                "  vectorField: embedding").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: sink.collection", error.getMessage());
+    }
+
+    @Test
     void loadsSkipBadRecordsErrorPolicy() throws Exception {
         Path configPath = tempDir.resolve("skip-bad-records.yaml");
         Files.write(configPath, String.join("\n",

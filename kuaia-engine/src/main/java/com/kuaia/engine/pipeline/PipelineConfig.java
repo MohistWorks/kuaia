@@ -191,16 +191,42 @@ public class PipelineConfig {
         private final String path;
         private final String format;
         private final String mode;
+        private final String url;
+        private final String collection;
+        private final String apiKeyEnv;
+        private final String idField;
+        private final String vectorField;
+        private final boolean wait;
 
         public SinkConfig(String type) {
             this(type, null, null, null);
         }
 
         public SinkConfig(String type, String path, String format, String mode) {
+            this(type, path, format, mode, null, null, null, null, null, true);
+        }
+
+        public SinkConfig(
+                String type,
+                String path,
+                String format,
+                String mode,
+                String url,
+                String collection,
+                String apiKeyEnv,
+                String idField,
+                String vectorField,
+                boolean wait) {
             this.type = type;
             this.path = path;
             this.format = format;
             this.mode = mode;
+            this.url = url;
+            this.collection = collection;
+            this.apiKeyEnv = apiKeyEnv;
+            this.idField = idField;
+            this.vectorField = vectorField;
+            this.wait = wait;
         }
 
         public String getType() {
@@ -217,6 +243,30 @@ public class PipelineConfig {
 
         public String getMode() {
             return mode;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public String getCollection() {
+            return collection;
+        }
+
+        public String getApiKeyEnv() {
+            return apiKeyEnv;
+        }
+
+        public String getIdField() {
+            return idField;
+        }
+
+        public String getVectorField() {
+            return vectorField;
+        }
+
+        public boolean isWait() {
+            return wait;
         }
     }
 

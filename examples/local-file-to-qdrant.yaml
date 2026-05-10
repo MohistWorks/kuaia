@@ -1,0 +1,21 @@
+name: local-file-to-qdrant
+source:
+  type: file
+  path: data/documents.csv
+  format: csv
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+sink:
+  type: qdrant
+  url: http://localhost:6333
+  collection: kuaia_docs
+  idField: id
+  vectorField: embedding
+  wait: true
+checkpoint:
+  stateDir: .kuaia/state/local-file-to-qdrant

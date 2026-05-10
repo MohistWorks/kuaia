@@ -4,6 +4,7 @@ import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.data.BinaryRow;
 import com.kuaia.common.type.DataType;
 import com.kuaia.common.type.KuaiaRowType;
+import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import org.junit.jupiter.api.Test;
 
@@ -47,5 +48,31 @@ class SinkFactoryRegistryTest {
                 () -> SinkFactoryRegistry.defaultRegistry().create("missing", rowType, System.out));
 
         assertEquals("Unsupported sink.type: missing", error.getMessage());
+    }
+
+    @Test
+    void defaultRegistryCreatesQdrantSink() throws Exception {
+        KuaiaRowType rowType = new KuaiaRowType(
+                new String[]{"id", "embedding"},
+                new DataType[]{DataType.LONG, DataType.VECTOR});
+        PipelineConfig.SinkConfig config = new PipelineConfig.SinkConfig(
+                "qdrant",
+                null,
+                null,
+                null,
+                "http://localhost:6333",
+                "docs",
+                null,
+                "id",
+                "embedding",
+                true);
+
+        SinkWriter sink = SinkFactoryRegistry.defaultRegistry().create(
+                "qdrant",
+                rowType,
+                System.out,
+                config);
+
+        assertTrue(sink instanceof QdrantVectorSink);
     }
 }

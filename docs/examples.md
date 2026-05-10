@@ -72,6 +72,32 @@ and writes the resulting vectors to the mock vector sink. The example requires a
 real API key in `OPENAI_API_KEY`; it is not part of the default automated smoke
 tests.
 
+## Qdrant Vector Sink
+
+Start Qdrant:
+
+```bash
+docker compose -f docker-compose.qdrant.yml up -d
+```
+
+Create the example collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Run the local file-to-Qdrant pipeline:
+
+```bash
+bin/kuaia run -f examples/local-file-to-qdrant.yaml
+```
+
+The example reads `examples/data/documents.csv`, creates deterministic mock
+embeddings, and upserts points into Qdrant collection `kuaia_docs`. It is not
+part of default automated tests because it requires a running Qdrant service.
+
 ## Docker Quickstart
 
 ```bash

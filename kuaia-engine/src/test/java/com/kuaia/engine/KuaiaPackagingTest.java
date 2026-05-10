@@ -64,7 +64,12 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
         assertTrue(Files.exists(root.resolve("docs/examples.md")), "docs/examples.md should exist");
         assertTrue(read(root.resolve("docs/examples.md")).contains("local-file-to-openai-compatible-vector.yaml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("local-file-to-qdrant.yaml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.qdrant.yml"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
+        assertTrue(Files.exists(root.resolve("examples/local-file-to-qdrant.yaml")), "Qdrant example should exist");
+        assertTrue(Files.exists(root.resolve("docker-compose.qdrant.yml")), "Qdrant compose file should exist");
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);

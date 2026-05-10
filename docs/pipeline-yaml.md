@@ -230,7 +230,46 @@ Rules:
 
 Implementation note: `mock-vector` is backed by Kuaia's local mock vector sink
 factory. The sink factory registry is an internal extension point for future
-vector database integrations; this MVP does not include real vector databases.
+vector database integrations. Use `qdrant` for the current real vector database
+sink.
+
+### qdrant
+
+```yaml
+sink:
+  type: qdrant
+  url: http://localhost:6333
+  collection: kuaia_docs
+  idField: id
+  vectorField: embedding
+  wait: true
+```
+
+`sink.type: qdrant` writes vectors to Qdrant with
+`PUT /collections/{collection}/points`.
+
+Fields:
+
+- `type`: must be `qdrant`
+- `url`: Qdrant HTTP base URL, for example `http://localhost:6333`
+- `collection`: target collection name
+- `idField`: `LONG` field used as the Qdrant point id
+- `vectorField`: `VECTOR` field used as the Qdrant vector
+- `apiKeyEnv`: optional environment variable containing the Qdrant API key
+- `wait`: optional, defaults to `true`; controls Qdrant's `wait` query parameter
+
+Qdrant collections are not created automatically. Create the example collection
+before running `examples/local-file-to-qdrant.yaml`:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+When `apiKeyEnv` is configured, Kuaia reads that environment variable at runtime
+and sends it as Qdrant's `api-key` header. Missing API keys, missing id/vector
+fields, and non-2xx Qdrant responses are fatal sink errors.
 
 ## Error Policy
 
@@ -365,6 +404,10 @@ Common examples:
 - `Duplicate transform field: <field>`
 - `Transform field must be STRING: <field>`
 - `Mock vector sink requires VECTOR field: embedding`
+- `Qdrant sink requires LONG field: <field>`
+- `Qdrant sink requires VECTOR field: <field>`
+- `Missing Qdrant API key environment variable: <name>`
+- `Qdrant upsert failed with status <code>: <response>`
 - `File sink does not support quoted CSV fields`
 - `File sink does not support field type: <type>`
 - `Invalid CSV row at line <line>: expected <n> columns but found <m>`
@@ -379,7 +422,7 @@ The current YAML contract does not support:
 - filters, joins, casts, or aggregations,
 - CDC offsets,
 - real external connectors,
-- real vector databases,
+- additional real vector databases beyond Qdrant,
 - provider-specific SDK integrations,
 - production deployment settings,
 - exactly-once guarantees.
