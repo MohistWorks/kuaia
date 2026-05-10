@@ -17,5 +17,6 @@ sink:
   idField: id
   vectorField: embedding
   wait: true
+  timeoutMs: 30000
 checkpoint:
   stateDir: .kuaia/state/local-file-to-qdrant

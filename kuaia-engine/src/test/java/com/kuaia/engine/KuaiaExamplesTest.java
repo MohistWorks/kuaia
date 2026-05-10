@@ -1,5 +1,7 @@
 package com.kuaia.engine;
 
+import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -41,6 +43,21 @@ class KuaiaExamplesTest {
                 Files.readAllLines(fileSinkOutput, StandardCharsets.UTF_8));
     }
 
+    @Test
+    void externalServiceExamplesIncludeTuningOptions() throws Exception {
+        Path fileToQdrantPath = repoRoot().resolve("examples/local-file-to-qdrant.yaml");
+        Path postgresToQdrantPath = repoRoot().resolve("examples/postgres-to-qdrant.yaml");
+        PipelineConfig fileToQdrant = new PipelineConfigLoader().load(fileToQdrantPath);
+        PipelineConfig postgresToQdrant = new PipelineConfigLoader().load(postgresToQdrantPath);
+
+        assertTrue(read(fileToQdrantPath).contains("timeoutMs: 30000"));
+        assertTrue(read(postgresToQdrantPath).contains("fetchSize: 1000"));
+        assertTrue(read(postgresToQdrantPath).contains("timeoutMs: 30000"));
+        assertEquals(30000, fileToQdrant.getSink().getTimeoutMs());
+        assertEquals(1000, postgresToQdrant.getSource().getFetchSize());
+        assertEquals(30000, postgresToQdrant.getSink().getTimeoutMs());
+    }
+
     private CliResult run(String... args) throws Exception {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         PrintStream out = new PrintStream(bytes, true, StandardCharsets.UTF_8.name());
@@ -55,6 +72,10 @@ class KuaiaExamplesTest {
             return cwd;
         }
         return cwd.getParent();
+    }
+
+    private String read(Path path) throws Exception {
+        return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
     }
 
     private static class CliResult {
