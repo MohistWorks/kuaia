@@ -4,20 +4,28 @@ import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.worker.connector.LocalSource;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class LocalSourceAdapter implements SourceEnumerator {
     private final LocalSource source;
-    private final SourceSplit split;
+    private final List<SourceSplit> splits;
 
     public LocalSourceAdapter(LocalSource source, String splitId) {
         this(source, new SourceSplit(splitId));
     }
 
     public LocalSourceAdapter(LocalSource source, SourceSplit split) {
+        this(source, Collections.singletonList(split));
+    }
+
+    public LocalSourceAdapter(LocalSource source, List<SourceSplit> splits) {
+        if (splits == null || splits.isEmpty()) {
+            throw new IllegalArgumentException("splits must not be empty");
+        }
         this.source = source;
-        this.split = split;
+        this.splits = Collections.unmodifiableList(new ArrayList<>(splits));
     }
 
     @Override
@@ -27,21 +35,23 @@ public class LocalSourceAdapter implements SourceEnumerator {
 
     @Override
     public List<SourceSplit> enumerateSplits() {
-        return Collections.singletonList(split);
+        return splits;
     }
 
     @Override
     public BatchSourceReader createReader(SourceSplit split) throws PipelineExecutionException {
-        if (!sameSplit(split)) {
-            throw new PipelineExecutionException("Unknown source split: " + split.getSplitId());
+        for (SourceSplit knownSplit : splits) {
+            if (sameSplit(knownSplit, split)) {
+                return new SplitReader(source, split);
+            }
         }
-        return new SplitReader(source, split);
+        throw new PipelineExecutionException("Unknown source split: " + split.getSplitId());
     }
 
-    private boolean sameSplit(SourceSplit other) {
-        return this.split.getSplitId().equals(other.getSplitId())
-                && this.split.getStartSeqInclusive() == other.getStartSeqInclusive()
-                && this.split.getEndSeqInclusive() == other.getEndSeqInclusive();
+    private boolean sameSplit(SourceSplit left, SourceSplit right) {
+        return left.getSplitId().equals(right.getSplitId())
+                && left.getStartSeqInclusive() == right.getStartSeqInclusive()
+                && left.getEndSeqInclusive() == right.getEndSeqInclusive();
     }
 
     @Override

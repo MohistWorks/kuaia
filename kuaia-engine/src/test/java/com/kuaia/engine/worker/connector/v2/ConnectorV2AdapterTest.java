@@ -111,6 +111,62 @@ class ConnectorV2AdapterTest {
     }
 
     @Test
+    void localSourceAdapterEnumeratesMultipleSplitsInOrderAndListIsImmutable() throws Exception {
+        RecordingSource source = new RecordingSource(rows(row(1L, "Alice")));
+        List<SourceSplit> splits = Arrays.asList(
+                new SourceSplit("file-0-part-0", 1L, 2L),
+                new SourceSplit("file-0-part-1", 3L, 4L));
+        LocalSourceAdapter adapter = new LocalSourceAdapter(source, splits);
+
+        List<SourceSplit> enumerated = adapter.enumerateSplits();
+
+        assertEquals(2, enumerated.size());
+        assertEquals("file-0-part-0", enumerated.get(0).getSplitId());
+        assertEquals("file-0-part-1", enumerated.get(1).getSplitId());
+        assertThrows(
+                UnsupportedOperationException.class,
+                () -> enumerated.add(new SourceSplit("file-0-part-2", 5L, 6L)));
+    }
+
+    @Test
+    void localSourceAdapterReadersIsolateMultipleSplitRanges() throws Exception {
+        RecordingSource source = new RecordingSource(rows(
+                row(1L, "Alice"),
+                row(2L, "Bob"),
+                row(3L, "Carol"),
+                row(4L, "Dave")));
+        List<SourceSplit> splits = Arrays.asList(
+                new SourceSplit("file-0-part-0", 1L, 2L),
+                new SourceSplit("file-0-part-1", 3L, 4L));
+        LocalSourceAdapter adapter = new LocalSourceAdapter(source, splits);
+
+        adapter.open();
+        List<Long> firstSeqIds = new ArrayList<>();
+        int firstRead = adapter.createReader(splits.get(0)).readFrom(
+                0L,
+                (seqId, row) -> firstSeqIds.add(seqId),
+                (seqId, error) -> false);
+        List<Long> secondSeqIds = new ArrayList<>();
+        int secondRead = adapter.createReader(splits.get(1)).readFrom(
+                0L,
+                (seqId, row) -> secondSeqIds.add(seqId),
+                (seqId, error) -> false);
+
+        assertEquals(2, firstRead);
+        assertEquals(Arrays.asList(1L, 2L), firstSeqIds);
+        assertEquals(2, secondRead);
+        assertEquals(Arrays.asList(3L, 4L), secondSeqIds);
+        adapter.close();
+    }
+
+    @Test
+    void localSourceAdapterRejectsEmptySplitList() {
+        RecordingSource source = new RecordingSource(rows(row(1L, "Alice")));
+
+        assertThrows(IllegalArgumentException.class, () -> new LocalSourceAdapter(source, new ArrayList<>()));
+    }
+
+    @Test
     void sinkWriterBatchAdapterWritesBatchThenCommits() throws Exception {
         RecordingSink sink = new RecordingSink();
         RecordingCommitter committer = new RecordingCommitter();
