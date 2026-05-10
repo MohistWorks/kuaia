@@ -41,6 +41,7 @@ source:
   type: file
   path: data/users.csv
   format: csv
+  maxRowsPerSplit: 10000
 ```
 
 Fields:
@@ -48,6 +49,8 @@ Fields:
 - `type`: must be `file`
 - `path`: local CSV path. Relative paths are resolved from the YAML file directory.
 - `format`: must be `csv`
+- `maxRowsPerSplit`: optional internal source split size. Defaults to `10000`
+  and must be a positive integer when configured.
 
 CSV rules:
 

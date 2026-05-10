@@ -244,12 +244,17 @@ public class LocalPipelineRunner {
             return new FileSourceAdapter(
                     new FileSource(Paths.get(config.getSource().getPath())),
                     "file-0",
-                    fileRowsPerSplit);
+                    fileRowsPerSplit(config));
         }
         if ("postgres".equals(sourceType)) {
             return new LocalSourceAdapter(new PostgresSource(config.getSource()), "postgres-0");
         }
         throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
+    }
+
+    private int fileRowsPerSplit(PipelineConfig config) {
+        int configured = config.getSource().getMaxRowsPerSplit();
+        return configured > 0 ? configured : fileRowsPerSplit;
     }
 
     private boolean hasCheckpointStateDir(PipelineConfig config) {

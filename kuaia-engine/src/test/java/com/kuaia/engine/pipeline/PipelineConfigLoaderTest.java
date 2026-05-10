@@ -31,6 +31,45 @@ class PipelineConfigLoaderTest {
         assertEquals("content", embedding.getInput());
         assertEquals("embedding", embedding.getOutput());
         assertEquals(4, embedding.getDimensions());
+        assertEquals(0, config.getSource().getMaxRowsPerSplit());
+    }
+
+    @Test
+    void loadsFileSourceMaxRowsPerSplit() throws Exception {
+        Path configPath = tempDir.resolve("file-source-split.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: file-source-split",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "  maxRowsPerSplit: 2",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals(2, config.getSource().getMaxRowsPerSplit());
+    }
+
+    @Test
+    void rejectsInvalidFileSourceMaxRowsPerSplit() throws Exception {
+        Path configPath = tempDir.resolve("invalid-file-source-split.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-file-source-split",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "  maxRowsPerSplit: zero",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid source.maxRowsPerSplit: zero", error.getMessage());
     }
 
     @Test

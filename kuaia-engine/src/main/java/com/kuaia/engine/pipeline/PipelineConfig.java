@@ -72,9 +72,14 @@ public class PipelineConfig {
         private final String userEnv;
         private final String passwordEnv;
         private final String query;
+        private final int maxRowsPerSplit;
 
         public SourceConfig(String type, String path, String format) {
-            this(type, path, format, null, null, null, null);
+            this(type, path, format, 0);
+        }
+
+        public SourceConfig(String type, String path, String format, int maxRowsPerSplit) {
+            this(type, path, format, null, null, null, null, maxRowsPerSplit);
         }
 
         public SourceConfig(
@@ -85,6 +90,18 @@ public class PipelineConfig {
                 String userEnv,
                 String passwordEnv,
                 String query) {
+            this(type, path, format, url, userEnv, passwordEnv, query, 0);
+        }
+
+        public SourceConfig(
+                String type,
+                String path,
+                String format,
+                String url,
+                String userEnv,
+                String passwordEnv,
+                String query,
+                int maxRowsPerSplit) {
             this.type = type;
             this.path = path;
             this.format = format;
@@ -92,6 +109,7 @@ public class PipelineConfig {
             this.userEnv = userEnv;
             this.passwordEnv = passwordEnv;
             this.query = query;
+            this.maxRowsPerSplit = maxRowsPerSplit;
         }
 
         public String getType() {
@@ -120,6 +138,10 @@ public class PipelineConfig {
 
         public String getQuery() {
             return query;
+        }
+
+        public int getMaxRowsPerSplit() {
+            return maxRowsPerSplit;
         }
     }
 

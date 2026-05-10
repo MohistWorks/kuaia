@@ -156,6 +156,47 @@ class LocalPipelineRunnerTest {
     }
 
     @Test
+    void usesConfiguredFileSourceSplitSize() throws Exception {
+        Path data = tempDir.resolve("configured-split-documents.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta",
+                "3,Gamma",
+                "4,Delta",
+                "5,Epsilon").getBytes(StandardCharsets.UTF_8));
+        Path configPath = tempDir.resolve("configured-split-vector.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: configured-split-vector",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "  maxRowsPerSplit: 2",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "    batchSize: 10",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+        CapturingSink sink = new CapturingSink();
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+        SinkFactoryRegistry registry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PipelineRunSummary summary = new LocalPipelineRunner(registry)
+                .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(java.util.Arrays.asList(2, 2, 1), sink.batchSizes);
+        assertEquals(3L, summary.getSourceSplits());
+        assertEquals(3L, summary.getSinkBatches());
+    }
+
+    @Test
     void rejectsNonPositiveFileRowsPerSplit() {
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,

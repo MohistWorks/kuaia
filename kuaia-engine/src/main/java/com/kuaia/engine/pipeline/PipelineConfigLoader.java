@@ -171,7 +171,11 @@ public class PipelineConfigLoader {
         String sourcePath = resolveLocalPath(configPath, require(source, "source.path"), "source.path");
         String sourceFormat = require(source, "source.format");
         requireSupported("source.format", sourceFormat, "csv");
-        return new PipelineConfig.SourceConfig(sourceType, sourcePath, sourceFormat);
+        return new PipelineConfig.SourceConfig(
+                sourceType,
+                sourcePath,
+                sourceFormat,
+                parseSourceMaxRowsPerSplit(source.get("maxRowsPerSplit")));
     }
 
     private PipelineConfig.TransformConfig loadEmbeddingTransform(Map<String, String> transform, String fieldPrefix)
@@ -372,6 +376,21 @@ public class PipelineConfigLoader {
             return batchSize;
         } catch (NumberFormatException e) {
             throw new PipelineConfigException("Invalid transform.batchSize: " + value, e);
+        }
+    }
+
+    private int parseSourceMaxRowsPerSplit(String value) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return 0;
+        }
+        try {
+            int maxRowsPerSplit = Integer.parseInt(value.trim());
+            if (maxRowsPerSplit <= 0) {
+                throw new PipelineConfigException("Invalid source.maxRowsPerSplit: " + value);
+            }
+            return maxRowsPerSplit;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid source.maxRowsPerSplit: " + value, e);
         }
     }
 
