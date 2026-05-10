@@ -188,6 +188,13 @@ class ConnectorV2AdapterTest {
         assertEquals(1, sink.closeCalls);
     }
 
+    @Test
+    void batchCommitRejectsInvalidMetadata() {
+        assertThrows(IllegalArgumentException.class, () -> new BatchCommit("", 1L, 1));
+        assertThrows(IllegalArgumentException.class, () -> new BatchCommit("file-0", 0L, 1));
+        assertThrows(IllegalArgumentException.class, () -> new BatchCommit("file-0", 1L, 0));
+    }
+
     private static BinaryRow row(long id, String name) {
         BinaryRow row = new BinaryRow(2);
         row.setLong(0, id);
