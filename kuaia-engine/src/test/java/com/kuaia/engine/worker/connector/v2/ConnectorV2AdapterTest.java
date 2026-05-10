@@ -14,8 +14,25 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ConnectorV2AdapterTest {
+    @Test
+    void sourceSplitDefaultsToFullSeqRange() {
+        SourceSplit split = new SourceSplit("file-0");
+
+        assertEquals("file-0", split.getSplitId());
+        assertEquals(1L, split.getStartSeqInclusive());
+        assertEquals(Long.MAX_VALUE, split.getEndSeqInclusive());
+    }
+
+    @Test
+    void sourceSplitRejectsInvalidRanges() {
+        assertThrows(IllegalArgumentException.class, () -> new SourceSplit("", 1L, 2L));
+        assertThrows(IllegalArgumentException.class, () -> new SourceSplit("file-0", 0L, 2L));
+        assertThrows(IllegalArgumentException.class, () -> new SourceSplit("file-0", 3L, 2L));
+    }
+
     @Test
     void localSourceAdapterEnumeratesSingleSplitAndResumesFromCheckpoint() throws Exception {
         RecordingSource source = new RecordingSource(rows(
@@ -47,6 +64,50 @@ class ConnectorV2AdapterTest {
         adapter.close();
         assertEquals(1, source.openCalls);
         assertEquals(1, source.closeCalls);
+    }
+
+    @Test
+    void localSourceAdapterReaderHonorsSplitRangeAndCheckpoint() throws Exception {
+        RecordingSource source = new RecordingSource(rows(
+                row(1L, "Alice"),
+                row(2L, "Bob"),
+                row(3L, "Carol"),
+                row(4L, "Dave"),
+                row(5L, "Eve")));
+        SourceSplit split = new SourceSplit("file-0-part-0", 2L, 4L);
+        LocalSourceAdapter adapter = new LocalSourceAdapter(source, split);
+
+        adapter.open();
+        BatchSourceReader reader = adapter.createReader(split);
+        List<Long> seqIds = new ArrayList<>();
+
+        int read = reader.readFrom(
+                0L,
+                (seqId, row) -> seqIds.add(seqId),
+                (seqId, error) -> false);
+
+        assertEquals(3, read);
+        assertEquals(Arrays.asList(2L, 3L, 4L), seqIds);
+
+        seqIds.clear();
+        int resumed = reader.readFrom(
+                3L,
+                (seqId, row) -> seqIds.add(seqId),
+                (seqId, error) -> false);
+
+        assertEquals(1, resumed);
+        assertEquals(Arrays.asList(4L), seqIds);
+        adapter.close();
+    }
+
+    @Test
+    void localSourceAdapterRejectsUnexpectedSplitRange() {
+        RecordingSource source = new RecordingSource(rows(row(1L, "Alice")));
+        LocalSourceAdapter adapter = new LocalSourceAdapter(source, new SourceSplit("file-0", 2L, 4L));
+
+        assertThrows(
+                PipelineExecutionException.class,
+                () -> adapter.createReader(new SourceSplit("file-0", 1L, 4L)));
     }
 
     @Test
