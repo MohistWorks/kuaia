@@ -191,6 +191,24 @@ Declarative runs print a stable summary line with rows read, rows written, rows
 failed under the configured bad-record policy, rows skipped by checkpoint
 resume, latest checkpoint sequence, task state, and duration in milliseconds.
 
+## Benchmarks
+
+Kuaia includes a small local benchmark smoke test for the batch-aware pipeline
+path. It uses generated CSV data, a counting embedding provider, a counting
+vector sink, and local checkpoint state; it does not call OpenAI, Qdrant, or any
+external service.
+
+```bash
+mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dsurefire.failIfNoSpecifiedTests=false test
+cat kuaia-engine/target/kuaia-benchmark/local-pipeline-batch.json
+```
+
+The default smoke uses 128 rows so CI stays fast. For a larger local run:
+
+```bash
+mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dkuaia.benchmark.rows=10000 -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
 ## Repository Layout
 
 - `kuaia-common`: shared data model, connector APIs, protobuf contracts, and common utilities.

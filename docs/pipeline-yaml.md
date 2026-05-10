@@ -463,6 +463,22 @@ export KUAIA_POSTGRES_PASSWORD=kuaia
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
+## Benchmark Smoke
+
+Kuaia's benchmark smoke is a developer check for the local batch path. It
+generates CSV input, runs batch sizes `1`, `8`, `32`, and `128`, and writes
+counter output to `kuaia-engine/target/kuaia-benchmark/local-pipeline-batch.json`.
+
+```bash
+mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+For larger local runs, override the row count:
+
+```bash
+mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dkuaia.benchmark.rows=10000 -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
 ## Error Messages
 
 Expected user errors return exit code `1` and print a deterministic message.

@@ -11,6 +11,7 @@ import com.kuaia.engine.pipeline.PipelineRunSummary;
 import com.kuaia.engine.worker.connector.ConsoleSink;
 import com.kuaia.engine.worker.connector.FakeSource;
 import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.FileSource;
 import com.kuaia.engine.worker.connector.FileSink;
@@ -32,13 +33,19 @@ import java.util.List;
 
 public class LocalPipelineRunner {
     private final SinkFactoryRegistry sinkFactories;
+    private final EmbeddingProviderRegistry embeddingProviders;
 
     public LocalPipelineRunner() {
         this(SinkFactoryRegistry.defaultRegistry());
     }
 
     public LocalPipelineRunner(SinkFactoryRegistry sinkFactories) {
+        this(sinkFactories, EmbeddingProviderRegistry.defaultRegistry());
+    }
+
+    public LocalPipelineRunner(SinkFactoryRegistry sinkFactories, EmbeddingProviderRegistry embeddingProviders) {
         this.sinkFactories = sinkFactories;
+        this.embeddingProviders = embeddingProviders;
     }
 
     public int run(PrintStream out) throws Exception {
@@ -79,7 +86,10 @@ public class LocalPipelineRunner {
         source.open();
         BatchSinkWriter sink = null;
         try {
-            TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
+            TransformPipeline transforms = TransformPipeline.from(
+                    source.getRowType(),
+                    config.getTransforms(),
+                    embeddingProviders);
             sink = createSink(config, transforms.getOutputType(), out);
             sink.open();
             out.println("Starting pipeline: " + config.getName());
@@ -117,7 +127,10 @@ public class LocalPipelineRunner {
         source.open();
         BatchSinkWriter sink = null;
         try {
-            TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
+            TransformPipeline transforms = TransformPipeline.from(
+                    source.getRowType(),
+                    config.getTransforms(),
+                    embeddingProviders);
             out.println("Starting pipeline: " + config.getName());
             try (LocalPipelineCheckpointStore checkpointStore = new LocalPipelineCheckpointStore(
                     Paths.get(config.getCheckpoint().getStateDir()),
