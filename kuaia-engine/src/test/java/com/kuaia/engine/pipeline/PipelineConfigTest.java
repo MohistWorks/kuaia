@@ -39,4 +39,31 @@ class PipelineConfigTest {
 
         assertEquals("fetchSize must not be negative", error.getMessage());
     }
+
+    @Test
+    void sinkConfigAllowsUnsetTimeoutMs() {
+        PipelineConfig.SinkConfig sink = new PipelineConfig.SinkConfig("qdrant");
+
+        assertEquals(0, sink.getTimeoutMs());
+    }
+
+    @Test
+    void sinkConfigRejectsNegativeTimeoutMs() {
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineConfig.SinkConfig(
+                        "qdrant",
+                        null,
+                        null,
+                        null,
+                        "http://localhost:6333",
+                        "docs",
+                        null,
+                        "id",
+                        "embedding",
+                        true,
+                        -1));
+
+        assertEquals("timeoutMs must not be negative", error.getMessage());
+    }
 }
