@@ -37,6 +37,10 @@ git diff --check
 6. Do not commit local state, generated output, or machine-specific files such
    as `.kuaia/`, `target/`, `.DS_Store`, or `dev/`.
 
+Use the GitHub issue templates for bug reports and feature requests. Pull
+requests should fill out the repository PR template, including the validation
+commands that were run.
+
 ## Current Scope
 
 The MVP supports local declarative batch pipelines, typed `BinaryRow` records,

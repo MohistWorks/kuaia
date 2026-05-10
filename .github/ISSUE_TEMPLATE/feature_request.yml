@@ -1,0 +1,50 @@
+name: Feature Request
+description: Propose an improvement aligned with the MVP product scope.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Kuaia is currently an MVP focused on local, checkpoint-aware AI-ready
+        batch pipelines. See docs/product-scope.md before proposing broad
+        platform features.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - Pipeline YAML
+        - Connector
+        - Transform
+        - Vector pipeline
+        - Checkpoint or recovery
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      description: How should this be tested or demonstrated?
+      placeholder: |
+        Example command:
+        Expected output:
+    validations:
+      required: false

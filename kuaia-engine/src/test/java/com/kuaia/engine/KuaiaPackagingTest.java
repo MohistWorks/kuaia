@@ -59,6 +59,16 @@ class KuaiaPackagingTest {
         assertTrue(compose.contains("/opt/kuaia/.kuaia"), compose);
         assertTrue(read(root.resolve(".dockerignore")).contains("dev/"));
         assertTrue(read(root.resolve(".dockerignore")).contains("daily_tasks.json"));
+        assertTrue(Files.exists(root.resolve(".github/ISSUE_TEMPLATE/bug_report.yml")),
+                "bug report issue template should exist");
+        assertTrue(Files.exists(root.resolve(".github/ISSUE_TEMPLATE/feature_request.yml")),
+                "feature request issue template should exist");
+        assertTrue(Files.exists(root.resolve(".github/ISSUE_TEMPLATE/config.yml")),
+                "issue template config should exist");
+        assertTrue(Files.exists(root.resolve(".github/pull_request_template.md")),
+                "pull request template should exist");
+        assertTrue(read(root.resolve(".github/pull_request_template.md")).contains("make public-mvp-smoke"));
+        assertTrue(read(root.resolve(".github/ISSUE_TEMPLATE/bug_report.yml")).contains("Do not include API keys"));
         assertTrue(Files.exists(root.resolve("docs/pipeline-yaml.md")), "docs/pipeline-yaml.md should exist");
         assertTrue(read(root.resolve("README.md")).contains("docs/pipeline-yaml.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/examples.md"));
