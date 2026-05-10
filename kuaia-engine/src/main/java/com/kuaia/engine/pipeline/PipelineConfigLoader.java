@@ -13,6 +13,7 @@ import java.util.Map;
 public class PipelineConfigLoader {
     private static final String DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
     private static final int DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS = 30_000;
+    private static final int DEFAULT_QDRANT_TIMEOUT_MS = 30_000;
     private static final int DEFAULT_EMBEDDING_BATCH_SIZE = 32;
     private static final String RESTRICT_LOCAL_PATHS_ENV = "KUAIA_RESTRICT_LOCAL_PATHS";
 
@@ -240,6 +241,9 @@ public class PipelineConfigLoader {
         if ("qdrant".equals(sinkType)) {
             return loadQdrantSink(sink);
         }
+        if (hasText(sink.get("timeoutMs"))) {
+            throw new PipelineConfigException("sink.timeoutMs is only supported for sink.type: qdrant");
+        }
         if (!"file".equals(sinkType)) {
             return new PipelineConfig.SinkConfig(sinkType);
         }
@@ -274,7 +278,8 @@ public class PipelineConfigLoader {
                 sink.get("apiKeyEnv"),
                 require(sink, "sink.idField"),
                 require(sink, "sink.vectorField"),
-                waitForCommit);
+                waitForCommit,
+                parseSinkTimeoutMs(sink.get("timeoutMs"), DEFAULT_QDRANT_TIMEOUT_MS));
     }
 
     private PipelineConfig.ErrorPolicyConfig loadErrorPolicy(Map<String, String> errorPolicy)
@@ -384,6 +389,21 @@ public class PipelineConfigLoader {
             return batchSize;
         } catch (NumberFormatException e) {
             throw new PipelineConfigException("Invalid transform.batchSize: " + value, e);
+        }
+    }
+
+    private int parseSinkTimeoutMs(String value, int defaultTimeoutMs) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return defaultTimeoutMs;
+        }
+        try {
+            int timeoutMs = Integer.parseInt(value.trim());
+            if (timeoutMs <= 0) {
+                throw new PipelineConfigException("Invalid sink.timeoutMs: " + value);
+            }
+            return timeoutMs;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid sink.timeoutMs: " + value, e);
         }
     }
 

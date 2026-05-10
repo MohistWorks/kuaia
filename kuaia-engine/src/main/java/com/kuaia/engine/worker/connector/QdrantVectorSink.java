@@ -8,6 +8,7 @@ import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -19,11 +20,15 @@ import java.util.List;
 import java.util.Map;
 
 public class QdrantVectorSink implements SinkWriter {
+    private static final int DEFAULT_TIMEOUT_MILLIS = 30_000;
+
     private final KuaiaRowType rowType;
     private final int idOrdinal;
     private final int vectorOrdinal;
     private final String upsertUrl;
     private final String apiKey;
+    private final int timeoutMillis;
+    private final ConnectionFactory connectionFactory;
 
     public QdrantVectorSink(KuaiaRowType rowType, PipelineConfig.SinkConfig config)
             throws PipelineExecutionException {
@@ -32,11 +37,22 @@ public class QdrantVectorSink implements SinkWriter {
 
     QdrantVectorSink(KuaiaRowType rowType, PipelineConfig.SinkConfig config, Map<String, String> environment)
             throws PipelineExecutionException {
+        this(rowType, config, environment, QdrantVectorSink::openHttpConnection);
+    }
+
+    QdrantVectorSink(
+            KuaiaRowType rowType,
+            PipelineConfig.SinkConfig config,
+            Map<String, String> environment,
+            ConnectionFactory connectionFactory)
+            throws PipelineExecutionException {
         this.rowType = rowType;
         this.idOrdinal = requireField(rowType, config.getIdField(), DataType.LONG);
         this.vectorOrdinal = requireField(rowType, config.getVectorField(), DataType.VECTOR);
         this.upsertUrl = buildUpsertUrl(config);
         this.apiKey = loadApiKey(config.getApiKeyEnv(), environment);
+        this.timeoutMillis = config.getTimeoutMs() > 0 ? config.getTimeoutMs() : DEFAULT_TIMEOUT_MILLIS;
+        this.connectionFactory = connectionFactory;
     }
 
     @Override
@@ -56,7 +72,9 @@ public class QdrantVectorSink implements SinkWriter {
             return;
         }
         byte[] body = buildRequestBody(rows).getBytes(StandardCharsets.UTF_8);
-        HttpURLConnection connection = (HttpURLConnection) new URL(upsertUrl).openConnection();
+        HttpURLConnection connection = connectionFactory.open(new URL(upsertUrl));
+        connection.setConnectTimeout(timeoutMillis);
+        connection.setReadTimeout(timeoutMillis);
         connection.setRequestMethod("PUT");
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "application/json");
@@ -220,5 +238,13 @@ public class QdrantVectorSink implements SinkWriter {
             }
         }
         return escaped.toString();
+    }
+
+    private static HttpURLConnection openHttpConnection(URL url) throws IOException {
+        return (HttpURLConnection) url.openConnection();
+    }
+
+    interface ConnectionFactory {
+        HttpURLConnection open(URL url) throws IOException;
     }
 }

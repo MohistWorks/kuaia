@@ -531,6 +531,78 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsQdrantSinkTimeout() throws Exception {
+        Path configPath = tempDir.resolve("qdrant-sink-timeout.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: qdrant-sink-timeout",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_docs",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  timeoutMs: 12000").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals(12000, config.getSink().getTimeoutMs());
+    }
+
+    @Test
+    void rejectsInvalidQdrantSinkTimeout() throws Exception {
+        Path configPath = tempDir.resolve("invalid-qdrant-sink-timeout.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-qdrant-sink-timeout",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_docs",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  timeoutMs: zero").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid sink.timeoutMs: zero", error.getMessage());
+    }
+
+    @Test
+    void rejectsQdrantTimeoutForFileSink() throws Exception {
+        Path configPath = tempDir.resolve("file-sink-timeout.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: file-sink-timeout",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: out/users.csv",
+                "  format: csv",
+                "  timeoutMs: 12000").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("sink.timeoutMs is only supported for sink.type: qdrant", error.getMessage());
+    }
+
+    @Test
     void rejectsMissingQdrantCollection() throws Exception {
         Path configPath = tempDir.resolve("missing-qdrant-collection.yaml");
         Files.write(configPath, String.join("\n",

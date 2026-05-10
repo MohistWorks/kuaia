@@ -9,11 +9,14 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -72,6 +75,31 @@ class QdrantVectorSinkTest {
                         + "{\"id\":8,\"vector\":[3.0,4.0],\"payload\":{\"id\":8,\"content\":\"Beta\"}}"
                         + "]}",
                 captured.body);
+    }
+
+    @Test
+    void appliesConfiguredTimeoutToUpsertConnection() throws Exception {
+        CapturingConnection connection = new CapturingConnection();
+        PipelineConfig.SinkConfig config = config(
+                "http://localhost:6333",
+                "docs",
+                null,
+                "id",
+                "embedding",
+                true,
+                12000);
+        QdrantVectorSink sink = new QdrantVectorSink(
+                rowType(),
+                config,
+                Collections.emptyMap(),
+                url -> connection);
+
+        sink.open();
+        sink.write(row());
+        sink.close();
+
+        assertEquals(12000, connection.getConnectTimeout());
+        assertEquals(12000, connection.getReadTimeout());
     }
 
     @Test
@@ -194,6 +222,17 @@ class QdrantVectorSinkTest {
             String idField,
             String vectorField,
             boolean wait) {
+        return config(url, collection, apiKeyEnv, idField, vectorField, wait, 0);
+    }
+
+    private PipelineConfig.SinkConfig config(
+            String url,
+            String collection,
+            String apiKeyEnv,
+            String idField,
+            String vectorField,
+            boolean wait,
+            int timeoutMs) {
         return new PipelineConfig.SinkConfig(
                 "qdrant",
                 null,
@@ -204,7 +243,8 @@ class QdrantVectorSinkTest {
                 apiKeyEnv,
                 idField,
                 vectorField,
-                wait);
+                wait,
+                timeoutMs);
     }
 
     private Map<String, String> env(String key, String value) {
@@ -229,5 +269,39 @@ class QdrantVectorSinkTest {
         private String query;
         private String apiKey;
         private String body;
+    }
+
+    private static class CapturingConnection extends HttpURLConnection {
+        private final ByteArrayOutputStream requestBody = new ByteArrayOutputStream();
+
+        CapturingConnection() throws Exception {
+            super(new URL("http://localhost:6333/collections/docs/points"));
+        }
+
+        @Override
+        public void disconnect() {}
+
+        @Override
+        public boolean usingProxy() {
+            return false;
+        }
+
+        @Override
+        public void connect() {}
+
+        @Override
+        public OutputStream getOutputStream() {
+            return requestBody;
+        }
+
+        @Override
+        public int getResponseCode() {
+            return 200;
+        }
+
+        @Override
+        public InputStream getInputStream() {
+            return new ByteArrayInputStream("{\"status\":\"ok\"}".getBytes(StandardCharsets.UTF_8));
+        }
     }
 }

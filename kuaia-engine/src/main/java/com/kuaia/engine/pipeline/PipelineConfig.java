@@ -324,13 +324,14 @@ public class PipelineConfig {
         private final String idField;
         private final String vectorField;
         private final boolean wait;
+        private final int timeoutMs;
 
         public SinkConfig(String type) {
             this(type, null, null, null);
         }
 
         public SinkConfig(String type, String path, String format, String mode) {
-            this(type, path, format, mode, null, null, null, null, null, true);
+            this(type, path, format, mode, null, null, null, null, null, true, 0);
         }
 
         public SinkConfig(
@@ -344,6 +345,24 @@ public class PipelineConfig {
                 String idField,
                 String vectorField,
                 boolean wait) {
+            this(type, path, format, mode, url, collection, apiKeyEnv, idField, vectorField, wait, 0);
+        }
+
+        public SinkConfig(
+                String type,
+                String path,
+                String format,
+                String mode,
+                String url,
+                String collection,
+                String apiKeyEnv,
+                String idField,
+                String vectorField,
+                boolean wait,
+                int timeoutMs) {
+            if (timeoutMs < 0) {
+                throw new IllegalArgumentException("timeoutMs must not be negative");
+            }
             this.type = type;
             this.path = path;
             this.format = format;
@@ -354,6 +373,7 @@ public class PipelineConfig {
             this.idField = idField;
             this.vectorField = vectorField;
             this.wait = wait;
+            this.timeoutMs = timeoutMs;
         }
 
         public String getType() {
@@ -394,6 +414,10 @@ public class PipelineConfig {
 
         public boolean isWait() {
             return wait;
+        }
+
+        public int getTimeoutMs() {
+            return timeoutMs;
         }
     }
 

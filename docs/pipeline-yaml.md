@@ -291,6 +291,7 @@ sink:
   idField: id
   vectorField: embedding
   wait: true
+  timeoutMs: 30000
 ```
 
 `sink.type: qdrant` writes vectors to Qdrant with
@@ -306,6 +307,8 @@ Fields:
 - `vectorField`: `VECTOR` field used as the Qdrant vector
 - `apiKeyEnv`: optional environment variable containing the Qdrant API key
 - `wait`: optional, defaults to `true`; controls Qdrant's `wait` query parameter
+- `timeoutMs`: optional HTTP connect/read timeout in milliseconds. Defaults to
+  `30000` and must be a positive integer when configured.
 
 Qdrant collections are not created automatically. Create the example collection
 before running `examples/local-file-to-qdrant.yaml`:
@@ -511,6 +514,8 @@ Common examples:
 - `source.maxRowsPerSplit is only supported for source.type: file`
 - `source.fetchSize is only supported for source.type: postgres`
 - `Invalid source.fetchSize: <value>`
+- `sink.timeoutMs is only supported for sink.type: qdrant`
+- `Invalid sink.timeoutMs: <value>`
 - `Invalid transform.dimensions: <value>`
 - `Invalid transform.timeoutMs: <value>`
 - `Invalid transform.batchSize: <value>`
