@@ -1,7 +1,8 @@
 # Pipeline YAML
 
 Kuaia's current public pipeline YAML is a small MVP contract for local examples.
-It is intentionally not a general YAML dialect or production job spec.
+It is intentionally not a general YAML dialect or production job spec. For the
+current product boundary, see [`product-scope.md`](product-scope.md).
 
 ## Shape
 

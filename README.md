@@ -1,6 +1,30 @@
 # Kuaia
 
-Kuaia is an experimental Java runtime for AI-ready data integration. The current repository is an MVP focused on execution semantics: local pipelines, typed task attempts, checkpoint-aware state, RocksDB persistence, and a bounded Raft HA prototype.
+Kuaia is an experimental Java runtime for AI-ready data integration. The
+long-term product direction is an AI-ready DataOps engine for moving,
+transforming, vectorizing, and activating data with predictable infrastructure
+costs.
+
+The current open-source repository is intentionally narrower. It is an MVP for
+developers who want to run local, declarative, checkpoint-aware batch pipelines
+and evaluate the core execution semantics before Kuaia grows into a broader
+platform.
+
+For the user-facing product boundary, see [`docs/product-scope.md`](docs/product-scope.md).
+
+## Product Scope
+
+Kuaia today is best understood as a local AI data pipeline runtime:
+
+- It reads bounded data from supported sources.
+- It carries rows through a typed `BinaryRow` model.
+- It applies a linear transform chain, including embedding transforms.
+- It writes to local outputs or vector sinks.
+- It persists checkpoint progress so reruns can resume completed work.
+
+Kuaia is not yet a general ETL platform, a CDC engine, a distributed DAG
+runtime, or a visual DataOps product. Those are roadmap directions, not current
+MVP promises.
 
 ## Current Status
 

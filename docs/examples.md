@@ -1,7 +1,8 @@
 # Examples
 
 These examples are small local pipelines for the public MVP contract. Run them
-from the repository root with `bin/kuaia`.
+from the repository root with `bin/kuaia`. For the current product boundary,
+read [`product-scope.md`](product-scope.md) first.
 
 ## Local File To Console
 

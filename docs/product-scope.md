@@ -1,0 +1,90 @@
+# Product Scope
+
+Kuaia is being built toward an AI-ready DataOps engine: one runtime for moving,
+transforming, vectorizing, and activating data across local and distributed
+deployments.
+
+The current public repository is an MVP. Its job is to prove a smaller and more
+concrete product slice: developers can run, inspect, and recover local AI-ready
+data pipelines from a declarative YAML file.
+
+## Current Product Definition
+
+Kuaia today is a local Java runtime for checkpoint-aware batch pipelines:
+
+```text
+Source -> BinaryRow -> Transforms -> Sink
+```
+
+The MVP focuses on execution semantics rather than platform breadth. It should
+be evaluated by whether a pipeline can be run locally, resumed after completed
+work, extended through connector boundaries, and explained through deterministic
+state transitions.
+
+## Who It Is For Today
+
+Kuaia is currently useful for:
+
+- developers evaluating AI/RAG data preparation flows,
+- contributors exploring source, transform, and sink connector boundaries,
+- users who want a small local pipeline from CSV or Postgres into files,
+  console output, mock vector output, or Qdrant,
+- maintainers validating checkpoint and state-store behavior before broader
+  distributed execution work.
+
+It is not yet aimed at production teams that need CDC, streaming joins, a visual
+control plane, RBAC, lineage, Kubernetes operation, or a large connector catalog.
+
+## What You Can Run Today
+
+Supported sources:
+
+- local CSV files through `source.type: file`,
+- batch PostgreSQL queries through `source.type: postgres`.
+
+Supported transforms:
+
+- `select`,
+- `rename`,
+- deterministic local `mock-embedding`,
+- OpenAI-compatible `embedding` requests.
+
+Supported sinks:
+
+- `console`,
+- local CSV `file`,
+- `mock-vector`,
+- Qdrant vector upserts.
+
+Supported runtime behavior:
+
+- declarative YAML pipelines,
+- linear transform chains,
+- RocksDB-backed local checkpoints,
+- bad-record skipping for malformed CSV rows,
+- batch-aware embedding and vector sink execution,
+- run summaries with row, checkpoint, split, and sink batch counters.
+
+## Current Contract
+
+The public contract is documented in [`pipeline-yaml.md`](pipeline-yaml.md).
+The example catalog is documented in [`examples.md`](examples.md).
+
+The current execution guarantee is at-least-once style processing with
+idempotent sinks. Kuaia does not claim exactly-once execution in the MVP.
+
+The current topology is linear. Kuaia does not yet expose DAGs, joins, branches,
+fan-out, streaming windows, or CDC offset coordination.
+
+## Roadmap Direction
+
+The long-term direction remains broader than the MVP:
+
+- richer connector APIs and production-certified connectors,
+- more vector database and embedding provider integrations,
+- stronger batching and performance baselines,
+- distributed scheduling and high availability,
+- governance, lineage, and operational control-plane capabilities.
+
+Public docs should describe these as future direction until they are shipped in
+the open-source runtime.
