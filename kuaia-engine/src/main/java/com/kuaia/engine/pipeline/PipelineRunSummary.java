@@ -9,6 +9,8 @@ public class PipelineRunSummary {
     private final long rowsSkipped;
     private final long checkpointSeq;
     private final TaskState taskState;
+    private final long sourceSplits;
+    private final long sinkBatches;
     private final long durationMillis;
 
     public PipelineRunSummary(
@@ -19,12 +21,36 @@ public class PipelineRunSummary {
             long checkpointSeq,
             TaskState taskState,
             long durationMillis) {
+        this(
+                rowsRead,
+                rowsWritten,
+                rowsFailed,
+                rowsSkipped,
+                checkpointSeq,
+                taskState,
+                0L,
+                0L,
+                durationMillis);
+    }
+
+    public PipelineRunSummary(
+            long rowsRead,
+            long rowsWritten,
+            long rowsFailed,
+            long rowsSkipped,
+            long checkpointSeq,
+            TaskState taskState,
+            long sourceSplits,
+            long sinkBatches,
+            long durationMillis) {
         this.rowsRead = rowsRead;
         this.rowsWritten = rowsWritten;
         this.rowsFailed = rowsFailed;
         this.rowsSkipped = rowsSkipped;
         this.checkpointSeq = checkpointSeq;
         this.taskState = taskState;
+        this.sourceSplits = sourceSplits;
+        this.sinkBatches = sinkBatches;
         this.durationMillis = durationMillis;
     }
 
@@ -52,6 +78,14 @@ public class PipelineRunSummary {
         return taskState;
     }
 
+    public long getSourceSplits() {
+        return sourceSplits;
+    }
+
+    public long getSinkBatches() {
+        return sinkBatches;
+    }
+
     public long getDurationMillis() {
         return durationMillis;
     }
@@ -64,6 +98,8 @@ public class PipelineRunSummary {
                 rowsSkipped,
                 checkpointSeq,
                 taskState,
+                sourceSplits,
+                sinkBatches,
                 durationMillis);
     }
 
@@ -80,6 +116,10 @@ public class PipelineRunSummary {
                 + checkpointSeq
                 + " taskState="
                 + taskState
+                + " sourceSplits="
+                + sourceSplits
+                + " sinkBatches="
+                + sinkBatches
                 + " durationMs="
                 + durationMillis;
     }

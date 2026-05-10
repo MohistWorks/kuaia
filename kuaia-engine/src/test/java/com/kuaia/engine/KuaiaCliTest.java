@@ -104,7 +104,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("Starting pipeline: local-file-to-file"));
         assertTrue(result.output.contains("Pipeline Finished. rows=2"));
         assertTrue(result.output.contains(
-                "Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED durationMs="));
+                "Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED sourceSplits=1 sinkBatches=2 durationMs="));
         assertEquals(String.join("\n",
                         "id,name",
                         "1,Alice",
@@ -152,7 +152,7 @@ class KuaiaCliTest {
         assertEquals(0, second.exitCode);
         assertTrue(second.output.contains("Pipeline Finished. rows=0 checkpoint=2 state=COMPLETED"));
         assertTrue(second.output.contains(
-                "Run Summary: rowsRead=0 rowsWritten=0 rowsFailed=0 rowsSkipped=2 checkpointSeq=2 taskState=COMPLETED durationMs="));
+                "Run Summary: rowsRead=0 rowsWritten=0 rowsFailed=0 rowsSkipped=2 checkpointSeq=2 taskState=COMPLETED sourceSplits=0 sinkBatches=0 durationMs="));
         assertEquals(String.join("\n",
                         "id,name",
                         "1,Alice",

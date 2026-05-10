@@ -112,6 +112,7 @@ public class LocalPipelineRunner {
             PipelineCounters counters = new PipelineCounters();
             BatchBuffer batch = new BatchBuffer(transforms.getBatchSize());
             for (SourceSplit split : source.enumerateSplits()) {
+                counters.recordSourceSplit();
                 BatchSourceReader reader = source.createReader(split);
                 reader.readFrom(
                         0L,
@@ -175,6 +176,7 @@ public class LocalPipelineRunner {
                 counters.rowsSkipped = task.getLastCheckpointSeq();
                 counters.checkpointSeq = task.getLastCheckpointSeq();
                 for (SourceSplit split : source.enumerateSplits()) {
+                    counters.recordSourceSplit();
                     BatchSourceReader reader = source.createReader(split);
                     reader.readFrom(
                             task.getLastCheckpointSeq(),
@@ -303,6 +305,7 @@ public class LocalPipelineRunner {
         sink.writeBatch(outputs);
         long maxSeqId = maxSeqId(seqIds);
         sink.committer().commit(new BatchCommit(split.getSplitId(), maxSeqId, outputs.size()));
+        counters.recordSinkBatch();
         if (committer != null) {
             committer.commit(maxSeqId);
         }
@@ -368,6 +371,16 @@ public class LocalPipelineRunner {
         private long rowsFailed;
         private long rowsSkipped;
         private long checkpointSeq;
+        private long sourceSplits;
+        private long sinkBatches;
+
+        private void recordSourceSplit() {
+            sourceSplits++;
+        }
+
+        private void recordSinkBatch() {
+            sinkBatches++;
+        }
 
         private void recordWritten(long seqId) {
             rowsRead++;
@@ -389,6 +402,8 @@ public class LocalPipelineRunner {
                     rowsSkipped,
                     checkpointSeq,
                     taskState,
+                    sourceSplits,
+                    sinkBatches,
                     0L);
         }
     }

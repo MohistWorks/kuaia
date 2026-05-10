@@ -146,11 +146,13 @@ class LocalPipelineRunnerTest {
                 (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
 
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        new LocalPipelineRunner(registry, EmbeddingProviderRegistry.defaultRegistry(), 2)
+        PipelineRunSummary summary = new LocalPipelineRunner(registry, EmbeddingProviderRegistry.defaultRegistry(), 2)
                 .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
 
         assertEquals(0, sink.singleWrites);
         assertEquals(java.util.Arrays.asList(2, 2, 1), sink.batchSizes);
+        assertEquals(3L, summary.getSourceSplits());
+        assertEquals(3L, summary.getSinkBatches());
     }
 
     @Test
