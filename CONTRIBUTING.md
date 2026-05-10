@@ -58,3 +58,8 @@ changes should include:
   services,
 - documentation updates in [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md),
 - public MVP smoke coverage when the change affects default examples.
+
+## Security Reports
+
+Do not report vulnerabilities or leaked credentials in public issues. Use
+GitHub Security Advisories and follow [`SECURITY.md`](SECURITY.md).

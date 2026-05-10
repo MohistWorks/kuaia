@@ -68,6 +68,9 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help"));
         assertTrue(read(root.resolve("README.md")).contains("docker compose up --build"));
         assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
+        assertTrue(read(root.resolve("README.md")).contains("SECURITY.md"));
+        assertTrue(Files.exists(root.resolve("SECURITY.md")), "SECURITY.md should exist");
+        assertTrue(read(root.resolve("CONTRIBUTING.md")).contains("SECURITY.md"));
         assertTrue(Files.exists(root.resolve("docs/examples.md")), "docs/examples.md should exist");
         assertTrue(read(root.resolve("docs/examples.md")).contains("local-file-to-openai-compatible-vector.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("local-file-to-qdrant.yaml"));

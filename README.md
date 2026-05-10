@@ -264,6 +264,11 @@ tree. Public user-facing docs should live in `README.md` or future files under
 
 Kuaia is licensed under the Apache License, Version 2.0. See `LICENSE`.
 
+## Security
+
+Please report suspected vulnerabilities through GitHub Security Advisories. See
+[`SECURITY.md`](SECURITY.md) for the current MVP security policy.
+
 ## Development Notes
 
 The codebase is intentionally small and test-first. Before making behavioral changes, add a focused failing test, implement the minimum production code, and run:
