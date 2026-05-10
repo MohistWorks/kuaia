@@ -1,6 +1,7 @@
 package com.kuaia.engine;
 
 import com.kuaia.common.api.SinkWriter;
+import com.kuaia.common.data.BinaryRow;
 import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
@@ -19,6 +20,8 @@ import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 
 import java.io.PrintStream;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 public class LocalPipelineRunner {
     private final SinkFactoryRegistry sinkFactories;
@@ -75,13 +78,20 @@ public class LocalPipelineRunner {
             out.println("Starting pipeline: " + config.getName());
             SinkWriter openedSink = sink;
             PipelineCounters counters = new PipelineCounters();
+            BatchBuffer batch = new BatchBuffer(transforms.getBatchSize());
             source.readFrom(
                     0L,
                     (seqId, row) -> {
-                        openedSink.write(transforms.apply(row));
-                        counters.recordWritten(seqId);
+                        batch.add(seqId, row);
+                        if (batch.isFull()) {
+                            flushBatch(batch, transforms, openedSink, counters, null);
+                        }
                     },
-                    (seqId, error) -> handleRecordError(config, out, counters, seqId, error));
+                    (seqId, error) -> {
+                        flushBatch(batch, transforms, openedSink, counters, null);
+                        return handleRecordError(config, out, counters, seqId, error);
+                    });
+            flushBatch(batch, transforms, openedSink, counters, null);
             out.println("Pipeline Finished. rows=" + counters.rowsWritten);
             return counters.toSummary(TaskState.COMPLETED);
         } finally {
@@ -123,22 +133,45 @@ public class LocalPipelineRunner {
                 SinkWriter openedSink = sink;
                 final TaskRecord[] taskRef = new TaskRecord[]{task};
                 PipelineCounters counters = new PipelineCounters();
+                BatchBuffer batch = new BatchBuffer(transforms.getBatchSize());
                 counters.rowsSkipped = task.getLastCheckpointSeq();
                 counters.checkpointSeq = task.getLastCheckpointSeq();
                 source.readFrom(
                         task.getLastCheckpointSeq(),
                         (seqId, row) -> {
-                            openedSink.write(transforms.apply(row));
-                            taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
-                            counters.recordWritten(seqId);
+                            batch.add(seqId, row);
+                            if (batch.isFull()) {
+                                flushBatch(
+                                        batch,
+                                        transforms,
+                                        openedSink,
+                                        counters,
+                                        committedSeqId -> taskRef[0] = checkpointStore.checkpoint(
+                                                taskRef[0],
+                                                committedSeqId));
+                            }
                         },
                         (seqId, error) -> {
+                            flushBatch(
+                                    batch,
+                                    transforms,
+                                    openedSink,
+                                    counters,
+                                    committedSeqId -> taskRef[0] = checkpointStore.checkpoint(
+                                            taskRef[0],
+                                            committedSeqId));
                             boolean skipped = handleRecordError(config, out, counters, seqId, error);
                             if (skipped) {
                                 taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
                             }
                             return skipped;
                         });
+                flushBatch(
+                        batch,
+                        transforms,
+                        openedSink,
+                        counters,
+                        committedSeqId -> taskRef[0] = checkpointStore.checkpoint(taskRef[0], committedSeqId));
                 TaskRecord completed = checkpointStore.complete(taskRef[0]);
                 out.println("Pipeline Finished. rows="
                         + counters.rowsWritten
@@ -203,6 +236,67 @@ public class LocalPipelineRunner {
         counters.recordFailed(seqId);
         out.println("Skipped bad record seq=" + seqId + " error=" + error.getMessage());
         return true;
+    }
+
+    private void flushBatch(
+            BatchBuffer batch,
+            TransformPipeline transforms,
+            SinkWriter sink,
+            PipelineCounters counters,
+            SeqIdCommitter committer) throws Exception {
+        if (batch.isEmpty()) {
+            return;
+        }
+        List<Long> seqIds = batch.seqIds();
+        List<BinaryRow> outputs = transforms.applyBatch(batch.rows());
+        sink.writeBatch(outputs);
+        for (Long seqId : seqIds) {
+            if (committer != null) {
+                committer.commit(seqId);
+            }
+            counters.recordWritten(seqId);
+        }
+        batch.clear();
+    }
+
+    private interface SeqIdCommitter {
+        void commit(long seqId) throws Exception;
+    }
+
+    private static class BatchBuffer {
+        private final int batchSize;
+        private final List<Long> seqIds = new ArrayList<>();
+        private final List<com.kuaia.common.data.BinaryRow> rows = new ArrayList<>();
+
+        private BatchBuffer(int batchSize) {
+            this.batchSize = Math.max(1, batchSize);
+        }
+
+        private void add(long seqId, com.kuaia.common.data.BinaryRow row) {
+            seqIds.add(seqId);
+            rows.add(row);
+        }
+
+        private boolean isFull() {
+            return rows.size() >= batchSize;
+        }
+
+        private boolean isEmpty() {
+            return rows.isEmpty();
+        }
+
+        private List<Long> seqIds() {
+            return new ArrayList<>(seqIds);
+        }
+
+        private List<com.kuaia.common.data.BinaryRow> rows() {
+            return new ArrayList<>(rows);
+        }
+
+        private void clear() {
+            seqIds.clear();
+            rows.clear();
+        }
     }
 
     private static class PipelineCounters {

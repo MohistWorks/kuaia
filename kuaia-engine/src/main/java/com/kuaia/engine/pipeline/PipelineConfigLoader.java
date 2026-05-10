@@ -13,6 +13,7 @@ import java.util.Map;
 public class PipelineConfigLoader {
     private static final String DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
     private static final int DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS = 30_000;
+    private static final int DEFAULT_EMBEDDING_BATCH_SIZE = 32;
     private static final String RESTRICT_LOCAL_PATHS_ENV = "KUAIA_RESTRICT_LOCAL_PATHS";
 
     private final boolean restrictLocalPaths;
@@ -142,7 +143,9 @@ public class PipelineConfigLoader {
                         "mock",
                         null,
                         null,
-                        null));
+                        null,
+                        DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS,
+                        parseBatchSize(transform.get("batchSize"))));
             } else if ("embedding".equals(type)) {
                 configs.add(loadEmbeddingTransform(transform, fieldPrefix));
             } else {
@@ -180,6 +183,7 @@ public class PipelineConfigLoader {
         String output = require(transform, fieldPrefix + ".output");
         int defaultDimensions = "mock".equals(provider) ? 4 : 0;
         int dimensions = parseDimensions(transform.get("dimensions"), defaultDimensions);
+        int batchSize = parseBatchSize(transform.get("batchSize"));
 
         if ("mock".equals(provider)) {
             return new PipelineConfig.TransformConfig(
@@ -194,7 +198,8 @@ public class PipelineConfigLoader {
                     null,
                     null,
                     null,
-                    DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS);
+                    DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS,
+                    batchSize);
         }
 
         String baseUrl = transform.get("baseUrl");
@@ -214,7 +219,8 @@ public class PipelineConfigLoader {
                 baseUrl,
                 require(transform, fieldPrefix + ".model"),
                 require(transform, fieldPrefix + ".apiKeyEnv"),
-                timeoutMs);
+                timeoutMs,
+                batchSize);
     }
 
     private PipelineConfig.SinkConfig loadSink(Path configPath, String sinkType, Map<String, String> sink)
@@ -351,6 +357,21 @@ public class PipelineConfigLoader {
             return timeoutMs;
         } catch (NumberFormatException e) {
             throw new PipelineConfigException("Invalid transform.timeoutMs: " + value, e);
+        }
+    }
+
+    private int parseBatchSize(String value) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return DEFAULT_EMBEDDING_BATCH_SIZE;
+        }
+        try {
+            int batchSize = Integer.parseInt(value.trim());
+            if (batchSize <= 0) {
+                throw new PipelineConfigException("Invalid transform.batchSize: " + value);
+            }
+            return batchSize;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid transform.batchSize: " + value, e);
         }
     }
 

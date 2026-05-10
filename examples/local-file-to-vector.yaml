@@ -10,6 +10,7 @@ transforms:
     input: content
     output: embedding
     dimensions: 4
+    batchSize: 32
 sink:
   type: mock-vector
 checkpoint:

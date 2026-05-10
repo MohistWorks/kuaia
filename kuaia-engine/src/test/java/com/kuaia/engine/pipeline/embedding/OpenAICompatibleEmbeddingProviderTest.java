@@ -10,6 +10,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -79,6 +81,34 @@ class OpenAICompatibleEmbeddingProviderTest {
         provider.embed("Alpha", 0);
 
         assertTrue(!captured.body.contains("\"dimensions\""), captured.body);
+    }
+
+    @Test
+    void postsBatchEmbeddingRequestAndOrdersVectorsByIndex() throws Exception {
+        CapturedRequest captured = new CapturedRequest();
+        server = startServer(captured, 200, "{"
+                + "\"object\":\"list\","
+                + "\"data\":["
+                + "{\"object\":\"embedding\",\"index\":1,\"embedding\":[2.0,2.5]},"
+                + "{\"object\":\"embedding\",\"index\":0,\"embedding\":[1.0,1.5]}"
+                + "],"
+                + "\"model\":\"text-embedding-3-small\""
+                + "}");
+        OpenAICompatibleEmbeddingProvider provider = new OpenAICompatibleEmbeddingProvider(
+                baseUrl(),
+                "text-embedding-3-small",
+                "OPENAI_API_KEY",
+                () -> "test-key");
+
+        List<float[]> vectors = provider.embedBatch(Arrays.asList("Alpha", "Beta"), 2);
+
+        assertEquals(2, vectors.size());
+        assertArrayEquals(new float[]{1.0f, 1.5f}, vectors.get(0), 0.00001f);
+        assertArrayEquals(new float[]{2.0f, 2.5f}, vectors.get(1), 0.00001f);
+        assertEquals("POST", captured.method);
+        assertTrue(captured.body.contains("\"input\":[\"Alpha\",\"Beta\"]"), captured.body);
+        assertTrue(captured.body.contains("\"model\":\"text-embedding-3-small\""), captured.body);
+        assertTrue(captured.body.contains("\"dimensions\":2"), captured.body);
     }
 
     @Test

@@ -14,6 +14,7 @@ public class TransformPipeline {
     private final List<PipelineTransform> transforms;
     private final KuaiaRowType outputType;
     private final EmbeddingProviderRegistry embeddingProviders;
+    private final int batchSize;
 
     private TransformPipeline(
             KuaiaRowType inputType,
@@ -30,6 +31,7 @@ public class TransformPipeline {
         }
         this.transforms = Collections.unmodifiableList(builtTransforms);
         this.outputType = currentType;
+        this.batchSize = determineBatchSize(builtTransforms);
     }
 
     public static TransformPipeline from(KuaiaRowType inputType, List<PipelineConfig.TransformConfig> configs)
@@ -56,6 +58,18 @@ public class TransformPipeline {
         return current;
     }
 
+    public List<BinaryRow> applyBatch(List<BinaryRow> inputs) throws PipelineExecutionException {
+        List<BinaryRow> current = inputs;
+        for (PipelineTransform transform : transforms) {
+            current = transform.applyBatch(current);
+        }
+        return current;
+    }
+
+    public int getBatchSize() {
+        return batchSize;
+    }
+
     private PipelineTransform createTransform(PipelineConfig.TransformConfig config) throws PipelineExecutionException {
         if ("select".equals(config.getType())) {
             return new SelectTransform(config.getFields());
@@ -68,15 +82,25 @@ public class TransformPipeline {
                     config.getInput(),
                     config.getOutput(),
                     config.getDimensions(),
-                    embeddingProviders.get("mock"));
+                    embeddingProviders.get("mock"),
+                    config.getBatchSize());
         }
         if ("embedding".equals(config.getType())) {
             return new EmbeddingTransform(
                     config.getInput(),
                     config.getOutput(),
                     config.getDimensions(),
-                    embeddingProviders.create(config));
+                    embeddingProviders.create(config),
+                    config.getBatchSize());
         }
         throw new PipelineExecutionException("Unsupported transform.type: " + config.getType());
+    }
+
+    private int determineBatchSize(List<PipelineTransform> transforms) {
+        int selected = Integer.MAX_VALUE;
+        for (PipelineTransform transform : transforms) {
+            selected = Math.min(selected, transform.preferredBatchSize());
+        }
+        return selected == Integer.MAX_VALUE ? 1 : selected;
     }
 }

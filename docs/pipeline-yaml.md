@@ -135,6 +135,7 @@ transforms:
     input: content
     output: embedding
     dimensions: 4
+    batchSize: 32
 ```
 
 `mock-embedding` appends a deterministic `VECTOR` field. It is a local mock for
@@ -145,7 +146,8 @@ Rules:
 - `input` must exist and be `STRING`,
 - `output` must not already exist,
 - `dimensions` is optional and defaults to `4`,
-- `dimensions` must be a positive integer.
+- `dimensions` must be a positive integer,
+- `batchSize` is optional and defaults to `32`.
 
 The mock vector is deterministic:
 
@@ -170,6 +172,7 @@ transforms:
     baseUrl: https://api.openai.com/v1
     dimensions: 1536
     timeoutMs: 30000
+    batchSize: 32
 ```
 
 `embedding` appends a `VECTOR` field using a configured embedding provider.
@@ -188,6 +191,7 @@ Fields:
 - `output`: required output vector field name.
 - `dimensions`: optional. For `mock`, defaults to `4`. For
   `openai-compatible`, it is omitted from the HTTP request unless configured.
+- `batchSize`: optional. Defaults to `32` and must be a positive integer.
 
 Additional `openai-compatible` fields:
 
@@ -198,11 +202,12 @@ Additional `openai-compatible` fields:
 - `timeoutMs`: optional request connect/read timeout in milliseconds. Defaults
   to `30000` and must be a positive integer.
 
-Kuaia sends one embedding request per input row. The request body contains
-`input`, `model`, and `encoding_format: float`; when `dimensions` is configured,
-it is included as a positive integer. The API key is read at runtime from
-`apiKeyEnv` and is never stored in YAML. The configured `timeoutMs` is applied
-to both the HTTP connect timeout and read timeout.
+Kuaia sends one embedding request per batch. For `openai-compatible`, the
+request body contains `input` as an array of strings, `model`, and
+`encoding_format: float`; when `dimensions` is configured, it is included as a
+positive integer. The API key is read at runtime from `apiKeyEnv` and is never
+stored in YAML. The configured `timeoutMs` is applied to both the HTTP connect
+timeout and read timeout.
 
 ## Sink
 
@@ -283,7 +288,8 @@ sink:
 ```
 
 `sink.type: qdrant` writes vectors to Qdrant with
-`PUT /collections/{collection}/points`.
+`PUT /collections/{collection}/points`. Local vector pipelines send rows in
+batches when an upstream embedding transform has `batchSize` configured.
 
 Fields:
 
@@ -463,6 +469,7 @@ Common examples:
 - `Unsupported transforms[0].provider: <value>`
 - `Invalid transform.dimensions: <value>`
 - `Invalid transform.timeoutMs: <value>`
+- `Invalid transform.batchSize: <value>`
 - `Local path escapes allowed directories: <field>`
 - `Missing API key environment variable: <name>`
 - `Missing Postgres environment variable: <name>`

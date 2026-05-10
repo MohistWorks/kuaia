@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,6 +50,27 @@ class QdrantVectorSinkTest {
         assertEquals("secret-token", captured.apiKey);
         assertEquals(
                 "{\"points\":[{\"id\":7,\"vector\":[1.0,2.0],\"payload\":{\"id\":7,\"content\":\"Alpha\"}}]}",
+                captured.body);
+    }
+
+    @Test
+    void writesBatchPointsToQdrantInSingleRequest() throws Exception {
+        CapturedRequest captured = startServer(200, "{\"status\":\"ok\"}");
+        PipelineConfig.SinkConfig config = config(baseUrl(), "docs", null, "id", "embedding", true);
+        QdrantVectorSink sink = new QdrantVectorSink(rowType(), config, Collections.emptyMap());
+
+        sink.open();
+        sink.writeBatch(Arrays.asList(
+                row(7L, "Alpha", new float[]{1.0f, 2.0f}),
+                row(8L, "Beta", new float[]{3.0f, 4.0f})));
+        sink.close();
+
+        assertEquals("PUT", captured.method);
+        assertEquals(
+                "{\"points\":["
+                        + "{\"id\":7,\"vector\":[1.0,2.0],\"payload\":{\"id\":7,\"content\":\"Alpha\"}},"
+                        + "{\"id\":8,\"vector\":[3.0,4.0],\"payload\":{\"id\":8,\"content\":\"Beta\"}}"
+                        + "]}",
                 captured.body);
     }
 
@@ -154,10 +176,14 @@ class QdrantVectorSinkTest {
     }
 
     private BinaryRow row() {
+        return row(7L, "Alpha", new float[]{1.0f, 2.0f});
+    }
+
+    private BinaryRow row(long id, String content, float[] vector) {
         BinaryRow row = new BinaryRow(3);
-        row.setLong(0, 7L);
-        row.setString(1, "Alpha");
-        row.setVector(2, new float[]{1.0f, 2.0f});
+        row.setLong(0, id);
+        row.setString(1, content);
+        row.setVector(2, vector);
         return row;
     }
 

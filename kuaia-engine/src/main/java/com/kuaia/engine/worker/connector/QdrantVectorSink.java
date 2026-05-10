@@ -14,6 +14,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 public class QdrantVectorSink implements SinkWriter {
@@ -45,7 +47,15 @@ public class QdrantVectorSink implements SinkWriter {
 
     @Override
     public void write(BinaryRow row) throws Exception {
-        byte[] body = buildRequestBody(row).getBytes(StandardCharsets.UTF_8);
+        writeBatch(Collections.singletonList(row));
+    }
+
+    @Override
+    public void writeBatch(List<BinaryRow> rows) throws Exception {
+        if (rows.isEmpty()) {
+            return;
+        }
+        byte[] body = buildRequestBody(rows).getBytes(StandardCharsets.UTF_8);
         HttpURLConnection connection = (HttpURLConnection) new URL(upsertUrl).openConnection();
         connection.setRequestMethod("PUT");
         connection.setDoOutput(true);
@@ -93,13 +103,21 @@ public class QdrantVectorSink implements SinkWriter {
         return value;
     }
 
-    private String buildRequestBody(BinaryRow row) throws PipelineExecutionException {
+    private String buildRequestBody(List<BinaryRow> rows) throws PipelineExecutionException {
         StringBuilder json = new StringBuilder();
-        json.append("{\"points\":[{");
-        json.append("\"id\":").append(row.getLong(idOrdinal));
-        json.append(",\"vector\":").append(vectorJson(row.getVector(vectorOrdinal)));
-        json.append(",\"payload\":").append(payloadJson(row));
-        json.append("}]}");
+        json.append("{\"points\":[");
+        for (int i = 0; i < rows.size(); i++) {
+            if (i > 0) {
+                json.append(",");
+            }
+            BinaryRow row = rows.get(i);
+            json.append("{");
+            json.append("\"id\":").append(row.getLong(idOrdinal));
+            json.append(",\"vector\":").append(vectorJson(row.getVector(vectorOrdinal)));
+            json.append(",\"payload\":").append(payloadJson(row));
+            json.append("}");
+        }
+        json.append("]}");
         return json.toString();
     }
 

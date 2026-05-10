@@ -52,6 +52,7 @@ class PipelineConfigLoaderTest {
                 "    baseUrl: https://api.openai.com/v1",
                 "    dimensions: 8",
                 "    timeoutMs: 12000",
+                "    batchSize: 16",
                 "sink:",
                 "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
 
@@ -67,6 +68,7 @@ class PipelineConfigLoaderTest {
         assertEquals("https://api.openai.com/v1", embedding.getBaseUrl());
         assertEquals(8, embedding.getDimensions());
         assertEquals(12000, embedding.getTimeoutMs());
+        assertEquals(16, embedding.getBatchSize());
     }
 
     @Test
@@ -93,6 +95,7 @@ class PipelineConfigLoaderTest {
         assertEquals("https://api.openai.com/v1", config.getTransforms().get(0).getBaseUrl());
         assertEquals(0, config.getTransforms().get(0).getDimensions());
         assertEquals(30000, config.getTransforms().get(0).getTimeoutMs());
+        assertEquals(32, config.getTransforms().get(0).getBatchSize());
     }
 
     @Test
@@ -120,6 +123,33 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("Invalid transform.timeoutMs: zero", error.getMessage());
+    }
+
+    @Test
+    void rejectsInvalidOpenAICompatibleEmbeddingBatchSize() throws Exception {
+        Path configPath = tempDir.resolve("invalid-openai-compatible-batch-size.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-openai-compatible-batch-size",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: embedding",
+                "    provider: openai-compatible",
+                "    input: content",
+                "    output: embedding",
+                "    model: text-embedding-3-small",
+                "    apiKeyEnv: OPENAI_API_KEY",
+                "    batchSize: zero",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid transform.batchSize: zero", error.getMessage());
     }
 
     @Test

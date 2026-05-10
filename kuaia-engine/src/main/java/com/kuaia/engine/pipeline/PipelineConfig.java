@@ -136,6 +136,7 @@ public class PipelineConfig {
         private final String model;
         private final String apiKeyEnv;
         private final int timeoutMs;
+        private final int batchSize;
 
         public TransformConfig(String type, List<String> fields, String from, String to) {
             this(type, fields, from, to, null, null, 4);
@@ -180,6 +181,23 @@ public class PipelineConfig {
                 String model,
                 String apiKeyEnv,
                 int timeoutMs) {
+            this(type, fields, from, to, input, output, dimensions, provider, baseUrl, model, apiKeyEnv, timeoutMs, 32);
+        }
+
+        public TransformConfig(
+                String type,
+                List<String> fields,
+                String from,
+                String to,
+                String input,
+                String output,
+                int dimensions,
+                String provider,
+                String baseUrl,
+                String model,
+                String apiKeyEnv,
+                int timeoutMs,
+                int batchSize) {
             this.type = type;
             this.fields = Collections.unmodifiableList(new ArrayList<>(fields));
             this.from = from;
@@ -192,6 +210,7 @@ public class PipelineConfig {
             this.model = model;
             this.apiKeyEnv = apiKeyEnv;
             this.timeoutMs = timeoutMs;
+            this.batchSize = batchSize;
         }
 
         public String getType() {
@@ -240,6 +259,10 @@ public class PipelineConfig {
 
         public int getTimeoutMs() {
             return timeoutMs;
+        }
+
+        public int getBatchSize() {
+            return batchSize;
         }
     }
 

@@ -136,10 +136,10 @@ export OPENAI_API_KEY=...
 bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
 ```
 
-The OpenAI-compatible embedding transform supports `timeoutMs` for HTTP
-connect/read timeout control. For stricter local file runs, set
-`KUAIA_RESTRICT_LOCAL_PATHS=true` to reject YAML paths outside the YAML directory
-or repository `.kuaia/`.
+The OpenAI-compatible embedding transform supports `batchSize` for batched array
+input requests and `timeoutMs` for HTTP connect/read timeout control. For
+stricter local file runs, set `KUAIA_RESTRICT_LOCAL_PATHS=true` to reject YAML
+paths outside the YAML directory or repository `.kuaia/`.
 
 Run a declarative vector pipeline into Qdrant:
 

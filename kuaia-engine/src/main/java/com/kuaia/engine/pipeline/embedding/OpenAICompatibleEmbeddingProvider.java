@@ -57,6 +57,18 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
 
     @Override
     public float[] embed(String input, int dimensions) throws PipelineExecutionException {
+        return requestEmbedding(requestBody(input, dimensions), 1).get(0);
+    }
+
+    @Override
+    public List<float[]> embedBatch(List<String> inputs, int dimensions) throws PipelineExecutionException {
+        if (inputs.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return requestEmbedding(batchRequestBody(inputs, dimensions), inputs.size());
+    }
+
+    private List<float[]> requestEmbedding(String requestBody, int expectedCount) throws PipelineExecutionException {
         String apiKey = apiKeySupplier.get();
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new PipelineExecutionException("Missing API key environment variable: " + apiKeyEnv);
@@ -74,7 +86,7 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("Accept", "application/json");
 
-            byte[] body = requestBody(input, dimensions).getBytes(StandardCharsets.UTF_8);
+            byte[] body = requestBody.getBytes(StandardCharsets.UTF_8);
             connection.setFixedLengthStreamingMode(body.length);
             try (OutputStream output = connection.getOutputStream()) {
                 output.write(body);
@@ -88,7 +100,7 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
                 throw new PipelineExecutionException(
                         "Embedding request failed with status " + status + ": " + truncate(response));
             }
-            return parseEmbedding(response);
+            return parseEmbeddings(response, expectedCount);
         } catch (PipelineExecutionException e) {
             throw e;
         } catch (IOException e) {
@@ -113,21 +125,116 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
         return body.toString();
     }
 
-    private float[] parseEmbedding(String response) throws PipelineExecutionException {
-        int key = response.indexOf("\"embedding\"");
-        if (key < 0) {
-            throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+    private String batchRequestBody(List<String> inputs, int dimensions) {
+        StringBuilder body = new StringBuilder();
+        body.append("{")
+                .append("\"input\":[");
+        for (int i = 0; i < inputs.size(); i++) {
+            if (i > 0) {
+                body.append(",");
+            }
+            body.append("\"").append(escapeJson(inputs.get(i))).append("\"");
         }
-        int arrayStart = response.indexOf('[', key);
-        if (arrayStart < 0) {
-            throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+        body.append("],")
+                .append("\"model\":\"").append(escapeJson(model)).append("\",")
+                .append("\"encoding_format\":\"float\"");
+        if (dimensions > 0) {
+            body.append(",\"dimensions\":").append(dimensions);
         }
-        int arrayEnd = findArrayEnd(response, arrayStart);
-        if (arrayEnd < 0) {
-            throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+        body.append("}");
+        return body.toString();
+    }
+
+    private List<float[]> parseEmbeddings(String response, int expectedCount) throws PipelineExecutionException {
+        List<float[]> vectors = new ArrayList<>();
+        for (int i = 0; i < expectedCount; i++) {
+            vectors.add(null);
         }
 
-        String body = response.substring(arrayStart + 1, arrayEnd).trim();
+        int searchFrom = 0;
+        int fallbackIndex = 0;
+        while (searchFrom < response.length()) {
+            int key = findEmbeddingFieldKey(response, searchFrom);
+            if (key < 0) {
+                break;
+            }
+            int arrayStart = response.indexOf('[', key);
+            if (arrayStart < 0) {
+                throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+            }
+            int arrayEnd = findArrayEnd(response, arrayStart);
+            if (arrayEnd < 0) {
+                throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+            }
+
+            int index = parseIndex(response, key, fallbackIndex);
+            if (index < 0 || index >= expectedCount) {
+                throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+            }
+            vectors.set(index, parseVector(response.substring(arrayStart + 1, arrayEnd).trim()));
+            fallbackIndex++;
+            searchFrom = arrayEnd + 1;
+        }
+
+        for (float[] vector : vectors) {
+            if (vector == null) {
+                throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+            }
+        }
+        return vectors;
+    }
+
+    private int findEmbeddingFieldKey(String response, int searchFrom) {
+        int cursor = searchFrom;
+        while (cursor < response.length()) {
+            int key = response.indexOf("\"embedding\"", cursor);
+            if (key < 0) {
+                return -1;
+            }
+            int colon = response.indexOf(':', key);
+            if (colon < 0) {
+                return -1;
+            }
+            int valueStart = colon + 1;
+            while (valueStart < response.length() && Character.isWhitespace(response.charAt(valueStart))) {
+                valueStart++;
+            }
+            if (valueStart < response.length() && response.charAt(valueStart) == '[') {
+                return key;
+            }
+            cursor = key + 1;
+        }
+        return -1;
+    }
+
+    private int parseIndex(String response, int embeddingKey, int fallbackIndex) throws PipelineExecutionException {
+        int objectStart = response.lastIndexOf('{', embeddingKey);
+        if (objectStart < 0) {
+            return fallbackIndex;
+        }
+        int indexKey = response.indexOf("\"index\"", objectStart);
+        if (indexKey < 0 || indexKey > embeddingKey) {
+            return fallbackIndex;
+        }
+        int colon = response.indexOf(':', indexKey);
+        if (colon < 0 || colon > embeddingKey) {
+            return fallbackIndex;
+        }
+        int cursor = colon + 1;
+        while (cursor < response.length() && Character.isWhitespace(response.charAt(cursor))) {
+            cursor++;
+        }
+        int numberStart = cursor;
+        while (cursor < response.length() && Character.isDigit(response.charAt(cursor))) {
+            cursor++;
+        }
+        if (numberStart == cursor) {
+            throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+        }
+        return Integer.parseInt(response.substring(numberStart, cursor));
+    }
+
+    private float[] parseVector(String body) throws PipelineExecutionException {
         if (body.isEmpty()) {
             throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
         }
