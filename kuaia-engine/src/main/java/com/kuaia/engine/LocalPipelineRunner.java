@@ -17,6 +17,13 @@ import com.kuaia.engine.worker.connector.FileSink;
 import com.kuaia.engine.worker.connector.LocalSource;
 import com.kuaia.engine.worker.connector.PostgresSource;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
+import com.kuaia.engine.worker.connector.v2.BatchCommit;
+import com.kuaia.engine.worker.connector.v2.BatchSinkWriter;
+import com.kuaia.engine.worker.connector.v2.BatchSourceReader;
+import com.kuaia.engine.worker.connector.v2.LocalSourceAdapter;
+import com.kuaia.engine.worker.connector.v2.SinkWriterBatchAdapter;
+import com.kuaia.engine.worker.connector.v2.SourceEnumerator;
+import com.kuaia.engine.worker.connector.v2.SourceSplit;
 
 import java.io.PrintStream;
 import java.nio.file.Paths;
@@ -68,30 +75,33 @@ public class LocalPipelineRunner {
     }
 
     private PipelineRunSummary runWithoutCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
-        LocalSource source = createSource(config);
+        SourceEnumerator source = createSource(config);
         source.open();
-        SinkWriter sink = null;
+        BatchSinkWriter sink = null;
         try {
             TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
             sink = createSink(config, transforms.getOutputType(), out);
             sink.open();
             out.println("Starting pipeline: " + config.getName());
-            SinkWriter openedSink = sink;
+            BatchSinkWriter openedSink = sink;
             PipelineCounters counters = new PipelineCounters();
             BatchBuffer batch = new BatchBuffer(transforms.getBatchSize());
-            source.readFrom(
-                    0L,
-                    (seqId, row) -> {
-                        batch.add(seqId, row);
-                        if (batch.isFull()) {
-                            flushBatch(batch, transforms, openedSink, counters, null);
-                        }
-                    },
-                    (seqId, error) -> {
-                        flushBatch(batch, transforms, openedSink, counters, null);
-                        return handleRecordError(config, out, counters, seqId, error);
-                    });
-            flushBatch(batch, transforms, openedSink, counters, null);
+            for (SourceSplit split : source.enumerateSplits()) {
+                BatchSourceReader reader = source.createReader(split);
+                reader.readFrom(
+                        0L,
+                        (seqId, row) -> {
+                            batch.add(seqId, row);
+                            if (batch.isFull()) {
+                                flushBatch(split, batch, transforms, openedSink, counters, null);
+                            }
+                        },
+                        (seqId, error) -> {
+                            flushBatch(split, batch, transforms, openedSink, counters, null);
+                            return handleRecordError(config, out, counters, seqId, error);
+                        });
+                flushBatch(split, batch, transforms, openedSink, counters, null);
+            }
             out.println("Pipeline Finished. rows=" + counters.rowsWritten);
             return counters.toSummary(TaskState.COMPLETED);
         } finally {
@@ -103,9 +113,9 @@ public class LocalPipelineRunner {
     }
 
     private PipelineRunSummary runWithCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
-        LocalSource source = createSource(config);
+        SourceEnumerator source = createSource(config);
         source.open();
-        SinkWriter sink = null;
+        BatchSinkWriter sink = null;
         try {
             TransformPipeline transforms = TransformPipeline.from(source.getRowType(), config.getTransforms());
             out.println("Starting pipeline: " + config.getName());
@@ -130,18 +140,33 @@ public class LocalPipelineRunner {
 
                 sink = createSink(config, transforms.getOutputType(), out);
                 sink.open();
-                SinkWriter openedSink = sink;
+                BatchSinkWriter openedSink = sink;
                 final TaskRecord[] taskRef = new TaskRecord[]{task};
                 PipelineCounters counters = new PipelineCounters();
                 BatchBuffer batch = new BatchBuffer(transforms.getBatchSize());
                 counters.rowsSkipped = task.getLastCheckpointSeq();
                 counters.checkpointSeq = task.getLastCheckpointSeq();
-                source.readFrom(
-                        task.getLastCheckpointSeq(),
-                        (seqId, row) -> {
-                            batch.add(seqId, row);
-                            if (batch.isFull()) {
+                for (SourceSplit split : source.enumerateSplits()) {
+                    BatchSourceReader reader = source.createReader(split);
+                    reader.readFrom(
+                            task.getLastCheckpointSeq(),
+                            (seqId, row) -> {
+                                batch.add(seqId, row);
+                                if (batch.isFull()) {
+                                    flushBatch(
+                                            split,
+                                            batch,
+                                            transforms,
+                                            openedSink,
+                                            counters,
+                                            maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
+                                                    taskRef[0],
+                                                    maxCommittedSeqId));
+                                }
+                            },
+                            (seqId, error) -> {
                                 flushBatch(
+                                        split,
                                         batch,
                                         transforms,
                                         openedSink,
@@ -149,31 +174,22 @@ public class LocalPipelineRunner {
                                         maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
                                                 taskRef[0],
                                                 maxCommittedSeqId));
-                            }
-                        },
-                        (seqId, error) -> {
-                            flushBatch(
-                                    batch,
-                                    transforms,
-                                    openedSink,
-                                    counters,
-                                    maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
-                                            taskRef[0],
-                                            maxCommittedSeqId));
-                            boolean skipped = handleRecordError(config, out, counters, seqId, error);
-                            if (skipped) {
-                                taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
-                            }
-                            return skipped;
-                        });
-                flushBatch(
-                        batch,
-                        transforms,
-                        openedSink,
-                        counters,
-                        maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
-                                taskRef[0],
-                                maxCommittedSeqId));
+                                boolean skipped = handleRecordError(config, out, counters, seqId, error);
+                                if (skipped) {
+                                    taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
+                                }
+                                return skipped;
+                            });
+                    flushBatch(
+                            split,
+                            batch,
+                            transforms,
+                            openedSink,
+                            counters,
+                            maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
+                                    taskRef[0],
+                                    maxCommittedSeqId));
+                }
                 TaskRecord completed = checkpointStore.complete(taskRef[0]);
                 out.println("Pipeline Finished. rows="
                         + counters.rowsWritten
@@ -192,13 +208,13 @@ public class LocalPipelineRunner {
         }
     }
 
-    private LocalSource createSource(PipelineConfig config) throws PipelineExecutionException {
+    private SourceEnumerator createSource(PipelineConfig config) throws PipelineExecutionException {
         String sourceType = config.getSource().getType();
         if ("file".equals(sourceType)) {
-            return new FileSource(Paths.get(config.getSource().getPath()));
+            return new LocalSourceAdapter(new FileSource(Paths.get(config.getSource().getPath())), "file-0");
         }
         if ("postgres".equals(sourceType)) {
-            return new PostgresSource(config.getSource());
+            return new LocalSourceAdapter(new PostgresSource(config.getSource()), "postgres-0");
         }
         throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
     }
@@ -208,22 +224,23 @@ public class LocalPipelineRunner {
         return stateDir != null && !stateDir.trim().isEmpty();
     }
 
-    private SinkWriter createSink(PipelineConfig config, KuaiaRowType rowType, PrintStream out)
+    private BatchSinkWriter createSink(PipelineConfig config, KuaiaRowType rowType, PrintStream out)
             throws PipelineExecutionException {
         String sinkType = config.getSink().getType();
+        SinkWriter sink;
         if ("console".equals(sinkType)) {
-            return new ConsoleSink(rowType, out);
-        }
-        if ("mock-vector".equals(sinkType) || "qdrant".equals(sinkType)) {
-            return sinkFactories.create(sinkType, rowType, out, config.getSink());
-        }
-        if ("file".equals(sinkType)) {
-            return new FileSink(
+            sink = new ConsoleSink(rowType, out);
+        } else if ("mock-vector".equals(sinkType) || "qdrant".equals(sinkType)) {
+            sink = sinkFactories.create(sinkType, rowType, out, config.getSink());
+        } else if ("file".equals(sinkType)) {
+            sink = new FileSink(
                     rowType,
                     Paths.get(config.getSink().getPath()),
                     config.getSink().getMode());
+        } else {
+            throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
         }
-        throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
+        return new SinkWriterBatchAdapter(sink);
     }
 
     private boolean handleRecordError(
@@ -241,9 +258,10 @@ public class LocalPipelineRunner {
     }
 
     private void flushBatch(
+            SourceSplit split,
             BatchBuffer batch,
             TransformPipeline transforms,
-            SinkWriter sink,
+            BatchSinkWriter sink,
             PipelineCounters counters,
             BatchSeqIdCommitter committer) throws Exception {
         if (batch.isEmpty()) {
@@ -252,8 +270,10 @@ public class LocalPipelineRunner {
         List<Long> seqIds = batch.seqIds();
         List<BinaryRow> outputs = transforms.applyBatch(batch.rows());
         sink.writeBatch(outputs);
+        long maxSeqId = maxSeqId(seqIds);
+        sink.committer().commit(new BatchCommit(split.getSplitId(), maxSeqId, outputs.size()));
         if (committer != null) {
-            committer.commit(maxSeqId(seqIds));
+            committer.commit(maxSeqId);
         }
         for (Long seqId : seqIds) {
             counters.recordWritten(seqId);

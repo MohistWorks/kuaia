@@ -342,6 +342,14 @@ For checkpointed local runs, skipped bad records count as consumed and advance
 the checkpoint sequence. Pipeline definition errors, transform schema errors,
 and sink IO errors remain fatal.
 
+## Connector Boundary
+
+The public YAML contract remains source -> transforms -> sink. Internally, Kuaia
+adapts current sources into a connector API v2 shape with one `SourceSplit` per
+local source and batch-aware sink writers. This is an implementation boundary for
+future connector work; it does not add CDC, parallel split scheduling, DAGs, or
+exactly-once guarantees to the current MVP contract.
+
 ## Checkpoint
 
 ```yaml
