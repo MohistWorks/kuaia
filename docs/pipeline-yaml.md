@@ -169,6 +169,7 @@ transforms:
     apiKeyEnv: OPENAI_API_KEY
     baseUrl: https://api.openai.com/v1
     dimensions: 1536
+    timeoutMs: 30000
 ```
 
 `embedding` appends a `VECTOR` field using a configured embedding provider.
@@ -194,11 +195,14 @@ Additional `openai-compatible` fields:
 - `apiKeyEnv`: required environment variable name that contains the bearer token.
 - `baseUrl`: optional, defaults to `https://api.openai.com/v1`. Set it to the
   `/v1` base URL of another OpenAI-compatible service when needed.
+- `timeoutMs`: optional request connect/read timeout in milliseconds. Defaults
+  to `30000` and must be a positive integer.
 
 Kuaia sends one embedding request per input row. The request body contains
 `input`, `model`, and `encoding_format: float`; when `dimensions` is configured,
 it is included as a positive integer. The API key is read at runtime from
-`apiKeyEnv` and is never stored in YAML.
+`apiKeyEnv` and is never stored in YAML. The configured `timeoutMs` is applied
+to both the HTTP connect timeout and read timeout.
 
 ## Sink
 
@@ -352,6 +356,25 @@ completed rows again.
 The MVP guarantee is at-least-once style execution with idempotent sinks. Kuaia
 does not claim exactly-once semantics.
 
+## Local Path Guardrails
+
+By default, Kuaia preserves the local CLI path behavior:
+
+- `source.path` and file `sink.path` are resolved from the YAML file directory,
+- `checkpoint.stateDir` is passed through as configured.
+
+For stricter local runs, set:
+
+```bash
+export KUAIA_RESTRICT_LOCAL_PATHS=true
+```
+
+When enabled, Kuaia rejects local file paths that resolve outside the YAML file
+directory or the repository `.kuaia/` runtime directory. This applies to
+`source.path`, file `sink.path`, and `checkpoint.stateDir`. Relative
+`checkpoint.stateDir` values under `.kuaia/...` are anchored at the repository
+`.kuaia/` directory in restricted mode.
+
 ## Run Summary
 
 Successful declarative runs print a stable summary line:
@@ -439,6 +462,8 @@ Common examples:
 - `Unsupported transform.type: <value>`
 - `Unsupported transforms[0].provider: <value>`
 - `Invalid transform.dimensions: <value>`
+- `Invalid transform.timeoutMs: <value>`
+- `Local path escapes allowed directories: <field>`
 - `Missing API key environment variable: <name>`
 - `Missing Postgres environment variable: <name>`
 - `Postgres source query failed: <message>`

@@ -27,6 +27,17 @@ class OpenAICompatibleEmbeddingProviderTest {
     }
 
     @Test
+    void defaultsToThirtySecondTimeout() throws Exception {
+        OpenAICompatibleEmbeddingProvider provider = new OpenAICompatibleEmbeddingProvider(
+                "http://127.0.0.1:1/v1",
+                "text-embedding-3-small",
+                "OPENAI_API_KEY",
+                () -> "test-key");
+
+        assertEquals(30000, provider.getTimeoutMillis());
+    }
+
+    @Test
     void postsEmbeddingRequestAndParsesFloatVector() throws Exception {
         CapturedRequest captured = new CapturedRequest();
         server = startServer(captured, 200, "{"

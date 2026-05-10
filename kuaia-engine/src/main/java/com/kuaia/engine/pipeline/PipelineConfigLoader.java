@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -11,6 +12,18 @@ import java.util.Map;
 
 public class PipelineConfigLoader {
     private static final String DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
+    private static final int DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS = 30_000;
+    private static final String RESTRICT_LOCAL_PATHS_ENV = "KUAIA_RESTRICT_LOCAL_PATHS";
+
+    private final boolean restrictLocalPaths;
+
+    public PipelineConfigLoader() {
+        this(isRestrictedLocalPathsEnabled());
+    }
+
+    PipelineConfigLoader(boolean restrictLocalPaths) {
+        this.restrictLocalPaths = restrictLocalPaths;
+    }
 
     public PipelineConfig load(Path path) throws PipelineConfigException {
         if (!Files.exists(path)) {
@@ -42,7 +55,7 @@ public class PipelineConfigLoader {
         PipelineConfig.SinkConfig sinkConfig = loadSink(path, sinkType, sink);
         PipelineConfig.ErrorPolicyConfig errorPolicyConfig = loadErrorPolicy(errorPolicy);
 
-        String stateDir = checkpoint == null ? null : checkpoint.get("stateDir");
+        String stateDir = checkpoint == null ? null : resolveCheckpointPath(path, checkpoint.get("stateDir"));
         return new PipelineConfig(
                 name,
                 sourceConfig,
@@ -152,7 +165,7 @@ public class PipelineConfigLoader {
                     require(source, "source.query"));
         }
 
-        String sourcePath = resolveLocalPath(configPath, require(source, "source.path"));
+        String sourcePath = resolveLocalPath(configPath, require(source, "source.path"), "source.path");
         String sourceFormat = require(source, "source.format");
         requireSupported("source.format", sourceFormat, "csv");
         return new PipelineConfig.SourceConfig(sourceType, sourcePath, sourceFormat);
@@ -180,13 +193,15 @@ public class PipelineConfigLoader {
                     provider,
                     null,
                     null,
-                    null);
+                    null,
+                    DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS);
         }
 
         String baseUrl = transform.get("baseUrl");
         if (baseUrl == null || baseUrl.trim().isEmpty()) {
             baseUrl = DEFAULT_OPENAI_COMPATIBLE_BASE_URL;
         }
+        int timeoutMs = parseTimeoutMs(transform.get("timeoutMs"));
         return new PipelineConfig.TransformConfig(
                 "embedding",
                 new ArrayList<>(),
@@ -198,7 +213,8 @@ public class PipelineConfigLoader {
                 provider,
                 baseUrl,
                 require(transform, fieldPrefix + ".model"),
-                require(transform, fieldPrefix + ".apiKeyEnv"));
+                require(transform, fieldPrefix + ".apiKeyEnv"),
+                timeoutMs);
     }
 
     private PipelineConfig.SinkConfig loadSink(Path configPath, String sinkType, Map<String, String> sink)
@@ -210,7 +226,7 @@ public class PipelineConfigLoader {
             return new PipelineConfig.SinkConfig(sinkType);
         }
 
-        String sinkPath = resolveLocalPath(configPath, require(sink, "sink.path"));
+        String sinkPath = resolveLocalPath(configPath, require(sink, "sink.path"), "sink.path");
         String sinkFormat = require(sink, "sink.format");
         requireSupported("sink.format", sinkFormat, "csv");
 
@@ -323,6 +339,21 @@ public class PipelineConfigLoader {
         }
     }
 
+    private int parseTimeoutMs(String value) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS;
+        }
+        try {
+            int timeoutMs = Integer.parseInt(value.trim());
+            if (timeoutMs <= 0) {
+                throw new PipelineConfigException("Invalid transform.timeoutMs: " + value);
+            }
+            return timeoutMs;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid transform.timeoutMs: " + value, e);
+        }
+    }
+
     private void requireSupported(String field, String value, String... supported) throws PipelineConfigException {
         for (String candidate : supported) {
             if (candidate.equals(value)) {
@@ -337,16 +368,76 @@ public class PipelineConfigLoader {
         }
     }
 
-    private String resolveLocalPath(Path configPath, String localPath) {
-        Path path = java.nio.file.Paths.get(localPath);
+    private String resolveLocalPath(Path configPath, String localPath, String field) throws PipelineConfigException {
+        Path path = Paths.get(localPath);
+        String resolved;
         if (path.isAbsolute()) {
-            return path.toString();
+            resolved = path.toString();
+        } else {
+            Path parent = configPath.toAbsolutePath().getParent();
+            if (parent == null) {
+                resolved = path.normalize().toString();
+            } else {
+                resolved = parent.resolve(path).normalize().toString();
+            }
         }
-        Path parent = configPath.toAbsolutePath().getParent();
-        if (parent == null) {
-            return path.normalize().toString();
+        Path resolvedPath = Paths.get(resolved);
+        requireAllowedLocalPath(configPath, resolvedPath, field);
+        if (restrictLocalPaths) {
+            return resolvedPath.toAbsolutePath().normalize().toString();
         }
-        return parent.resolve(path).normalize().toString();
+        return resolved;
+    }
+
+    private String resolveCheckpointPath(Path configPath, String stateDir) throws PipelineConfigException {
+        if (stateDir == null || stateDir.trim().isEmpty() || !restrictLocalPaths) {
+            return stateDir;
+        }
+        Path statePath = Paths.get(stateDir);
+        Path resolved;
+        if (statePath.isAbsolute()) {
+            resolved = statePath.normalize();
+        } else if (statePath.getNameCount() > 0 && ".kuaia".equals(statePath.getName(0).toString())) {
+            resolved = findRepoRoot(configPath.toAbsolutePath().getParent()).resolve(statePath).normalize();
+        } else {
+            Path parent = configPath.toAbsolutePath().getParent();
+            resolved = parent == null ? statePath.toAbsolutePath().normalize() : parent.resolve(statePath).normalize();
+        }
+        requireAllowedLocalPath(configPath, resolved, "checkpoint.stateDir");
+        return resolved.toString();
+    }
+
+    private void requireAllowedLocalPath(Path configPath, Path path, String field) throws PipelineConfigException {
+        if (!restrictLocalPaths) {
+            return;
+        }
+        Path normalized = path.toAbsolutePath().normalize();
+        Path configDir = configPath.toAbsolutePath().getParent();
+        if (configDir == null) {
+            configDir = Paths.get("").toAbsolutePath();
+        }
+        configDir = configDir.normalize();
+        Path repoKuaiaDir = findRepoRoot(configDir).resolve(".kuaia").normalize();
+        if (normalized.startsWith(configDir) || normalized.startsWith(repoKuaiaDir)) {
+            return;
+        }
+        throw new PipelineConfigException("Local path escapes allowed directories: " + field);
+    }
+
+    private Path findRepoRoot(Path start) {
+        Path current = start == null ? Paths.get("").toAbsolutePath().normalize() : start.toAbsolutePath().normalize();
+        while (current != null) {
+            if (Files.exists(current.resolve("pom.xml")) && Files.isDirectory(current.resolve("kuaia-engine"))) {
+                return current;
+            }
+            current = current.getParent();
+        }
+        return Paths.get("").toAbsolutePath().normalize();
+    }
+
+    private static boolean isRestrictedLocalPathsEnabled() {
+        String value = System.getenv(RESTRICT_LOCAL_PATHS_ENV);
+        return value != null && "true".equalsIgnoreCase(value.trim());
     }
 
     private String stripQuotes(String value) {

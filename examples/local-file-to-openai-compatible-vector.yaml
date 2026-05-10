@@ -12,5 +12,6 @@ transforms:
     output: embedding
     model: text-embedding-3-small
     apiKeyEnv: OPENAI_API_KEY
+    timeoutMs: 30000
 sink:
   type: mock-vector

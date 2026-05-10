@@ -15,16 +15,20 @@ import java.util.function.Supplier;
 
 public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
     public static final String DEFAULT_BASE_URL = "https://api.openai.com/v1";
-
-    private static final int TIMEOUT_MILLIS = 30_000;
+    public static final int DEFAULT_TIMEOUT_MILLIS = 30_000;
 
     private final String baseUrl;
     private final String model;
     private final String apiKeyEnv;
+    private final int timeoutMillis;
     private final Supplier<String> apiKeySupplier;
 
     public OpenAICompatibleEmbeddingProvider(String baseUrl, String model, String apiKeyEnv) {
-        this(baseUrl, model, apiKeyEnv, () -> System.getenv(apiKeyEnv));
+        this(baseUrl, model, apiKeyEnv, DEFAULT_TIMEOUT_MILLIS);
+    }
+
+    public OpenAICompatibleEmbeddingProvider(String baseUrl, String model, String apiKeyEnv, int timeoutMillis) {
+        this(baseUrl, model, apiKeyEnv, timeoutMillis, () -> System.getenv(apiKeyEnv));
     }
 
     OpenAICompatibleEmbeddingProvider(
@@ -32,9 +36,22 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
             String model,
             String apiKeyEnv,
             Supplier<String> apiKeySupplier) {
+        this(baseUrl, model, apiKeyEnv, DEFAULT_TIMEOUT_MILLIS, apiKeySupplier);
+    }
+
+    OpenAICompatibleEmbeddingProvider(
+            String baseUrl,
+            String model,
+            String apiKeyEnv,
+            int timeoutMillis,
+            Supplier<String> apiKeySupplier) {
+        if (timeoutMillis <= 0) {
+            throw new IllegalArgumentException("timeoutMillis must be positive");
+        }
         this.baseUrl = trimTrailingSlash(baseUrl);
         this.model = model;
         this.apiKeyEnv = apiKeyEnv;
+        this.timeoutMillis = timeoutMillis;
         this.apiKeySupplier = apiKeySupplier;
     }
 
@@ -49,8 +66,8 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
         try {
             URL endpoint = new URL(baseUrl + "/embeddings");
             connection = (HttpURLConnection) endpoint.openConnection();
-            connection.setConnectTimeout(TIMEOUT_MILLIS);
-            connection.setReadTimeout(TIMEOUT_MILLIS);
+            connection.setConnectTimeout(timeoutMillis);
+            connection.setReadTimeout(timeoutMillis);
             connection.setRequestMethod("POST");
             connection.setDoOutput(true);
             connection.setRequestProperty("Authorization", "Bearer " + apiKey);
@@ -233,5 +250,9 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
             return value;
         }
         return value.substring(0, 1000);
+    }
+
+    int getTimeoutMillis() {
+        return timeoutMillis;
     }
 }

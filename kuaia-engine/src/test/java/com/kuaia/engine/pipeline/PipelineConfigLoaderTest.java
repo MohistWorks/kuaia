@@ -51,6 +51,7 @@ class PipelineConfigLoaderTest {
                 "    apiKeyEnv: OPENAI_API_KEY",
                 "    baseUrl: https://api.openai.com/v1",
                 "    dimensions: 8",
+                "    timeoutMs: 12000",
                 "sink:",
                 "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
 
@@ -65,6 +66,7 @@ class PipelineConfigLoaderTest {
         assertEquals("OPENAI_API_KEY", embedding.getApiKeyEnv());
         assertEquals("https://api.openai.com/v1", embedding.getBaseUrl());
         assertEquals(8, embedding.getDimensions());
+        assertEquals(12000, embedding.getTimeoutMs());
     }
 
     @Test
@@ -90,6 +92,34 @@ class PipelineConfigLoaderTest {
 
         assertEquals("https://api.openai.com/v1", config.getTransforms().get(0).getBaseUrl());
         assertEquals(0, config.getTransforms().get(0).getDimensions());
+        assertEquals(30000, config.getTransforms().get(0).getTimeoutMs());
+    }
+
+    @Test
+    void rejectsInvalidOpenAICompatibleEmbeddingTimeout() throws Exception {
+        Path configPath = tempDir.resolve("invalid-openai-compatible-timeout.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-openai-compatible-timeout",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: embedding",
+                "    provider: openai-compatible",
+                "    input: content",
+                "    output: embedding",
+                "    model: text-embedding-3-small",
+                "    apiKeyEnv: OPENAI_API_KEY",
+                "    timeoutMs: zero",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid transform.timeoutMs: zero", error.getMessage());
     }
 
     @Test
@@ -187,6 +217,105 @@ class PipelineConfigLoaderTest {
         assertEquals(tempDir.resolve("out/users.csv").normalize().toString(), sinkValue(config, "getPath"));
         assertEquals("csv", sinkValue(config, "getFormat"));
         assertEquals("overwrite", sinkValue(config, "getMode"));
+    }
+
+    @Test
+    void defaultLoaderPreservesExistingPathBehavior() throws Exception {
+        Path configDir = tempDir.resolve("pipelines");
+        Files.createDirectories(configDir);
+        Path configPath = configDir.resolve("default-paths.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: default-paths",
+                "source:",
+                "  type: file",
+                "  path: ../data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: ../out/users.csv",
+                "  format: csv",
+                "checkpoint:",
+                "  stateDir: .kuaia/state/default-paths").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals(tempDir.resolve("data/users.csv").normalize().toString(), config.getSource().getPath());
+        assertEquals(tempDir.resolve("out/users.csv").normalize().toString(), config.getSink().getPath());
+        assertEquals(".kuaia/state/default-paths", config.getCheckpoint().getStateDir());
+    }
+
+    @Test
+    void restrictedLoaderRejectsSourcePathOutsideYamlDirectoryAndRepoKuaia() throws Exception {
+        Path repoRoot = fakeRepoRoot();
+        Path configDir = repoRoot.resolve("examples");
+        Files.createDirectories(configDir);
+        Path configPath = configDir.resolve("restricted-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: restricted-source",
+                "source:",
+                "  type: file",
+                "  path: ../private/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader(true).load(configPath));
+
+        assertEquals("Local path escapes allowed directories: source.path", error.getMessage());
+    }
+
+    @Test
+    void restrictedLoaderAllowsYamlDirectoryAndRepoKuaiaPaths() throws Exception {
+        Path repoRoot = fakeRepoRoot();
+        Path configDir = repoRoot.resolve("examples");
+        Files.createDirectories(configDir.resolve("data"));
+        Path configPath = configDir.resolve("restricted-allowed.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: restricted-allowed",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: ../.kuaia/output/users.csv",
+                "  format: csv",
+                "checkpoint:",
+                "  stateDir: .kuaia/state/restricted-allowed").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader(true).load(configPath);
+
+        assertEquals(configDir.resolve("data/users.csv").normalize().toString(), config.getSource().getPath());
+        assertEquals(repoRoot.resolve(".kuaia/output/users.csv").normalize().toString(), config.getSink().getPath());
+        assertEquals(
+                repoRoot.resolve(".kuaia/state/restricted-allowed").normalize().toString(),
+                config.getCheckpoint().getStateDir());
+    }
+
+    @Test
+    void restrictedLoaderRejectsCheckpointPathOutsideAllowedDirectories() throws Exception {
+        Path repoRoot = fakeRepoRoot();
+        Path configDir = repoRoot.resolve("examples");
+        Files.createDirectories(configDir.resolve("data"));
+        Path configPath = configDir.resolve("restricted-checkpoint.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: restricted-checkpoint",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: console",
+                "checkpoint:",
+                "  stateDir: ../runtime-state").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader(true).load(configPath));
+
+        assertEquals("Local path escapes allowed directories: checkpoint.stateDir", error.getMessage());
     }
 
     @Test
@@ -453,5 +582,12 @@ class PipelineConfigLoaderTest {
 
     private String sinkValue(PipelineConfig config, String methodName) throws Exception {
         return (String) config.getSink().getClass().getMethod(methodName).invoke(config.getSink());
+    }
+
+    private Path fakeRepoRoot() throws Exception {
+        Path repoRoot = tempDir.resolve("repo");
+        Files.createDirectories(repoRoot.resolve("kuaia-engine"));
+        Files.write(repoRoot.resolve("pom.xml"), "<project/>".getBytes(StandardCharsets.UTF_8));
+        return repoRoot;
     }
 }

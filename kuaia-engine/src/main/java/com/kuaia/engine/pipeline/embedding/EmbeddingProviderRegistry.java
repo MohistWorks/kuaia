@@ -33,7 +33,8 @@ public class EmbeddingProviderRegistry {
             return new OpenAICompatibleEmbeddingProvider(
                     config.getBaseUrl(),
                     config.getModel(),
-                    config.getApiKeyEnv());
+                    config.getApiKeyEnv(),
+                    config.getTimeoutMs());
         }
         return get(config.getProvider());
     }
