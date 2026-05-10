@@ -1,6 +1,8 @@
 package com.kuaia.engine.worker.connector.v2;
 
 import com.kuaia.engine.worker.connector.FileSource;
+import com.kuaia.engine.worker.connector.LocalSource.RecordConsumer;
+import com.kuaia.engine.worker.connector.LocalSource.RecordErrorConsumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -76,6 +78,32 @@ class FileSourceAdapterTest {
     }
 
     @Test
+    void readersUseBoundedFileRangeForSplitReads() throws Exception {
+        Path csv = tempDir.resolve("bounded-documents.csv");
+        Files.write(csv, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta",
+                "3,Gamma").getBytes(StandardCharsets.UTF_8));
+        TrackingFileSource source = new TrackingFileSource(csv);
+        FileSourceAdapter adapter = new FileSourceAdapter(source, "file-0", 2);
+
+        adapter.open();
+        List<SourceSplit> splits = adapter.enumerateSplits();
+        List<Long> seqIds = new ArrayList<>();
+        int read = adapter.createReader(splits.get(0)).readFrom(
+                0L,
+                (seqId, row) -> seqIds.add(seqId),
+                (seqId, error) -> false);
+
+        assertEquals(2, read);
+        assertEquals(Arrays.asList(1L, 2L), seqIds);
+        assertEquals(1, source.rangeReads);
+        assertEquals(Arrays.asList(2L), source.rangeEndSeqIds);
+        adapter.close();
+    }
+
+    @Test
     void rejectsNonPositiveRowsPerSplit() {
         assertThrows(
                 IllegalArgumentException.class,
@@ -86,5 +114,25 @@ class FileSourceAdapterTest {
         assertEquals(splitId, split.getSplitId());
         assertEquals(startSeqInclusive, split.getStartSeqInclusive());
         assertEquals(endSeqInclusive, split.getEndSeqInclusive());
+    }
+
+    private static class TrackingFileSource extends FileSource {
+        private int rangeReads;
+        private final List<Long> rangeEndSeqIds = new ArrayList<>();
+
+        TrackingFileSource(Path path) {
+            super(path);
+        }
+
+        @Override
+        public int readRange(
+                long lastCheckpointSeq,
+                long endSeqInclusive,
+                RecordConsumer consumer,
+                RecordErrorConsumer errorConsumer) throws Exception {
+            rangeReads++;
+            rangeEndSeqIds.add(endSeqInclusive);
+            return super.readRange(lastCheckpointSeq, endSeqInclusive, consumer, errorConsumer);
+        }
     }
 }

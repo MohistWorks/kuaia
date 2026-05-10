@@ -45,7 +45,8 @@ public class FileSourceAdapter implements SourceEnumerator {
     @Override
     public BatchSourceReader createReader(SourceSplit split) throws Exception {
         ensureOpen();
-        return new LocalSourceAdapter(source, splits).createReader(split);
+        SourceSplit knownSplit = findSplit(split);
+        return new FileSplitReader(source, knownSplit);
     }
 
     @Override
@@ -61,6 +62,49 @@ public class FileSourceAdapter implements SourceEnumerator {
     private void ensureOpen() throws PipelineExecutionException {
         if (splits == null) {
             throw new PipelineExecutionException("File source adapter is not open");
+        }
+    }
+
+    private SourceSplit findSplit(SourceSplit split) throws PipelineExecutionException {
+        for (SourceSplit knownSplit : splits) {
+            if (sameSplit(knownSplit, split)) {
+                return knownSplit;
+            }
+        }
+        throw new PipelineExecutionException("Unknown source split: " + split.getSplitId());
+    }
+
+    private boolean sameSplit(SourceSplit left, SourceSplit right) {
+        return left.getSplitId().equals(right.getSplitId())
+                && left.getStartSeqInclusive() == right.getStartSeqInclusive()
+                && left.getEndSeqInclusive() == right.getEndSeqInclusive();
+    }
+
+    private static final class FileSplitReader implements BatchSourceReader {
+        private final FileSource source;
+        private final SourceSplit split;
+
+        private FileSplitReader(FileSource source, SourceSplit split) {
+            this.source = source;
+            this.split = split;
+        }
+
+        @Override
+        public int readFrom(
+                long lastCheckpointSeq,
+                SourceRecordConsumer consumer,
+                SourceRecordErrorConsumer errorConsumer) throws Exception {
+            long effectiveCheckpoint = Math.max(lastCheckpointSeq, split.getStartSeqInclusive() - 1L);
+            return source.readRange(
+                    effectiveCheckpoint,
+                    split.getEndSeqInclusive(),
+                    consumer::accept,
+                    errorConsumer::accept);
+        }
+
+        @Override
+        public KuaiaRowType getRowType() {
+            return source.getRowType();
         }
     }
 }

@@ -62,6 +62,17 @@ public class FileSource implements LocalSource {
     @Override
     public int readFrom(long lastCheckpointSeq, RecordConsumer consumer, RecordErrorConsumer errorConsumer)
             throws Exception {
+        return readRange(lastCheckpointSeq, Long.MAX_VALUE, consumer, errorConsumer);
+    }
+
+    public int readRange(
+            long lastCheckpointSeq,
+            long endSeqInclusive,
+            RecordConsumer consumer,
+            RecordErrorConsumer errorConsumer) throws Exception {
+        if (endSeqInclusive < 1L) {
+            throw new IllegalArgumentException("endSeqInclusive must be greater than zero");
+        }
         int count = 0;
         long seqId = 0L;
         for (int i = 1; i < lines.size(); i++) {
@@ -72,6 +83,9 @@ public class FileSource implements LocalSource {
             seqId++;
             if (seqId <= lastCheckpointSeq) {
                 continue;
+            }
+            if (seqId > endSeqInclusive) {
+                break;
             }
             String[] values = split(line);
             String[] fieldNames = rowType.getFieldNames();
