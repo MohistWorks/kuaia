@@ -30,10 +30,11 @@ jobs:
       - name: Package runtime
         run: mvn -q package
 
-      - name: Smoke test CLI
+      - name: Run public MVP smoke
+        run: make public-mvp-smoke
+
+      - name: Smoke test CLI help and Compose config
         run: |
           java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help
           bin/kuaia help
-          bin/kuaia run -f examples/local-file-to-file.yaml
-          bin/kuaia run -f examples/local-file-skip-bad-records.yaml
           docker compose config

@@ -45,7 +45,11 @@ class KuaiaPackagingTest {
         assertTrue(read(script).contains("-pl kuaia-common -DskipTests install"));
 
         assertTrue(read(root.resolve("Makefile")).contains("run-vector"));
+        assertTrue(read(root.resolve("Makefile")).contains("public-mvp-smoke"));
         assertTrue(read(root.resolve("Makefile")).contains("clean-state"));
+        assertTrue(Files.exists(root.resolve("scripts/public-mvp-smoke.sh")), "public MVP smoke script should exist");
+        assertTrue(Files.isExecutable(root.resolve("scripts/public-mvp-smoke.sh")),
+                "public MVP smoke script should be executable");
         String dockerfile = read(root.resolve("Dockerfile"));
         assertTrue(dockerfile.contains("AS build"), dockerfile);
         assertTrue(dockerfile.contains("COPY --from=build /workspace/kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar /opt/kuaia/kuaia.jar"), dockerfile);
@@ -58,6 +62,8 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("docs/pipeline-yaml.md")), "docs/pipeline-yaml.md should exist");
         assertTrue(read(root.resolve("README.md")).contains("docs/pipeline-yaml.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/examples.md"));
+        assertTrue(read(root.resolve("README.md")).contains("docs/connector-development.md"));
+        assertTrue(read(root.resolve("README.md")).contains("make public-mvp-smoke"));
         assertTrue(read(root.resolve("README.md")).contains("mvn -q package"));
         assertTrue(read(root.resolve("README.md")).contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help"));
         assertTrue(read(root.resolve("README.md")).contains("docker compose up --build"));
@@ -71,6 +77,10 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: postgres"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
+        assertTrue(Files.exists(root.resolve("docs/connector-development.md")),
+                "docs/connector-development.md should exist");
+        assertTrue(read(root.resolve("docs/product-scope.md")).contains("connector-development.md"));
+        assertTrue(read(root.resolve("CONTRIBUTING.md")).contains("make public-mvp-smoke"));
         assertTrue(Files.exists(root.resolve("examples/local-file-to-qdrant.yaml")), "Qdrant example should exist");
         assertTrue(Files.exists(root.resolve("docker-compose.qdrant.yml")), "Qdrant compose file should exist");
         assertTrue(Files.exists(root.resolve("examples/postgres-to-qdrant.yaml")), "Postgres to Qdrant example should exist");
@@ -93,10 +103,9 @@ class KuaiaPackagingTest {
         assertTrue(workflow.contains("workflow_dispatch:"), workflow);
         assertTrue(workflow.contains("mvn -q test"), workflow);
         assertTrue(workflow.contains("mvn -q package"), workflow);
+        assertTrue(workflow.contains("make public-mvp-smoke"), workflow);
         assertTrue(workflow.contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help"), workflow);
         assertTrue(workflow.contains("bin/kuaia help"), workflow);
-        assertTrue(workflow.contains("bin/kuaia run -f examples/local-file-to-file.yaml"), workflow);
-        assertTrue(workflow.contains("bin/kuaia run -f examples/local-file-skip-bad-records.yaml"), workflow);
         assertTrue(workflow.contains("docker compose config"), workflow);
     }
 
