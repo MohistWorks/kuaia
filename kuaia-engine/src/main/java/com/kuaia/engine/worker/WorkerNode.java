@@ -9,8 +9,12 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class WorkerNode {
+    private static final Logger LOG = Logger.getLogger(WorkerNode.class.getName());
+
     private final String id;
     private final TaskExecutor executor = new TaskExecutor();
     private final RocksDBBuffer dbBuffer = new RocksDBBuffer();
@@ -47,11 +51,11 @@ public class WorkerNode {
                     if (currentSize > THRESHOLD) {
                         try {
                             dbBuffer.put(task.getSeqId(), task.toByteArray());
-                            System.out.println("Spilling to disk: seqId=" + task.getSeqId());
+                            LOG.log(Level.INFO, "Spilling to disk: seqId={0}", task.getSeqId());
                             // Since it's spilled, it's no longer in the "memory queue"
                             memoryQueueSize.decrementAndGet();
                         } catch (Exception e) {
-                            System.err.println("Failed to spill task to disk: " + e.getMessage());
+                            LOG.log(Level.WARNING, "Failed to spill task to disk: seqId=" + task.getSeqId(), e);
                         }
                     } else {
                         executeTask(task);
@@ -90,8 +94,13 @@ public class WorkerNode {
                 // In a real scenario, we'd need to track which seqIds are on disk
             }
 
-            @Override public void onError(Throwable t) { t.printStackTrace(); }
-            @Override public void onCompleted() { System.out.println("Stream completed"); }
+            @Override public void onError(Throwable t) {
+                LOG.log(Level.WARNING, "Worker stream failed", t);
+            }
+
+            @Override public void onCompleted() {
+                LOG.info("Worker stream completed");
+            }
         });
         
         // Initial registration via heartbeat or separate call (omitted for skeleton)

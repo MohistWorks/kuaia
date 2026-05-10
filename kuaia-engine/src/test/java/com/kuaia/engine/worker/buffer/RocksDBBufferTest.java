@@ -20,4 +20,16 @@ public class RocksDBBufferTest {
         assertArrayEquals(data, buffer.get(100L));
         buffer.close();
     }
+
+    @Test
+    public void closeReleasesOptionsHandle() throws Exception {
+        RocksDBBuffer buffer = new RocksDBBuffer();
+        buffer.open(tempDir.toString());
+
+        assertTrue(buffer.isOptionsOwningHandleForTesting());
+
+        buffer.close();
+
+        assertFalse(buffer.isOptionsOwningHandleForTesting());
+    }
 }
