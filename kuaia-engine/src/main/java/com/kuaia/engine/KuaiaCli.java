@@ -93,5 +93,9 @@ public class KuaiaCli {
         out.println("  local-demo                   Run FakeSource -> BinaryRow -> ConsoleSink");
         out.println("  ai-demo                      Run mock embedding -> mock vector sink");
         out.println("  recover-demo --state-dir DIR Demonstrate RocksDB task recovery");
+        out.println();
+        out.println("Examples:");
+        out.println("  kuaia run -f examples/local-file-to-file.yaml");
+        out.println("  kuaia run -f examples/local-file-to-vector.yaml");
     }
 }

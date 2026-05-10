@@ -68,7 +68,9 @@ Supported runtime behavior:
 ## Current Contract
 
 The public contract is documented in [`pipeline-yaml.md`](pipeline-yaml.md).
-The example catalog is documented in [`examples.md`](examples.md).
+The example catalog is documented in [`examples.md`](examples.md). Connector
+extension notes are documented in
+[`connector-development.md`](connector-development.md).
 
 The current execution guarantee is at-least-once style processing with
 idempotent sinks. Kuaia does not claim exactly-once execution in the MVP.

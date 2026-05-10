@@ -31,6 +31,9 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("local-demo"));
         assertTrue(result.output.contains("ai-demo"));
         assertTrue(result.output.contains("recover-demo"));
+        assertTrue(result.output.contains("Examples:"));
+        assertTrue(result.output.contains("kuaia run -f examples/local-file-to-file.yaml"));
+        assertTrue(result.output.contains("kuaia run -f examples/local-file-to-vector.yaml"));
     }
 
     @Test

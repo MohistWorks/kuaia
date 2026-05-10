@@ -64,9 +64,16 @@ bin/kuaia run -f examples/local-file-to-file.yaml
 cat .kuaia/output/local-file-to-file.csv
 ```
 
+To validate the public MVP paths without external services:
+
+```bash
+make public-mvp-smoke
+```
+
 The supported pipeline YAML contract is documented in
 [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md). The public examples are
-listed in [`docs/examples.md`](docs/examples.md).
+listed in [`docs/examples.md`](docs/examples.md). Connector extension notes are
+in [`docs/connector-development.md`](docs/connector-development.md).
 
 To build a packaged runtime:
 
@@ -83,6 +90,7 @@ Or use Make aliases:
 
 ```bash
 make test
+make public-mvp-smoke
 make run-vector
 make clean-state
 ```
@@ -239,11 +247,16 @@ To stress source split behavior, add `-Dkuaia.benchmark.maxRowsPerSplit=<rows>`.
 
 ## Repository Layout
 
-- `kuaia-common`: shared data model, connector APIs, protobuf contracts, and common utilities.
-- `kuaia-engine`: local execution, worker/coordinator runtime components, state stores, Raft integration, and runnable demos.
+- `kuaia-common`: shared data model, connector APIs, protobuf contracts, and
+  common utilities.
+- `kuaia-engine`: local execution, worker/coordinator runtime components, state
+  stores, Raft integration, and runnable demos.
+- `scripts`: local developer and public MVP smoke checks.
 - `docs/visuals`: public visual references.
 
-Internal design notes are intentionally not part of the public documentation tree. Public user-facing docs should live in `README.md` or future files under `docs/`.
+Internal design notes are intentionally not part of the public documentation
+tree. Public user-facing docs should live in `README.md` or future files under
+`docs/`.
 
 ## License
 

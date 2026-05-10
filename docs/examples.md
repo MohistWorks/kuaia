@@ -4,6 +4,25 @@ These examples are small local pipelines for the public MVP contract. Run them
 from the repository root with `bin/kuaia`. For the current product boundary,
 read [`product-scope.md`](product-scope.md) first.
 
+## Recommended MVP Path
+
+Run the no-service smoke check first:
+
+```bash
+make public-mvp-smoke
+```
+
+It validates three public MVP paths in an isolated `.kuaia/public-mvp-smoke`
+work directory:
+
+- CSV source through `select` and `rename` transforms into a local CSV file,
+- CSV source through `mock-embedding` into the mock vector sink,
+- malformed CSV handling with `errorPolicy.mode: skip-bad-records`.
+
+After that, run individual examples below when you want to inspect one pipeline
+at a time. Qdrant, Postgres, and OpenAI-compatible examples require external
+services or credentials and are not part of the default smoke.
+
 ## Local File To Console
 
 ```bash
