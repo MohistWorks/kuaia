@@ -11,7 +11,7 @@ Implemented today:
 - Local demo pipelines for structured rows and mock AI vector output.
 - Declarative local YAML pipelines with checkpointed `select`, `rename`, and `mock-embedding` transforms.
 - Declarative `file` and batch `postgres` sources with `console`, `file`, `mock-vector`, and `qdrant` sinks.
-- Adapter-first connector API v2 boundary for single-split source readers and batch sink writers.
+- Adapter-first connector API v2 boundary with split-aware source readers and batch sink writers.
 - Local mock embedding provider, OpenAI-compatible embedding provider, and mock vector sink registries for future extension.
 - Coordinator/Worker protocol models for task assignment, ack, checkpoint, backpressure, and attempt results.
 - In-memory and RocksDB-backed task/worker state stores.

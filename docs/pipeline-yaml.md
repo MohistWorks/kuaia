@@ -345,10 +345,12 @@ and sink IO errors remain fatal.
 ## Connector Boundary
 
 The public YAML contract remains source -> transforms -> sink. Internally, Kuaia
-adapts current sources into a connector API v2 shape with one `SourceSplit` per
-local source and batch-aware sink writers. This is an implementation boundary for
-future connector work; it does not add CDC, parallel split scheduling, DAGs, or
-exactly-once guarantees to the current MVP contract.
+adapts current sources into a connector API v2 shape with split-aware source
+readers and batch-aware sink writers. File sources enumerate bounded
+`SourceSplit` ranges internally, while other current sources use a single split.
+This is an implementation boundary for future connector work; it does not add
+CDC, parallel split scheduling, DAGs, or exactly-once guarantees to the current
+MVP contract.
 
 ## Checkpoint
 
