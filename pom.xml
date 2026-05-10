@@ -17,6 +17,7 @@
         <protobuf.version>3.24.0</protobuf.version>
         <junit.version>5.10.0</junit.version>
         <rocksdb.version>8.1.1.1</rocksdb.version>
+        <postgresql.version>42.7.10</postgresql.version>
         <roaringbitmap.version>0.9.44</roaringbitmap.version>
         <arrow.version>12.0.0</arrow.version>
     </properties>

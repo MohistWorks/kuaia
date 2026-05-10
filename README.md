@@ -10,7 +10,7 @@ Implemented today:
 - Connector interfaces for source, transform, and sink components.
 - Local demo pipelines for structured rows and mock AI vector output.
 - Declarative local YAML pipelines with checkpointed `select`, `rename`, and `mock-embedding` transforms.
-- Declarative `console`, `file`, and `mock-vector` local sinks with CLI run summaries and basic bad-record counts.
+- Declarative `file` and batch `postgres` sources with `console`, `file`, `mock-vector`, and `qdrant` sinks.
 - Local mock embedding provider, OpenAI-compatible embedding provider, and mock vector sink registries for future extension.
 - Coordinator/Worker protocol models for task assignment, ack, checkpoint, backpressure, and attempt results.
 - In-memory and RocksDB-backed task/worker state stores.
@@ -20,7 +20,7 @@ Implemented today:
 Not implemented yet:
 
 - Production-grade installers or release artifacts.
-- Real external connectors.
+- CDC, streaming, or production-certified external connectors.
 - Additional vector database integrations beyond Qdrant.
 - Web UI, RBAC, audit, lineage, or Kubernetes operator support.
 - Exactly-once guarantees. The MVP target is at-least-once with idempotent sinks.
@@ -144,6 +144,18 @@ curl -X PUT http://localhost:6333/collections/kuaia_docs \
   -H 'Content-Type: application/json' \
   --data '{"vectors":{"size":4,"distance":"Cosine"}}'
 bin/kuaia run -f examples/local-file-to-qdrant.yaml
+```
+
+Run a batch Postgres-to-Qdrant pipeline:
+
+```bash
+docker compose -f docker-compose.postgres.yml -f docker-compose.qdrant.yml up -d
+curl -X PUT http://localhost:6333/collections/kuaia_pg_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+export KUAIA_POSTGRES_USER=kuaia
+export KUAIA_POSTGRES_PASSWORD=kuaia
+bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
 Run the mock AI vector pipeline:

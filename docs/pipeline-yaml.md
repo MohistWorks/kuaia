@@ -34,7 +34,7 @@ Optional top-level fields:
 
 ## Source
 
-Supported source:
+### file
 
 ```yaml
 source:
@@ -57,6 +57,39 @@ CSV rules:
 - a field named `id` is parsed as `LONG`,
 - other fields are parsed as `STRING`,
 - quoted CSV fields are not supported in this MVP.
+
+### postgres
+
+```yaml
+source:
+  type: postgres
+  url: jdbc:postgresql://localhost:5432/kuaia
+  userEnv: KUAIA_POSTGRES_USER
+  passwordEnv: KUAIA_POSTGRES_PASSWORD
+  query: select id, content from documents order by id
+```
+
+`source.type: postgres` runs one batch JDBC query and streams the result rows
+through the local pipeline. It is not a CDC source.
+
+Fields:
+
+- `type`: must be `postgres`
+- `url`: PostgreSQL JDBC URL
+- `userEnv`: environment variable containing the database user
+- `passwordEnv`: environment variable containing the database password
+- `query`: SQL query to execute
+
+Postgres type rules:
+
+- integer-like columns are exposed as `LONG`,
+- all other columns are exposed as `STRING`,
+- result rows use 1-based source sequence ids in query order,
+- checkpoint reruns skip result rows at or before the last checkpoint sequence.
+
+Credentials are read from the environment at runtime and are never stored in
+YAML. Query failures and missing credential environment variables are fatal
+source errors.
 
 ## Transforms
 
@@ -278,7 +311,7 @@ errorPolicy:
   mode: fail-fast
 ```
 
-`errorPolicy` controls how local CSV pipelines handle malformed source rows.
+`errorPolicy` controls how local pipelines handle malformed source rows.
 
 Fields:
 
@@ -286,8 +319,8 @@ Fields:
 
 Supported modes:
 
-- `fail-fast`: default behavior. The first malformed CSV row fails the run.
-- `skip-bad-records`: malformed CSV rows are counted, reported, and skipped.
+- `fail-fast`: default behavior. The first malformed source row fails the run.
+- `skip-bad-records`: malformed source rows are counted, reported, and skipped.
 
 When `skip-bad-records` is enabled, Kuaia prints each skipped row:
 
@@ -381,6 +414,15 @@ export OPENAI_API_KEY=...
 bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
 ```
 
+Run batch Postgres through mock embedding into Qdrant:
+
+```bash
+docker compose -f docker-compose.postgres.yml -f docker-compose.qdrant.yml up -d
+export KUAIA_POSTGRES_USER=kuaia
+export KUAIA_POSTGRES_PASSWORD=kuaia
+bin/kuaia run -f examples/postgres-to-qdrant.yaml
+```
+
 ## Error Messages
 
 Expected user errors return exit code `1` and print a deterministic message.
@@ -398,6 +440,9 @@ Common examples:
 - `Unsupported transforms[0].provider: <value>`
 - `Invalid transform.dimensions: <value>`
 - `Missing API key environment variable: <name>`
+- `Missing Postgres environment variable: <name>`
+- `Postgres source query failed: <message>`
+- `Invalid Postgres row seq=<seq>: field <field> is null`
 - `Embedding request failed with status <code>: <response>`
 - `Embedding response did not contain an embedding vector`
 - `Unknown transform field: <field>`
@@ -421,7 +466,8 @@ The current YAML contract does not support:
 - transform DAGs,
 - filters, joins, casts, or aggregations,
 - CDC offsets,
-- real external connectors,
+- CDC or streaming external connectors,
+- additional production-certified external connectors beyond batch PostgreSQL,
 - additional real vector databases beyond Qdrant,
 - provider-specific SDK integrations,
 - production deployment settings,

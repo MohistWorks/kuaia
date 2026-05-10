@@ -98,6 +98,36 @@ The example reads `examples/data/documents.csv`, creates deterministic mock
 embeddings, and upserts points into Qdrant collection `kuaia_docs`. It is not
 part of default automated tests because it requires a running Qdrant service.
 
+## Postgres To Qdrant
+
+Start Postgres and Qdrant:
+
+```bash
+docker compose -f docker-compose.postgres.yml -f docker-compose.qdrant.yml up -d
+```
+
+Create the example Qdrant collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_pg_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Run the batch Postgres-to-Qdrant pipeline:
+
+```bash
+export KUAIA_POSTGRES_USER=kuaia
+export KUAIA_POSTGRES_PASSWORD=kuaia
+bin/kuaia run -f examples/postgres-to-qdrant.yaml
+```
+
+The example reads rows from the `documents` table initialized by
+`examples/postgres/init/01-documents.sql`, creates deterministic mock
+embeddings, and upserts points into Qdrant collection `kuaia_pg_docs`. It is not
+part of default automated tests because it requires running Postgres and Qdrant
+services.
+
 ## Docker Quickstart
 
 ```bash

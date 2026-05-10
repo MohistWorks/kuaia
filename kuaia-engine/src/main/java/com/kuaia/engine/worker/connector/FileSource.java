@@ -11,23 +11,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-public class FileSource {
+public class FileSource implements LocalSource {
     private final Path path;
     private KuaiaRowType rowType;
     private List<String> lines;
-
-    public interface RecordConsumer {
-        void accept(long seqId, BinaryRow row) throws Exception;
-    }
-
-    public interface RecordErrorConsumer {
-        boolean accept(long seqId, PipelineExecutionException error) throws Exception;
-    }
 
     public FileSource(Path path) {
         this.path = path;
     }
 
+    @Override
     public void open() throws Exception {
         if (!Files.exists(path)) {
             throw new PipelineExecutionException("Source file not found: " + path);
@@ -56,6 +49,7 @@ public class FileSource {
         return readFrom(lastCheckpointSeq, consumer, (seqId, error) -> false);
     }
 
+    @Override
     public int readFrom(long lastCheckpointSeq, RecordConsumer consumer, RecordErrorConsumer errorConsumer)
             throws Exception {
         int count = 0;
@@ -88,10 +82,12 @@ public class FileSource {
         return count;
     }
 
+    @Override
     public void close() {
         lines = null;
     }
 
+    @Override
     public KuaiaRowType getRowType() {
         return rowType;
     }

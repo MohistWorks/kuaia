@@ -13,6 +13,8 @@ import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.FileSource;
 import com.kuaia.engine.worker.connector.FileSink;
+import com.kuaia.engine.worker.connector.LocalSource;
+import com.kuaia.engine.worker.connector.PostgresSource;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 
 import java.io.PrintStream;
@@ -63,7 +65,7 @@ public class LocalPipelineRunner {
     }
 
     private PipelineRunSummary runWithoutCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
-        FileSource source = new FileSource(Paths.get(config.getSource().getPath()));
+        LocalSource source = createSource(config);
         source.open();
         SinkWriter sink = null;
         try {
@@ -91,7 +93,7 @@ public class LocalPipelineRunner {
     }
 
     private PipelineRunSummary runWithCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
-        FileSource source = new FileSource(Paths.get(config.getSource().getPath()));
+        LocalSource source = createSource(config);
         source.open();
         SinkWriter sink = null;
         try {
@@ -153,6 +155,17 @@ public class LocalPipelineRunner {
                 sink.close();
             }
         }
+    }
+
+    private LocalSource createSource(PipelineConfig config) throws PipelineExecutionException {
+        String sourceType = config.getSource().getType();
+        if ("file".equals(sourceType)) {
+            return new FileSource(Paths.get(config.getSource().getPath()));
+        }
+        if ("postgres".equals(sourceType)) {
+            return new PostgresSource(config.getSource());
+        }
+        throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
     }
 
     private boolean hasCheckpointStateDir(PipelineConfig config) {

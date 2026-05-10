@@ -271,6 +271,53 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsPostgresSourceConfig() throws Exception {
+        Path configPath = tempDir.resolve("postgres-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: postgres-source",
+                "source:",
+                "  type: postgres",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: KUAIA_POSTGRES_USER",
+                "  passwordEnv: KUAIA_POSTGRES_PASSWORD",
+                "  query: select id, content from documents order by id",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("postgres", config.getSource().getType());
+        assertEquals("jdbc:postgresql://localhost:5432/kuaia", config.getSource().getUrl());
+        assertEquals("KUAIA_POSTGRES_USER", config.getSource().getUserEnv());
+        assertEquals("KUAIA_POSTGRES_PASSWORD", config.getSource().getPasswordEnv());
+        assertEquals("select id, content from documents order by id", config.getSource().getQuery());
+    }
+
+    @Test
+    void rejectsMissingPostgresQuery() throws Exception {
+        Path configPath = tempDir.resolve("missing-postgres-query.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-postgres-query",
+                "source:",
+                "  type: postgres",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: KUAIA_POSTGRES_USER",
+                "  passwordEnv: KUAIA_POSTGRES_PASSWORD",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: source.query", error.getMessage());
+    }
+
+    @Test
     void loadsSkipBadRecordsErrorPolicy() throws Exception {
         Path configPath = tempDir.resolve("skip-bad-records.yaml");
         Files.write(configPath, String.join("\n",

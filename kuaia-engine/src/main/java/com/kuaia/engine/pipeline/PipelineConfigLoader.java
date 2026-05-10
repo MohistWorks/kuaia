@@ -33,21 +33,19 @@ public class PipelineConfigLoader {
         Map<String, String> errorPolicy = sections.get("errorPolicy");
 
         String sourceType = require(source, "source.type");
-        String sourcePath = resolveLocalPath(path, require(source, "source.path"));
-        String sourceFormat = require(source, "source.format");
         String sinkType = require(sink, "sink.type");
 
-        requireSupported("source.type", sourceType, "file");
-        requireSupported("source.format", sourceFormat, "csv");
+        requireSupported("source.type", sourceType, "file", "postgres");
         requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant");
 
+        PipelineConfig.SourceConfig sourceConfig = loadSource(path, sourceType, source);
         PipelineConfig.SinkConfig sinkConfig = loadSink(path, sinkType, sink);
         PipelineConfig.ErrorPolicyConfig errorPolicyConfig = loadErrorPolicy(errorPolicy);
 
         String stateDir = checkpoint == null ? null : checkpoint.get("stateDir");
         return new PipelineConfig(
                 name,
-                new PipelineConfig.SourceConfig(sourceType, sourcePath, sourceFormat),
+                sourceConfig,
                 loadTransforms(transforms),
                 sinkConfig,
                 new PipelineConfig.CheckpointConfig(stateDir),
@@ -139,6 +137,25 @@ public class PipelineConfigLoader {
             }
         }
         return configs;
+    }
+
+    private PipelineConfig.SourceConfig loadSource(Path configPath, String sourceType, Map<String, String> source)
+            throws PipelineConfigException {
+        if ("postgres".equals(sourceType)) {
+            return new PipelineConfig.SourceConfig(
+                    "postgres",
+                    null,
+                    null,
+                    require(source, "source.url"),
+                    require(source, "source.userEnv"),
+                    require(source, "source.passwordEnv"),
+                    require(source, "source.query"));
+        }
+
+        String sourcePath = resolveLocalPath(configPath, require(source, "source.path"));
+        String sourceFormat = require(source, "source.format");
+        requireSupported("source.format", sourceFormat, "csv");
+        return new PipelineConfig.SourceConfig(sourceType, sourcePath, sourceFormat);
     }
 
     private PipelineConfig.TransformConfig loadEmbeddingTransform(Map<String, String> transform, String fieldPrefix)

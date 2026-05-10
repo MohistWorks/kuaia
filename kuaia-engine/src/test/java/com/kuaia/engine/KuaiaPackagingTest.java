@@ -66,10 +66,16 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/examples.md")).contains("local-file-to-openai-compatible-vector.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("local-file-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.qdrant.yml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("postgres-to-qdrant.yaml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.postgres.yml"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: postgres"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
         assertTrue(Files.exists(root.resolve("examples/local-file-to-qdrant.yaml")), "Qdrant example should exist");
         assertTrue(Files.exists(root.resolve("docker-compose.qdrant.yml")), "Qdrant compose file should exist");
+        assertTrue(Files.exists(root.resolve("examples/postgres-to-qdrant.yaml")), "Postgres to Qdrant example should exist");
+        assertTrue(Files.exists(root.resolve("docker-compose.postgres.yml")), "Postgres compose file should exist");
+        assertTrue(Files.exists(root.resolve("examples/postgres/init/01-documents.sql")), "Postgres init SQL should exist");
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);

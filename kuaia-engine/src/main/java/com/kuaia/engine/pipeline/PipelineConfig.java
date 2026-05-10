@@ -68,11 +68,30 @@ public class PipelineConfig {
         private final String type;
         private final String path;
         private final String format;
+        private final String url;
+        private final String userEnv;
+        private final String passwordEnv;
+        private final String query;
 
         public SourceConfig(String type, String path, String format) {
+            this(type, path, format, null, null, null, null);
+        }
+
+        public SourceConfig(
+                String type,
+                String path,
+                String format,
+                String url,
+                String userEnv,
+                String passwordEnv,
+                String query) {
             this.type = type;
             this.path = path;
             this.format = format;
+            this.url = url;
+            this.userEnv = userEnv;
+            this.passwordEnv = passwordEnv;
+            this.query = query;
         }
 
         public String getType() {
@@ -85,6 +104,22 @@ public class PipelineConfig {
 
         public String getFormat() {
             return format;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public String getUserEnv() {
+            return userEnv;
+        }
+
+        public String getPasswordEnv() {
+            return passwordEnv;
+        }
+
+        public String getQuery() {
+            return query;
         }
     }
 
