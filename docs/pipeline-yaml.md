@@ -397,7 +397,7 @@ directory or the repository `.kuaia/` runtime directory. This applies to
 Successful declarative runs print a stable summary line:
 
 ```text
-Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED durationMs=12
+Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED sourceSplits=1 sinkBatches=2 durationMs=12
 ```
 
 Fields:
@@ -409,6 +409,8 @@ Fields:
 - `checkpointSeq`: latest source sequence reached by this run or prior
   checkpoint,
 - `taskState`: final task state for the local pipeline run,
+- `sourceSplits`: source split readers executed by the local runner,
+- `sinkBatches`: sink batches successfully committed by the local runner,
 - `durationMs`: wall-clock runtime in milliseconds.
 
 ## Examples
