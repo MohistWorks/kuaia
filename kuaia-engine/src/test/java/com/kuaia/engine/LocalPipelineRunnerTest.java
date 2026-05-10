@@ -8,6 +8,7 @@ import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.coordinator.state.RocksDbStateStore;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
+import com.kuaia.engine.pipeline.PipelineRunSummary;
 import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import com.kuaia.engine.worker.connector.VectorSinkFactory;
@@ -165,6 +166,82 @@ class LocalPipelineRunnerTest {
     }
 
     @Test
+    void resumesFileSourceAfterFailedSplitBatch() throws Exception {
+        Path data = tempDir.resolve("resume-split-documents.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta",
+                "3,Gamma",
+                "4,Delta",
+                "5,Epsilon").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("resume-split-state");
+        Path configPath = tempDir.resolve("resume-split-vector.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: resume-split-vector",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "    batchSize: 2",
+                "sink:",
+                "  type: mock-vector",
+                "checkpoint:",
+                "  stateDir: " + stateDir).getBytes(StandardCharsets.UTF_8));
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        FailingOnBatchSink firstSink = new FailingOnBatchSink(2);
+        SinkFactoryRegistry firstRegistry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> firstSink));
+        ByteArrayOutputStream firstBytes = new ByteArrayOutputStream();
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> new LocalPipelineRunner(
+                        firstRegistry,
+                        EmbeddingProviderRegistry.defaultRegistry(),
+                        2)
+                        .run(config, new PrintStream(firstBytes, true, StandardCharsets.UTF_8.name())));
+
+        assertEquals("sink batch failed", error.getMessage());
+        assertEquals(java.util.Arrays.asList(2, 2), firstSink.batchSizes());
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-resume-split-vector");
+            assertNotNull(record);
+            assertEquals(TaskState.RUNNING, record.getState());
+            assertEquals(2L, record.getLastCheckpointSeq());
+        }
+
+        CapturingSink resumedSink = new CapturingSink();
+        SinkFactoryRegistry resumedRegistry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> resumedSink));
+        ByteArrayOutputStream resumedBytes = new ByteArrayOutputStream();
+        PipelineRunSummary summary = new LocalPipelineRunner(
+                resumedRegistry,
+                EmbeddingProviderRegistry.defaultRegistry(),
+                2)
+                .run(config, new PrintStream(resumedBytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(java.util.Arrays.asList(2, 1), resumedSink.batchSizes);
+        assertEquals(3L, summary.getRowsWritten());
+        assertEquals(2L, summary.getRowsSkipped());
+        assertEquals(5L, summary.getCheckpointSeq());
+        assertEquals(TaskState.COMPLETED, summary.getTaskState());
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-resume-split-vector");
+            assertNotNull(record);
+            assertEquals(TaskState.COMPLETED, record.getState());
+            assertEquals(5L, record.getLastCheckpointSeq());
+        }
+    }
+
+    @Test
     void doesNotCheckpointFailedSinkBatch() throws Exception {
         Path data = tempDir.resolve("failed-batch-documents.csv");
         Files.write(data, String.join("\n",
@@ -235,6 +312,10 @@ class LocalPipelineRunnerTest {
             return batchWrites;
         }
 
+        List<Integer> batchSizes() {
+            return batchSizes;
+        }
+
         @Override
         public void close() {}
     }
@@ -244,6 +325,22 @@ class LocalPipelineRunnerTest {
         public void writeBatch(List<BinaryRow> rows) {
             super.writeBatch(rows);
             throw new IllegalStateException("sink batch failed");
+        }
+    }
+
+    private static class FailingOnBatchSink extends CapturingSink {
+        private final int failedBatch;
+
+        private FailingOnBatchSink(int failedBatch) {
+            this.failedBatch = failedBatch;
+        }
+
+        @Override
+        public void writeBatch(List<BinaryRow> rows) {
+            super.writeBatch(rows);
+            if (batchWrites() == failedBatch) {
+                throw new IllegalStateException("sink batch failed");
+            }
         }
     }
 }
