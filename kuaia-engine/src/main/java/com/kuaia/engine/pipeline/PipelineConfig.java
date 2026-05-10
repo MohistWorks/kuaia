@@ -102,6 +102,9 @@ public class PipelineConfig {
                 String passwordEnv,
                 String query,
                 int maxRowsPerSplit) {
+            if (maxRowsPerSplit < 0) {
+                throw new IllegalArgumentException("maxRowsPerSplit must not be negative");
+            }
             this.type = type;
             this.path = path;
             this.format = format;
