@@ -4,7 +4,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 MAVEN_BIN=${MAVEN_BIN:-mvn}
-JAR_PATH=${KUAIA_JAR:-"$ROOT_DIR/kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar"}
+JAR_PATH=${KUAIA_JAR:-"$ROOT_DIR/kuaia-engine/target/kuaia-engine-0.1.0-cli.jar"}
 
 cd "$ROOT_DIR"
 if [ -f "$JAR_PATH" ]; then
