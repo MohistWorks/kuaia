@@ -69,7 +69,9 @@ class KuaiaPackagingTest {
                 "pull request template should exist");
         assertTrue(read(root.resolve(".github/pull_request_template.md")).contains("make public-mvp-smoke"));
         assertTrue(read(root.resolve(".github/ISSUE_TEMPLATE/bug_report.yml")).contains("Do not include API keys"));
+        assertTrue(Files.exists(root.resolve("docs/README.md")), "docs/README.md should exist");
         assertTrue(Files.exists(root.resolve("docs/pipeline-yaml.md")), "docs/pipeline-yaml.md should exist");
+        assertTrue(read(root.resolve("README.md")).contains("docs/README.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/pipeline-yaml.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/examples.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/connector-development.md"));
@@ -91,6 +93,10 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: postgres"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
+        assertTrue(read(root.resolve("docs/README.md")).contains("product-scope.md"));
+        assertTrue(read(root.resolve("docs/README.md")).contains("pipeline-yaml.md"));
+        assertTrue(read(root.resolve("docs/README.md")).contains("connector-development.md"));
+        assertTrue(read(root.resolve("docs/README.md")).contains("release-checklist.md"));
         assertTrue(Files.exists(root.resolve("docs/connector-development.md")),
                 "docs/connector-development.md should exist");
         assertTrue(Files.exists(root.resolve("docs/release-checklist.md")),
