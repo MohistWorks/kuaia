@@ -4,10 +4,15 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 MAVEN_BIN=${MAVEN_BIN:-mvn}
-JAR_PATH=${KUAIA_JAR:-"$ROOT_DIR/kuaia-engine/target/kuaia-engine-0.1.0-cli.jar"}
+JAR_PATH=${KUAIA_JAR:-}
+PROJECT_VERSION=$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' "$ROOT_DIR/pom.xml" | sed -n '1p')
+
+if [ -z "$JAR_PATH" ] && [ -n "$PROJECT_VERSION" ]; then
+  JAR_PATH="$ROOT_DIR/kuaia-engine/target/kuaia-engine-$PROJECT_VERSION-cli.jar"
+fi
 
 cd "$ROOT_DIR"
-if [ -f "$JAR_PATH" ]; then
+if [ -n "$JAR_PATH" ] && [ -f "$JAR_PATH" ]; then
   exec java -jar "$JAR_PATH" "$@"
 fi
 
