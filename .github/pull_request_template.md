@@ -22,7 +22,6 @@ Run the checks that match the change:
 
 ## Public Boundary
 
-- [ ] This does not commit `dev/`, `.kuaia/`, `target/`, `.DS_Store`, or local state.
 - [ ] This does not include API keys, bearer tokens, passwords, private URLs, or production data.
 - [ ] Public documentation changes live in `README.md` or `docs/`.
 - [ ] New capabilities are described as current behavior only if they are implemented and tested.
