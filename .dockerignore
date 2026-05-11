@@ -4,5 +4,3 @@ target/
 .kuaia/
 **/.kuaia/
 dev/
-daily_tasks.json
-.DS_Store

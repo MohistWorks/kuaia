@@ -26,13 +26,10 @@ not create a tag by itself.
 - [ ] `.dockerignore` excludes local state and internal planning files from
   Docker builds.
 
-## Internal And Local Files
+## Repository Hygiene
 
-- [ ] `dev/` is not tracked by git.
-- [ ] `.kuaia/` is not tracked by git.
-- [ ] `target/` directories are not tracked by git.
-- [ ] `.DS_Store` is not tracked by git.
-- [ ] `daily_tasks.json` is not tracked by git.
+- [ ] Local state, generated output, and internal planning notes are not
+  committed.
 - [ ] No API keys, bearer tokens, passwords, or private URLs are committed.
 
 ## Local Validation Gate
