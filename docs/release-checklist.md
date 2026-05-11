@@ -32,7 +32,7 @@ not create a tag by itself.
 - [ ] `.kuaia/` is not tracked by git.
 - [ ] `target/` directories are not tracked by git.
 - [ ] `.DS_Store` is not tracked by git.
-- [ ] `daily_tasks.json` is not staged for release commits.
+- [ ] `daily_tasks.json` is not tracked by git.
 - [ ] No API keys, bearer tokens, passwords, or private URLs are committed.
 
 ## Local Validation Gate
