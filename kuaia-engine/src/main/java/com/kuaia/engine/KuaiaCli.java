@@ -1,5 +1,6 @@
 package com.kuaia.engine;
 
+import com.kuaia.engine.benchmark.LocalPipelineBenchmarkRunner;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigException;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
@@ -33,6 +34,16 @@ public class KuaiaCli {
         if ("examples".equals(command)) {
             printExamples(out);
             return 0;
+        }
+        if ("benchmark".equals(command)) {
+            try {
+                LocalPipelineBenchmarkRunner.BenchmarkOptions options = parseBenchmarkOptions(args);
+                new LocalPipelineBenchmarkRunner().run(options, out);
+                return 0;
+            } catch (IllegalArgumentException e) {
+                out.println(e.getMessage());
+                return 1;
+            }
         }
         if ("recover-demo".equals(command)) {
             Path stateDir = parseStateDir(args, out);
@@ -77,6 +88,57 @@ public class KuaiaCli {
         return null;
     }
 
+    private static LocalPipelineBenchmarkRunner.BenchmarkOptions parseBenchmarkOptions(String[] args) {
+        int rows = LocalPipelineBenchmarkRunner.DEFAULT_ROWS;
+        int maxRowsPerSplit = LocalPipelineBenchmarkRunner.DEFAULT_MAX_ROWS_PER_SPLIT;
+        Path output = LocalPipelineBenchmarkRunner.DEFAULT_OUTPUT;
+        for (int i = 1; i < args.length; i++) {
+            String option = args[i];
+            if ("--rows".equals(option)) {
+                rows = parsePositiveIntOption(args, ++i, "--rows");
+            } else if ("--max-rows-per-split".equals(option)) {
+                maxRowsPerSplit = parseNonNegativeIntOption(args, ++i, "--max-rows-per-split");
+            } else if ("--output".equals(option)) {
+                output = Paths.get(requireOptionValue(args, ++i, "--output"));
+            } else {
+                throw new IllegalArgumentException("Unknown benchmark option: " + option);
+            }
+        }
+        return new LocalPipelineBenchmarkRunner.BenchmarkOptions(rows, maxRowsPerSplit, output);
+    }
+
+    private static int parsePositiveIntOption(String[] args, int valueIndex, String optionName) {
+        int value = parseIntOption(args, valueIndex, optionName);
+        if (value <= 0) {
+            throw new IllegalArgumentException("benchmark " + optionName + " must be greater than zero");
+        }
+        return value;
+    }
+
+    private static int parseNonNegativeIntOption(String[] args, int valueIndex, String optionName) {
+        int value = parseIntOption(args, valueIndex, optionName);
+        if (value < 0) {
+            throw new IllegalArgumentException("benchmark " + optionName + " must not be negative");
+        }
+        return value;
+    }
+
+    private static int parseIntOption(String[] args, int valueIndex, String optionName) {
+        String value = requireOptionValue(args, valueIndex, optionName);
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("benchmark " + optionName + " must be an integer: " + value, e);
+        }
+    }
+
+    private static String requireOptionValue(String[] args, int valueIndex, String optionName) {
+        if (valueIndex >= args.length) {
+            throw new IllegalArgumentException("benchmark " + optionName + " requires a value");
+        }
+        return args[valueIndex];
+    }
+
     private static Path parseRunConfigPath(String[] args, PrintStream out) {
         for (int i = 1; i < args.length - 1; i++) {
             if ("-f".equals(args[i]) || "--file".equals(args[i])) {
@@ -97,11 +159,13 @@ public class KuaiaCli {
         out.println("  local-demo                   Run FakeSource -> BinaryRow -> ConsoleSink");
         out.println("  ai-demo                      Run mock embedding -> mock vector sink");
         out.println("  examples                     Show runnable public example pipelines");
+        out.println("  benchmark [options]          Run local batch benchmark");
         out.println("  recover-demo --state-dir DIR Demonstrate RocksDB task recovery");
         out.println();
         out.println("Examples:");
         out.println("  kuaia run -f examples/local-file-to-file.yaml");
         out.println("  kuaia run -f examples/local-file-to-vector.yaml");
+        out.println("  kuaia benchmark --rows 10000");
     }
 
     private static void printExamples(PrintStream out) {
