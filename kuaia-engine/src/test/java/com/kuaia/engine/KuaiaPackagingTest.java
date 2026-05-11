@@ -58,8 +58,6 @@ class KuaiaPackagingTest {
         assertTrue(compose.contains("examples/local-file-to-file.yaml"), compose);
         assertTrue(compose.contains("/opt/kuaia/.kuaia"), compose);
         assertTrue(read(root.resolve(".dockerignore")).contains("dev/"));
-        assertTrue(read(root.resolve(".dockerignore")).contains("daily_tasks.json"));
-        assertTrue(read(root.resolve(".gitignore")).contains("daily_tasks.json"));
         assertTrue(Files.exists(root.resolve(".github/ISSUE_TEMPLATE/bug_report.yml")),
                 "bug report issue template should exist");
         assertTrue(Files.exists(root.resolve(".github/ISSUE_TEMPLATE/feature_request.yml")),

@@ -34,8 +34,7 @@ git diff --check
 4. Keep public user-facing documentation in `README.md` or `docs/`.
 5. Do not add internal planning notes or local design files to the public
    repository.
-6. Do not commit local state, generated output, or machine-specific files such
-   as `.kuaia/`, `target/`, `.DS_Store`, or `dev/`.
+6. Do not commit local state, generated output, or machine-specific files.
 
 Use the GitHub issue templates for bug reports and feature requests. Pull
 requests should fill out the repository PR template, including the validation
