@@ -72,6 +72,7 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("docs/README.md")), "docs/README.md should exist");
         assertTrue(Files.exists(root.resolve("docs/pipeline-yaml.md")), "docs/pipeline-yaml.md should exist");
         assertTrue(read(root.resolve("README.md")).contains("docs/README.md"));
+        assertTrue(read(root.resolve("README.md")).contains("actions/workflows/ci.yml/badge.svg"));
         assertTrue(read(root.resolve("README.md")).contains("docs/pipeline-yaml.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/examples.md"));
         assertTrue(read(root.resolve("README.md")).contains("docs/connector-development.md"));

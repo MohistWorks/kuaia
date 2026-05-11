@@ -1,5 +1,7 @@
 # Kuaia
 
+[![CI](https://github.com/gnehil/kuaia/actions/workflows/ci.yml/badge.svg)](https://github.com/gnehil/kuaia/actions/workflows/ci.yml)
+
 Kuaia is an experimental Java runtime for AI-ready data integration. The
 long-term product direction is an AI-ready DataOps engine for moving,
 transforming, vectorizing, and activating data with predictable infrastructure
