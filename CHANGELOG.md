@@ -1,9 +1,17 @@
 # Changelog
 
-All notable public changes to Kuaia are tracked here. This project has not cut
-a tagged release yet.
+All notable public changes to Kuaia are tracked here.
 
-## Unreleased MVP
+## Unreleased
+
+### Changed
+
+- Main branch development version is now `0.1.1-SNAPSHOT` after the `v0.1.0`
+  release.
+- Runtime packaging examples resolve the shaded CLI jar without hard-coding the
+  release version.
+
+## 0.1.0 - 2026-05-11
 
 ### Added
 
@@ -34,7 +42,7 @@ a tagged release yet.
 
 ### Not Included Yet
 
-- Tagged release artifacts or installers.
+- Binary installers or package-manager distribution.
 - CDC, streaming, or production-certified external connectors.
 - Distributed DAG execution, shuffle, joins, fan-out, or Kubernetes operation.
 - Additional vector database integrations beyond Qdrant.

@@ -62,7 +62,8 @@ in an isolated local state directory.
 
 ```bash
 mvn -q package
-java -jar kuaia-engine/target/kuaia-engine-0.1.0-cli.jar help
+VERSION=$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml | head -n 1)
+java -jar "kuaia-engine/target/kuaia-engine-${VERSION}-cli.jar" help
 ```
 
 After packaging, `bin/kuaia` uses the packaged jar automatically. Before

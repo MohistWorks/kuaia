@@ -48,6 +48,8 @@ git diff --check
 
 ## CI Gate
 
+- [ ] The protected `main` branch requires GitHub Actions `CI` to pass before
+  pull requests can merge.
 - [ ] GitHub Actions `CI` completes successfully on `main`.
 - [ ] CI includes `mvn -q test`.
 - [ ] CI includes `mvn -q package`.
@@ -62,5 +64,6 @@ Before tagging or announcing an MVP release:
 - [ ] Confirm the exact version name if tagging.
 - [ ] Confirm the target repository and branch.
 - [ ] Update `CHANGELOG.md` for the final public state.
+- [ ] After tagging a release, bump `main` to the next development version.
 - [ ] Re-run the local validation gate after the final commit.
 - [ ] Confirm the latest remote CI run is successful.
