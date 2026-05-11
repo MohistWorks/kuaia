@@ -18,6 +18,7 @@ MVP. Internal design notes are not part of this tree.
   transform, and sink extension boundaries.
 - [`release-checklist.md`](release-checklist.md): open-source MVP release
   candidate checks.
+- [`../CHANGELOG.md`](../CHANGELOG.md): current public MVP release notes.
 
 ## Visual References
 

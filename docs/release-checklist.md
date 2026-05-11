@@ -20,6 +20,7 @@ not create a tag by itself.
 
 - [ ] `LICENSE` is present.
 - [ ] `SECURITY.md` is present and tells users how to report vulnerabilities.
+- [ ] `CHANGELOG.md` is present and reflects the public MVP boundary.
 - [ ] `CONTRIBUTING.md` is present and includes the local validation gate.
 - [ ] `.gitignore` excludes local build/state/internal directories.
 - [ ] `.dockerignore` excludes local state and internal planning files from
@@ -63,5 +64,6 @@ Before tagging or announcing an MVP release:
 - [ ] Confirm whether the release should be tagless or tagged.
 - [ ] Confirm the exact version name if tagging.
 - [ ] Confirm the target repository and branch.
+- [ ] Update `CHANGELOG.md` for the final public state.
 - [ ] Re-run the local validation gate after the final commit.
 - [ ] Confirm the latest remote CI run is successful.

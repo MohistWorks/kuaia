@@ -11,6 +11,7 @@ and evaluate the core execution semantics before Kuaia grows into a broader
 platform.
 
 For the user-facing product boundary, see [`docs/product-scope.md`](docs/product-scope.md).
+Public release notes are tracked in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Product Scope
 
@@ -77,7 +78,8 @@ supported pipeline YAML contract is documented in
 in [`docs/examples.md`](docs/examples.md). Connector extension notes are in
 [`docs/connector-development.md`](docs/connector-development.md). Open-source
 release candidate checks are listed in
-[`docs/release-checklist.md`](docs/release-checklist.md).
+[`docs/release-checklist.md`](docs/release-checklist.md). Public release notes
+are tracked in [`CHANGELOG.md`](CHANGELOG.md).
 
 To build a packaged runtime:
 
