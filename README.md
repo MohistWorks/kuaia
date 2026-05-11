@@ -62,7 +62,7 @@ in an isolated local state directory.
 
 ```bash
 mvn -q package
-java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help
+java -jar kuaia-engine/target/kuaia-engine-0.1.0-cli.jar help
 ```
 
 After packaging, `bin/kuaia` uses the packaged jar automatically. Before

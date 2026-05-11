@@ -35,6 +35,6 @@ jobs:
 
       - name: Smoke test CLI help and Compose config
         run: |
-          java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help
+          java -jar kuaia-engine/target/kuaia-engine-0.1.0-cli.jar help
           bin/kuaia help
           docker compose config

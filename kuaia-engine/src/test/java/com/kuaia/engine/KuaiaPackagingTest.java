@@ -39,7 +39,7 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(script), "bin/kuaia should exist");
         assertTrue(Files.isExecutable(script), "bin/kuaia should be executable");
         assertTrue(read(script).contains("com.kuaia.engine.KuaiaCli"));
-        assertTrue(read(script).contains("kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar"));
+        assertTrue(read(script).contains("kuaia-engine/target/kuaia-engine-0.1.0-cli.jar"));
         assertTrue(read(script).contains("exec java -jar"));
         assertTrue(read(script).contains("-N -DskipTests install"));
         assertTrue(read(script).contains("-pl kuaia-common -DskipTests install"));
@@ -52,7 +52,7 @@ class KuaiaPackagingTest {
                 "public MVP smoke script should be executable");
         String dockerfile = read(root.resolve("Dockerfile"));
         assertTrue(dockerfile.contains("AS build"), dockerfile);
-        assertTrue(dockerfile.contains("COPY --from=build /workspace/kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar /opt/kuaia/kuaia.jar"), dockerfile);
+        assertTrue(dockerfile.contains("COPY --from=build /workspace/kuaia-engine/target/kuaia-engine-0.1.0-cli.jar /opt/kuaia/kuaia.jar"), dockerfile);
         assertTrue(dockerfile.contains("ENTRYPOINT [\"java\", \"-jar\", \"/opt/kuaia/kuaia.jar\"]"), dockerfile);
         String compose = read(root.resolve("docker-compose.yml"));
         assertTrue(compose.contains("examples/local-file-to-file.yaml"), compose);
@@ -79,7 +79,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("CHANGELOG.md"));
         assertTrue(read(root.resolve("README.md")).contains("make public-mvp-smoke"));
         assertTrue(read(root.resolve("README.md")).contains("mvn -q package"));
-        assertTrue(read(root.resolve("README.md")).contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help"));
+        assertTrue(read(root.resolve("README.md")).contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-cli.jar help"));
         assertTrue(read(root.resolve("README.md")).contains("docker compose up --build"));
         assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
         assertTrue(read(root.resolve("README.md")).contains("SECURITY.md"));
@@ -131,7 +131,7 @@ class KuaiaPackagingTest {
         assertTrue(workflow.contains("mvn -q test"), workflow);
         assertTrue(workflow.contains("mvn -q package"), workflow);
         assertTrue(workflow.contains("make public-mvp-smoke"), workflow);
-        assertTrue(workflow.contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-SNAPSHOT-cli.jar help"), workflow);
+        assertTrue(workflow.contains("java -jar kuaia-engine/target/kuaia-engine-0.1.0-cli.jar help"), workflow);
         assertTrue(workflow.contains("bin/kuaia help"), workflow);
         assertTrue(workflow.contains("docker compose config"), workflow);
     }
