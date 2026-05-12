@@ -33,12 +33,11 @@ import java.util.stream.Stream;
 public class LocalPipelineBenchmarkRunner {
     public static final int DEFAULT_ROWS = 128;
     public static final int DEFAULT_MAX_ROWS_PER_SPLIT = 0;
+    public static final int[] DEFAULT_BATCH_SIZES = new int[]{1, 8, 32, 128};
     public static final Path DEFAULT_OUTPUT = Paths.get(
             "target",
             "kuaia-benchmark",
             "local-pipeline-batch.json");
-
-    private static final int[] BATCH_SIZES = new int[]{1, 8, 32, 128};
 
     public List<BenchmarkResult> run(BenchmarkOptions options, PrintStream out) throws Exception {
         Path output = options.getOutput();
@@ -54,10 +53,11 @@ public class LocalPipelineBenchmarkRunner {
         List<BenchmarkResult> results = new ArrayList<>();
         out.println("Benchmark: local batch pipeline");
         out.println("rows=" + options.getRows()
+                + " batchSizes=" + formatBatchSizes(options.getBatchSizes())
                 + " maxRowsPerSplit=" + displayMaxRowsPerSplit(options.getMaxRowsPerSplit())
                 + " output=" + output);
 
-        for (int batchSize : BATCH_SIZES) {
+        for (int batchSize : options.getBatchSizes()) {
             CountingEmbeddingProvider provider = new CountingEmbeddingProvider();
             CountingVectorSink sink = new CountingVectorSink();
             LocalPipelineRunner runner = runner(provider, sink);
@@ -186,6 +186,17 @@ public class LocalPipelineBenchmarkRunner {
         return maxRowsPerSplit > 0 ? Integer.toString(maxRowsPerSplit) : "default";
     }
 
+    private String formatBatchSizes(int[] batchSizes) {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < batchSizes.length; i++) {
+            if (i > 0) {
+                text.append(",");
+            }
+            text.append(batchSizes[i]);
+        }
+        return text.toString();
+    }
+
     private static class CountingEmbeddingProvider implements EmbeddingProvider {
         private int singleCalls;
         private int batchCalls;
@@ -243,17 +254,31 @@ public class LocalPipelineBenchmarkRunner {
     public static class BenchmarkOptions {
         private final int rows;
         private final int maxRowsPerSplit;
+        private final int[] batchSizes;
         private final Path output;
 
         public BenchmarkOptions(int rows, int maxRowsPerSplit, Path output) {
+            this(rows, maxRowsPerSplit, DEFAULT_BATCH_SIZES, output);
+        }
+
+        public BenchmarkOptions(int rows, int maxRowsPerSplit, int[] batchSizes, Path output) {
             if (rows <= 0) {
                 throw new IllegalArgumentException("benchmark --rows must be greater than zero");
             }
             if (maxRowsPerSplit < 0) {
                 throw new IllegalArgumentException("benchmark --max-rows-per-split must not be negative");
             }
+            if (batchSizes == null || batchSizes.length == 0) {
+                throw new IllegalArgumentException("benchmark --batch-sizes requires at least one value");
+            }
             this.rows = rows;
             this.maxRowsPerSplit = maxRowsPerSplit;
+            this.batchSizes = batchSizes.clone();
+            for (int batchSize : this.batchSizes) {
+                if (batchSize <= 0) {
+                    throw new IllegalArgumentException("benchmark --batch-sizes values must be greater than zero");
+                }
+            }
             this.output = output;
         }
 
@@ -267,6 +292,10 @@ public class LocalPipelineBenchmarkRunner {
 
         public int getMaxRowsPerSplit() {
             return maxRowsPerSplit;
+        }
+
+        public int[] getBatchSizes() {
+            return batchSizes.clone();
         }
 
         public Path getOutput() {

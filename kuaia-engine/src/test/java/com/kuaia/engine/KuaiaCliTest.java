@@ -90,6 +90,35 @@ class KuaiaCliTest {
     }
 
     @Test
+    void benchmarkAcceptsCustomBatchSizes() throws Exception {
+        Path output = tempDir.resolve("benchmark/custom-batches.json");
+
+        CliResult result = run(
+                "benchmark",
+                "--rows", "6",
+                "--batch-sizes", "2,3",
+                "--output", output.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("batchSizes=2,3"));
+        assertFalse(result.output.contains("batchSize=1 rowsWritten="));
+        assertTrue(result.output.contains("batchSize=2 rowsWritten=6 sourceSplits=1 sinkBatches=3"));
+        assertTrue(result.output.contains("batchSize=3 rowsWritten=6 sourceSplits=1 sinkBatches=2"));
+        String json = new String(Files.readAllBytes(output), StandardCharsets.UTF_8);
+        assertFalse(json.contains("\"batchSize\":1"));
+        assertTrue(json.contains("\"batchSize\":2"));
+        assertTrue(json.contains("\"batchSize\":3"));
+    }
+
+    @Test
+    void benchmarkRejectsInvalidBatchSizes() throws Exception {
+        CliResult result = run("benchmark", "--batch-sizes", "2,0");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("benchmark --batch-sizes values must be greater than zero"));
+    }
+
+    @Test
     void unknownCommandReturnsError() throws Exception {
         CliResult result = run("missing");
 

@@ -91,6 +91,7 @@ public class KuaiaCli {
     private static LocalPipelineBenchmarkRunner.BenchmarkOptions parseBenchmarkOptions(String[] args) {
         int rows = LocalPipelineBenchmarkRunner.DEFAULT_ROWS;
         int maxRowsPerSplit = LocalPipelineBenchmarkRunner.DEFAULT_MAX_ROWS_PER_SPLIT;
+        int[] batchSizes = LocalPipelineBenchmarkRunner.DEFAULT_BATCH_SIZES;
         Path output = LocalPipelineBenchmarkRunner.DEFAULT_OUTPUT;
         for (int i = 1; i < args.length; i++) {
             String option = args[i];
@@ -98,13 +99,35 @@ public class KuaiaCli {
                 rows = parsePositiveIntOption(args, ++i, "--rows");
             } else if ("--max-rows-per-split".equals(option)) {
                 maxRowsPerSplit = parseNonNegativeIntOption(args, ++i, "--max-rows-per-split");
+            } else if ("--batch-sizes".equals(option)) {
+                batchSizes = parseBatchSizes(requireOptionValue(args, ++i, "--batch-sizes"));
             } else if ("--output".equals(option)) {
                 output = Paths.get(requireOptionValue(args, ++i, "--output"));
             } else {
                 throw new IllegalArgumentException("Unknown benchmark option: " + option);
             }
         }
-        return new LocalPipelineBenchmarkRunner.BenchmarkOptions(rows, maxRowsPerSplit, output);
+        return new LocalPipelineBenchmarkRunner.BenchmarkOptions(rows, maxRowsPerSplit, batchSizes, output);
+    }
+
+    private static int[] parseBatchSizes(String value) {
+        String[] parts = value.split(",");
+        int[] batchSizes = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i].trim();
+            if (part.isEmpty()) {
+                throw new IllegalArgumentException("benchmark --batch-sizes values must be integers: " + value);
+            }
+            try {
+                batchSizes[i] = Integer.parseInt(part);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("benchmark --batch-sizes values must be integers: " + value, e);
+            }
+            if (batchSizes[i] <= 0) {
+                throw new IllegalArgumentException("benchmark --batch-sizes values must be greater than zero");
+            }
+        }
+        return batchSizes;
     }
 
     private static int parsePositiveIntOption(String[] args, int valueIndex, String optionName) {
