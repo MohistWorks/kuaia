@@ -24,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -187,6 +188,32 @@ class CoordinatorServiceImplTest {
         assertEquals("task-1", message.getAssignment().getTaskId());
         assertEquals("attempt-1", message.getAssignment().getAttemptId());
         assertEquals(42L, message.getAssignment().getStartSeq());
+    }
+
+    @Test
+    void workerHelloDoesNotReplayRetryingTasksFromRecoveredStateStore() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        store.saveTask(TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", 10_000L)
+                .running()
+                .retrying("TRANSIENT", "temporary failure"));
+        CoordinatorServiceImpl service = new CoordinatorServiceImpl(
+                new WorkerRegistry(),
+                null,
+                new TaskAckHandler(store),
+                store);
+        StreamObserver<CoordinatorMessage> responseObserver = mock(StreamObserver.class);
+        StreamObserver<WorkerMessage> requestObserver = service.taskStream(responseObserver);
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId("worker-1")
+                        .setHost("127.0.0.1")
+                        .setPort(9001)
+                        .build())
+                .build());
+
+        verify(responseObserver, never()).onNext(any(CoordinatorMessage.class));
     }
 
     @Test

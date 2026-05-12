@@ -5,6 +5,7 @@ import com.kuaia.common.model.TaskState;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TaskStateMachineTest {
@@ -32,5 +33,20 @@ class TaskStateMachineTest {
 
         assertThrows(IllegalArgumentException.class, () -> record.complete("attempt-1"));
         assertEquals(TaskState.COMPLETED, record.complete("attempt-2").getState());
+    }
+
+    @Test
+    void retryingClearsStaleAssignmentBeforeRedispatch() {
+        TaskRecord retrying = TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", 10_000L)
+                .running()
+                .checkpoint("attempt-1", 42L)
+                .retrying("TRANSIENT", "HTTP 503");
+
+        assertEquals(TaskState.RETRYING, retrying.getState());
+        assertNull(retrying.getAssignedWorkerId());
+        assertNull(retrying.getAttemptId());
+        assertEquals(0L, retrying.getLeaseUntilMillis());
+        assertEquals(42L, retrying.getLastCheckpointSeq());
     }
 }

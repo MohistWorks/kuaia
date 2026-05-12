@@ -77,6 +77,6 @@ public class InMemoryStateStore implements StateStore {
     }
 
     private boolean isActive(TaskState state) {
-        return state == TaskState.DISPATCHING || state == TaskState.RUNNING || state == TaskState.RETRYING;
+        return state == TaskState.DISPATCHING || state == TaskState.RUNNING;
     }
 }

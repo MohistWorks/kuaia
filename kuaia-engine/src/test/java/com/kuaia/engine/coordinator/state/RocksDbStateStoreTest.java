@@ -55,6 +55,19 @@ class RocksDbStateStoreTest {
     }
 
     @Test
+    void retryingTasksAreNotIndexedAsActiveWorkerAssignments() throws Exception {
+        try (RocksDbStateStore store = new RocksDbStateStore(tempDir)) {
+            store.saveTask(TaskRecord.created("job-1", "task-1")
+                    .dispatching("worker-1", "attempt-1", 10_000L)
+                    .running()
+                    .retrying("TRANSIENT", "temporary failure"));
+
+            assertEquals(0, store.scanActiveTasksByWorker("worker-1").size());
+            assertEquals(1, store.scanTasksByState(TaskState.RETRYING).size());
+        }
+    }
+
+    @Test
     void rejectsCasWhenVersionDoesNotMatch() throws Exception {
         try (RocksDbStateStore store = new RocksDbStateStore(tempDir)) {
             TaskRecord running = TaskRecord.created("job-1", "task-1")

@@ -149,10 +149,10 @@ public class TaskRecord implements Serializable {
         }
         return copy(
                 TaskState.RETRYING,
-                assignedWorkerId,
-                attemptId,
+                null,
+                null,
                 attemptNo,
-                leaseUntilMillis,
+                0L,
                 lastCheckpointSeq,
                 errorCode,
                 errorMessage);
