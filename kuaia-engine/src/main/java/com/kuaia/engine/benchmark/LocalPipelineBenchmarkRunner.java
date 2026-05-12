@@ -34,10 +34,17 @@ public class LocalPipelineBenchmarkRunner {
     public static final int DEFAULT_ROWS = 128;
     public static final int DEFAULT_MAX_ROWS_PER_SPLIT = 0;
     public static final int[] DEFAULT_BATCH_SIZES = new int[]{1, 8, 32, 128};
+    public static final String FORMAT_JSON = "json";
+    public static final String FORMAT_CSV = "csv";
+    public static final String DEFAULT_FORMAT = FORMAT_JSON;
     public static final Path DEFAULT_OUTPUT = Paths.get(
             "target",
             "kuaia-benchmark",
             "local-pipeline-batch.json");
+    public static final Path DEFAULT_CSV_OUTPUT = Paths.get(
+            "target",
+            "kuaia-benchmark",
+            "local-pipeline-batch.csv");
 
     public List<BenchmarkResult> run(BenchmarkOptions options, PrintStream out) throws Exception {
         Path output = options.getOutput();
@@ -55,6 +62,7 @@ public class LocalPipelineBenchmarkRunner {
         out.println("rows=" + options.getRows()
                 + " batchSizes=" + formatBatchSizes(options.getBatchSizes())
                 + " maxRowsPerSplit=" + displayMaxRowsPerSplit(options.getMaxRowsPerSplit())
+                + " format=" + options.getFormat()
                 + " output=" + output);
 
         for (int batchSize : options.getBatchSizes()) {
@@ -107,7 +115,7 @@ public class LocalPipelineBenchmarkRunner {
                     result.rowsPerSecond()));
         }
 
-        writeResults(output, results);
+        writeResults(output, results, options.getFormat());
         return results;
     }
 
@@ -151,8 +159,12 @@ public class LocalPipelineBenchmarkRunner {
         Files.write(data, lines, StandardCharsets.UTF_8);
     }
 
-    private void writeResults(Path output, List<BenchmarkResult> results) throws IOException {
+    private void writeResults(Path output, List<BenchmarkResult> results, String format) throws IOException {
         Files.createDirectories(output.toAbsolutePath().getParent());
+        if (FORMAT_CSV.equals(format)) {
+            writeCsvResults(output, results);
+            return;
+        }
         StringBuilder json = new StringBuilder();
         json.append("[\n");
         for (int i = 0; i < results.size(); i++) {
@@ -163,6 +175,18 @@ public class LocalPipelineBenchmarkRunner {
         }
         json.append("\n]\n");
         Files.write(output, json.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void writeCsvResults(Path output, List<BenchmarkResult> results) throws IOException {
+        StringBuilder csv = new StringBuilder();
+        csv.append("rowCount,batchSize,durationMs,rowsPerSecond,")
+                .append("embeddingBatchCalls,embeddingSingleCalls,rowsEmbedded,")
+                .append("sinkBatchWrites,rowsWritten,checkpointUpdates,")
+                .append("summaryRowsWritten,sourceSplits,sinkBatches\n");
+        for (BenchmarkResult result : results) {
+            csv.append(result.toCsv()).append("\n");
+        }
+        Files.write(output, csv.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private void deleteIfExists(Path path) throws IOException {
@@ -255,13 +279,14 @@ public class LocalPipelineBenchmarkRunner {
         private final int rows;
         private final int maxRowsPerSplit;
         private final int[] batchSizes;
+        private final String format;
         private final Path output;
 
         public BenchmarkOptions(int rows, int maxRowsPerSplit, Path output) {
-            this(rows, maxRowsPerSplit, DEFAULT_BATCH_SIZES, output);
+            this(rows, maxRowsPerSplit, DEFAULT_BATCH_SIZES, DEFAULT_FORMAT, output);
         }
 
-        public BenchmarkOptions(int rows, int maxRowsPerSplit, int[] batchSizes, Path output) {
+        public BenchmarkOptions(int rows, int maxRowsPerSplit, int[] batchSizes, String format, Path output) {
             if (rows <= 0) {
                 throw new IllegalArgumentException("benchmark --rows must be greater than zero");
             }
@@ -279,11 +304,19 @@ public class LocalPipelineBenchmarkRunner {
                     throw new IllegalArgumentException("benchmark --batch-sizes values must be greater than zero");
                 }
             }
+            if (!FORMAT_JSON.equals(format) && !FORMAT_CSV.equals(format)) {
+                throw new IllegalArgumentException("benchmark --format must be json or csv: " + format);
+            }
+            this.format = format;
             this.output = output;
         }
 
         public static BenchmarkOptions defaults() {
             return new BenchmarkOptions(DEFAULT_ROWS, DEFAULT_MAX_ROWS_PER_SPLIT, DEFAULT_OUTPUT);
+        }
+
+        public static Path defaultOutput(String format) {
+            return FORMAT_CSV.equals(format) ? DEFAULT_CSV_OUTPUT : DEFAULT_OUTPUT;
         }
 
         public int getRows() {
@@ -296,6 +329,10 @@ public class LocalPipelineBenchmarkRunner {
 
         public int[] getBatchSizes() {
             return batchSizes.clone();
+        }
+
+        public String getFormat() {
+            return format;
         }
 
         public Path getOutput() {
@@ -368,6 +405,24 @@ public class LocalPipelineBenchmarkRunner {
                             + "\"sinkBatchWrites\":%d,\"rowsWritten\":%d,"
                             + "\"checkpointUpdates\":%d,\"summaryRowsWritten\":%d,"
                             + "\"sourceSplits\":%d,\"sinkBatches\":%d}",
+                    rowCount,
+                    batchSize,
+                    elapsedNanos / 1_000_000.0d,
+                    rowsPerSecond(),
+                    embeddingBatchCalls,
+                    embeddingSingleCalls,
+                    rowsEmbedded,
+                    sinkBatchWrites,
+                    rowsWritten,
+                    checkpointUpdates,
+                    summaryRowsWritten,
+                    sourceSplits,
+                    sinkBatches);
+        }
+
+        private String toCsv() {
+            return String.format(Locale.ROOT,
+                    "%d,%d,%.3f,%.3f,%d,%d,%d,%d,%d,%d,%d,%d,%d",
                     rowCount,
                     batchSize,
                     elapsedNanos / 1_000_000.0d,

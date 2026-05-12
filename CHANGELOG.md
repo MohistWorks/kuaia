@@ -11,6 +11,7 @@ All notable public changes to Kuaia are tracked here.
 
 ### Changed
 
+- `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
 - `kuaia benchmark` can now run caller-selected batch sizes with
   `--batch-sizes`.
 - Main branch development version is now `0.1.1-SNAPSHOT` after the `v0.1.0`

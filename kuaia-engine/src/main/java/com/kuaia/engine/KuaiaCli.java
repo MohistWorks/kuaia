@@ -92,7 +92,8 @@ public class KuaiaCli {
         int rows = LocalPipelineBenchmarkRunner.DEFAULT_ROWS;
         int maxRowsPerSplit = LocalPipelineBenchmarkRunner.DEFAULT_MAX_ROWS_PER_SPLIT;
         int[] batchSizes = LocalPipelineBenchmarkRunner.DEFAULT_BATCH_SIZES;
-        Path output = LocalPipelineBenchmarkRunner.DEFAULT_OUTPUT;
+        String format = LocalPipelineBenchmarkRunner.DEFAULT_FORMAT;
+        Path output = null;
         for (int i = 1; i < args.length; i++) {
             String option = args[i];
             if ("--rows".equals(option)) {
@@ -101,13 +102,32 @@ public class KuaiaCli {
                 maxRowsPerSplit = parseNonNegativeIntOption(args, ++i, "--max-rows-per-split");
             } else if ("--batch-sizes".equals(option)) {
                 batchSizes = parseBatchSizes(requireOptionValue(args, ++i, "--batch-sizes"));
+            } else if ("--format".equals(option)) {
+                format = parseBenchmarkFormat(requireOptionValue(args, ++i, "--format"));
             } else if ("--output".equals(option)) {
                 output = Paths.get(requireOptionValue(args, ++i, "--output"));
             } else {
                 throw new IllegalArgumentException("Unknown benchmark option: " + option);
             }
         }
-        return new LocalPipelineBenchmarkRunner.BenchmarkOptions(rows, maxRowsPerSplit, batchSizes, output);
+        Path selectedOutput = output == null
+                ? LocalPipelineBenchmarkRunner.BenchmarkOptions.defaultOutput(format)
+                : output;
+        return new LocalPipelineBenchmarkRunner.BenchmarkOptions(
+                rows,
+                maxRowsPerSplit,
+                batchSizes,
+                format,
+                selectedOutput);
+    }
+
+    private static String parseBenchmarkFormat(String value) {
+        String format = value.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!LocalPipelineBenchmarkRunner.FORMAT_JSON.equals(format)
+                && !LocalPipelineBenchmarkRunner.FORMAT_CSV.equals(format)) {
+            throw new IllegalArgumentException("benchmark --format must be json or csv: " + value);
+        }
+        return format;
     }
 
     private static int[] parseBatchSizes(String value) {
