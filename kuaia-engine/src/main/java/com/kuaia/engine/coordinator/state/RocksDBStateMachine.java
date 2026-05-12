@@ -25,6 +25,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class RocksDBStateMachine extends BaseStateMachine {
+    static final String CAS_REJECTED = "CAS_REJECTED";
+    private static final String OK = "OK";
+
     private static final String TASK_PREFIX = "task/";
     private static final String WORKER_PREFIX = "worker/";
     private static final String TASK_STATE_SCAN_PREFIX = "scan/task_state/";
@@ -62,15 +65,7 @@ public class RocksDBStateMachine extends BaseStateMachine {
                 db.put((payload.getTaskId() + "_state").getBytes(),
                        String.valueOf(payload.getStateCode()).getBytes());
             } else if (cmd.hasTaskRecord()) {
-                TaskRecordPayload payload = cmd.getTaskRecord();
-                TaskRecord record = deserialize(payload.getRecord().toByteArray(), TaskRecord.class);
-                boolean accepted = applyTaskRecordForTesting(
-                        record,
-                        cmd.getType() == CommandType.CAS_TASK_RECORD,
-                        payload.getExpectedVersion());
-                if (!accepted) {
-                    throw new IOException("Rejected stale task record command for " + payload.getTaskId());
-                }
+                return applyTaskRecordCommandForTesting(cmd);
             } else if (cmd.hasWorkerRecord()) {
                 WorkerRecordPayload payload = cmd.getWorkerRecord();
                 WorkerRecord record = deserialize(payload.getRecord().toByteArray(), WorkerRecord.class);
@@ -79,7 +74,7 @@ public class RocksDBStateMachine extends BaseStateMachine {
         } catch (Exception e) {
             return failedFuture(e);
         }
-        return CompletableFuture.completedFuture(Message.valueOf("OK"));
+        return CompletableFuture.completedFuture(Message.valueOf(OK));
     }
 
     @Override
@@ -125,6 +120,16 @@ public class RocksDBStateMachine extends BaseStateMachine {
         } catch (RocksDBException e) {
             throw new IOException("Failed to apply task record " + record.getTaskId(), e);
         }
+    }
+
+    CompletableFuture<Message> applyTaskRecordCommandForTesting(RaftCommand command) throws IOException {
+        TaskRecordPayload payload = command.getTaskRecord();
+        TaskRecord record = deserialize(payload.getRecord().toByteArray(), TaskRecord.class);
+        boolean accepted = applyTaskRecordForTesting(
+                record,
+                command.getType() == CommandType.CAS_TASK_RECORD,
+                payload.getExpectedVersion());
+        return CompletableFuture.completedFuture(Message.valueOf(accepted ? OK : CAS_REJECTED));
     }
 
     TaskRecord getTaskRecordForTesting(String taskId) throws IOException {

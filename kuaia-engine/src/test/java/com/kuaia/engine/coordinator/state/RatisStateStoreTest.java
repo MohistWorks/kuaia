@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -84,6 +85,24 @@ class RatisStateStoreTest {
         RaftCommand command = RaftCommand.parseFrom(messageCaptor.getValue().getContent().toByteArray());
         assertEquals(CommandType.CAS_TASK_RECORD, command.getType());
         assertEquals(running.getVersion(), command.getTaskRecord().getExpectedVersion());
+    }
+
+    @Test
+    void compareAndSetTaskReturnsFalseForRejectedCasReply() throws Exception {
+        RaftClient client = mock(RaftClient.class);
+        BlockingApi io = mock(BlockingApi.class);
+        RaftClientReply rejected = successMessageReply(RocksDBStateMachine.CAS_REJECTED);
+        when(client.io()).thenReturn(io);
+        when(io.send(any(Message.class))).thenReturn(rejected);
+
+        TaskRecord running = TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", 10_000L)
+                .running();
+
+        boolean updated = new RatisStateStore(client)
+                .compareAndSetTask(running, running.complete("attempt-1"));
+
+        assertFalse(updated);
     }
 
     @Test
@@ -217,6 +236,13 @@ class RatisStateStoreTest {
         when(reply.isSuccess()).thenReturn(true);
         when(reply.getMessage()).thenReturn(Message.valueOf(
                 org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(serialize(value))));
+        return reply;
+    }
+
+    private RaftClientReply successMessageReply(String value) {
+        RaftClientReply reply = mock(RaftClientReply.class);
+        when(reply.isSuccess()).thenReturn(true);
+        when(reply.getMessage()).thenReturn(Message.valueOf(value));
         return reply;
     }
 

@@ -3,11 +3,16 @@ package com.kuaia.engine.coordinator.state;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.common.model.WorkerRecord;
+import com.kuaia.common.raft.CommandType;
+import com.kuaia.common.raft.RaftCommand;
+import com.kuaia.common.raft.TaskRecordPayload;
 import org.apache.ratis.protocol.Message;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
+import java.io.ObjectOutputStream;
 import java.io.ObjectInputStream;
 import java.nio.file.Path;
 import java.util.List;
@@ -33,6 +38,29 @@ class RocksDBStateMachineTest {
         assertTrue(stateMachine.applyTaskRecordForTesting(checkpointed, true, running.getVersion()));
         assertFalse(stateMachine.applyTaskRecordForTesting(running.complete("attempt-1"), true, running.getVersion()));
 
+        TaskRecord stored = stateMachine.getTaskRecordForTesting("task-1");
+        assertEquals(TaskState.RUNNING, stored.getState());
+        assertEquals(10L, stored.getLastCheckpointSeq());
+        stateMachine.close();
+    }
+
+    @Test
+    void staleCasCommandReturnsRejectedMessageWithoutOverwritingRecord() throws Exception {
+        RocksDBStateMachine stateMachine = new RocksDBStateMachine();
+        stateMachine.initialize(tempDir.toString());
+        TaskRecord running = TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", 10_000L)
+                .running();
+        TaskRecord checkpointed = running.checkpoint("attempt-1", 10L);
+
+        assertTrue(stateMachine.applyTaskRecordForTesting(running, false, -1L));
+        assertTrue(stateMachine.applyTaskRecordForTesting(checkpointed, true, running.getVersion()));
+
+        Message result = stateMachine
+                .applyTaskRecordCommandForTesting(casCommand(running.complete("attempt-1"), running.getVersion()))
+                .get();
+
+        assertEquals(RocksDBStateMachine.CAS_REJECTED, result.getContent().toStringUtf8());
         TaskRecord stored = stateMachine.getTaskRecordForTesting("task-1");
         assertEquals(TaskState.RUNNING, stored.getState());
         assertEquals(10L, stored.getLastCheckpointSeq());
@@ -83,5 +111,24 @@ class RocksDBStateMachineTest {
         @SuppressWarnings("unchecked")
         List<T> cast = (List<T>) values;
         return cast;
+    }
+
+    private RaftCommand casCommand(TaskRecord record, long expectedVersion) throws Exception {
+        return RaftCommand.newBuilder()
+                .setType(CommandType.CAS_TASK_RECORD)
+                .setTaskRecord(TaskRecordPayload.newBuilder()
+                        .setTaskId(record.getTaskId())
+                        .setRecord(com.google.protobuf.ByteString.copyFrom(serialize(record)))
+                        .setExpectedVersion(expectedVersion)
+                        .build())
+                .build();
+    }
+
+    private byte[] serialize(Object value) throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        ObjectOutputStream objects = new ObjectOutputStream(bytes);
+        objects.writeObject(value);
+        objects.flush();
+        return bytes.toByteArray();
     }
 }
