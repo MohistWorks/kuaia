@@ -25,6 +25,8 @@ All notable public changes to Kuaia are tracked here.
   workers and order available workers by stored load.
 - Legacy ack flushing now completes v2 TaskRecord state through compare-and-set
   before falling back to deprecated state writes.
+- Deprecated task-definition saves now preserve TaskDefinition in v2 TaskRecord
+  scans, including the Ratis CREATED-task path.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
 - `kuaia benchmark` can now run caller-selected batch sizes with
   `--batch-sizes`.

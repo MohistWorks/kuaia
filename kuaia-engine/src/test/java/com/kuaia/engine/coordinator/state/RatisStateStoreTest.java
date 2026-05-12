@@ -12,9 +12,12 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -62,6 +65,30 @@ class RatisStateStoreTest {
         RaftCommand command = RaftCommand.parseFrom(messageCaptor.getValue().getContent().toByteArray());
         assertEquals(CommandType.SAVE_TASK_RECORD, command.getType());
         assertEquals("task-1", command.getTaskRecord().getTaskId());
+    }
+
+    @Test
+    void legacySaveTaskCreatedSendsTaskRecordWithDefinition() throws Exception {
+        RaftClient client = mock(RaftClient.class);
+        BlockingApi io = mock(BlockingApi.class);
+        RaftClientReply success = mock(RaftClientReply.class);
+        when(client.io()).thenReturn(io);
+        when(success.isSuccess()).thenReturn(true);
+        when(io.send(any(Message.class))).thenReturn(success);
+        ArgumentCaptor<Message> messageCaptor = forClass(Message.class);
+        TaskDefinition definition = new TaskDefinition();
+        definition.setTaskId("task-1");
+        definition.setJobName("job-1");
+        definition.setConfig(Collections.singletonMap("source", "file"));
+
+        new RatisStateStore(client).saveTask(definition, TaskState.CREATED);
+
+        verify(io).send(messageCaptor.capture());
+        RaftCommand command = RaftCommand.parseFrom(messageCaptor.getValue().getContent().toByteArray());
+        assertEquals(CommandType.SAVE_TASK_RECORD, command.getType());
+        TaskRecord record = deserialize(command.getTaskRecord().getRecord().toByteArray(), TaskRecord.class);
+        assertEquals("task-1", record.getTaskId());
+        assertEquals(definition, record.getDefinition());
     }
 
     @Test
@@ -252,5 +279,10 @@ class RatisStateStoreTest {
         objects.writeObject(value);
         objects.flush();
         return bytes.toByteArray();
+    }
+
+    private <T> T deserialize(byte[] bytes, Class<T> type) throws Exception {
+        ObjectInputStream objects = new ObjectInputStream(new ByteArrayInputStream(bytes));
+        return type.cast(objects.readObject());
     }
 }
