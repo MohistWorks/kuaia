@@ -13,6 +13,8 @@ All notable public changes to Kuaia are tracked here.
 
 - Ratis-backed StateStore now supports worker records and task/worker scan
   queries used by coordinator recovery paths.
+- Deprecated Ratis task state reads now prefer v2 task records and state scans
+  instead of stale legacy keys.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
 - `kuaia benchmark` can now run caller-selected batch sizes with
   `--batch-sizes`.

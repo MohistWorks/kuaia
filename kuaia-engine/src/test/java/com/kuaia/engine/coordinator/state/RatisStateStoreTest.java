@@ -1,5 +1,6 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.common.model.WorkerRecord;
@@ -122,6 +123,25 @@ class RatisStateStoreTest {
     }
 
     @Test
+    void legacyGetTaskStateReadsTaskRecordByKey() throws Exception {
+        RaftClient client = mock(RaftClient.class);
+        BlockingApi io = mock(BlockingApi.class);
+        TaskRecord running = TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", 10_000L)
+                .running();
+        RaftClientReply success = successReply(running);
+        when(client.io()).thenReturn(io);
+        when(io.sendReadOnly(any(Message.class))).thenReturn(success);
+        ArgumentCaptor<Message> messageCaptor = forClass(Message.class);
+
+        TaskState state = new RatisStateStore(client).getTaskState("task-1");
+
+        assertEquals(TaskState.RUNNING, state);
+        verify(io).sendReadOnly(messageCaptor.capture());
+        assertEquals("task/task-1", messageCaptor.getValue().getContent().toStringUtf8());
+    }
+
+    @Test
     void scanTasksByStateReadsRaftScanQuery() throws Exception {
         RaftClient client = mock(RaftClient.class);
         BlockingApi io = mock(BlockingApi.class);
@@ -135,6 +155,22 @@ class RatisStateStoreTest {
         List<TaskRecord> records = new RatisStateStore(client).scanTasksByState(TaskState.CREATED);
 
         assertEquals(2, records.size());
+        verify(io).sendReadOnly(messageCaptor.capture());
+        assertEquals("scan/task_state/CREATED", messageCaptor.getValue().getContent().toStringUtf8());
+    }
+
+    @Test
+    void legacyGetTasksByStateUsesTaskScanQuery() throws Exception {
+        RaftClient client = mock(RaftClient.class);
+        BlockingApi io = mock(BlockingApi.class);
+        RaftClientReply success = successReply(Arrays.asList(TaskRecord.created("job-1", "task-1")));
+        when(client.io()).thenReturn(io);
+        when(io.sendReadOnly(any(Message.class))).thenReturn(success);
+        ArgumentCaptor<Message> messageCaptor = forClass(Message.class);
+
+        List<TaskDefinition> definitions = new RatisStateStore(client).getTasksByState(TaskState.CREATED);
+
+        assertTrue(definitions.isEmpty());
         verify(io).sendReadOnly(messageCaptor.capture());
         assertEquals("scan/task_state/CREATED", messageCaptor.getValue().getContent().toStringUtf8());
     }
