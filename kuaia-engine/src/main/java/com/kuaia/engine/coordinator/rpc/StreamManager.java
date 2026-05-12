@@ -4,7 +4,11 @@ import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.rpc.CoordinatorMessage;
 import com.kuaia.common.rpc.TaskAssignment;
 import com.kuaia.common.rpc.TaskPayload;
+import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -44,15 +48,27 @@ public class StreamManager {
     public void sendAssignment(String workerId, TaskRecord task) {
         StreamObserver<CoordinatorMessage> observer = streams.get(workerId);
         if (observer != null) {
-            TaskAssignment assignment = TaskAssignment.newBuilder()
+            TaskAssignment.Builder assignment = TaskAssignment.newBuilder()
                     .setTaskId(task.getTaskId())
                     .setAttemptId(task.getAttemptId())
                     .setStartSeq(task.getLastCheckpointSeq() + 1)
-                    .setLeaseUntilMillis(task.getLeaseUntilMillis())
-                    .build();
-            synchronized (observer) {
-                observer.onNext(CoordinatorMessage.newBuilder().setAssignment(assignment).build());
+                    .setLeaseUntilMillis(task.getLeaseUntilMillis());
+            if (task.getDefinition() != null) {
+                assignment.setDefinition(ByteString.copyFrom(serialize(task.getDefinition())));
             }
+            synchronized (observer) {
+                observer.onNext(CoordinatorMessage.newBuilder().setAssignment(assignment.build()).build());
+            }
+        }
+    }
+
+    private byte[] serialize(Object value) {
+        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+             ObjectOutputStream objectStream = new ObjectOutputStream(bytes)) {
+            objectStream.writeObject(value);
+            return bytes.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to serialize task assignment definition", e);
         }
     }
 }

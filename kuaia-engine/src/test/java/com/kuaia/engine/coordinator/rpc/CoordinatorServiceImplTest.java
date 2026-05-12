@@ -1,6 +1,7 @@
 package com.kuaia.engine.coordinator.rpc;
 
 import com.kuaia.common.model.TaskRecord;
+import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.common.model.WorkerRecord;
 import com.kuaia.common.rpc.AttemptStatus;
@@ -20,6 +21,10 @@ import com.kuaia.engine.coordinator.state.InMemoryStateStore;
 import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -159,9 +164,13 @@ class CoordinatorServiceImplTest {
     }
 
     @Test
-    void workerHelloReplaysActiveAssignmentsFromRecoveredStateStore() {
+    void workerHelloReplaysActiveAssignmentsFromRecoveredStateStore() throws Exception {
         InMemoryStateStore store = new InMemoryStateStore();
-        store.saveTask(TaskRecord.created("job-1", "task-1")
+        TaskDefinition definition = new TaskDefinition();
+        definition.setTaskId("task-1");
+        definition.setJobName("job-1");
+        definition.setConfig(Collections.singletonMap("source", "file"));
+        store.saveTask(TaskRecord.created(definition)
                 .dispatching("worker-1", "attempt-1", 10_000L)
                 .running()
                 .checkpoint("attempt-1", 41L));
@@ -188,6 +197,9 @@ class CoordinatorServiceImplTest {
         assertEquals("task-1", message.getAssignment().getTaskId());
         assertEquals("attempt-1", message.getAssignment().getAttemptId());
         assertEquals(42L, message.getAssignment().getStartSeq());
+        assertTrue(message.getAssignment().getDefinition().size() > 0,
+                "replayed assignment should carry the task definition bytes");
+        assertEquals(definition, deserializeDefinition(message.getAssignment().getDefinition().toByteArray()));
     }
 
     @Test
@@ -444,5 +456,11 @@ class CoordinatorServiceImplTest {
         assertTrue(worker.getLastHeartbeatMillis() >= previousHeartbeat);
         assertEquals(WorkerRecord.WorkerState.ONLINE, worker.getState());
         assertTrue(worker.isStreamConnected());
+    }
+
+    private TaskDefinition deserializeDefinition(byte[] bytes) throws Exception {
+        try (ObjectInputStream objectStream = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+            return (TaskDefinition) objectStream.readObject();
+        }
     }
 }

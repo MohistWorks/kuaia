@@ -42,6 +42,8 @@ All notable public changes to Kuaia are tracked here.
 - Worker streams now ignore messages that try to switch an established stream
   to a different worker id, preserving disconnect/offline bookkeeping for the
   original worker.
+- Replayed worker assignments now include serialized task definitions so
+  reconnecting workers receive executable assignment payloads.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
