@@ -28,6 +28,7 @@ import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -253,6 +254,32 @@ class CoordinatorServiceImplTest {
         assertEquals(WorkerRecord.BackpressureLevel.LOW, worker.getBackpressureLevel());
         assertEquals("127.0.0.1", worker.getHost());
         assertEquals(9001, worker.getPort());
+    }
+
+    @Test
+    void workerHelloWithConflictingEnvelopeIdIsIgnored() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        CoordinatorServiceImpl service = new CoordinatorServiceImpl(
+                new WorkerRegistry(),
+                null,
+                null,
+                store);
+        StreamObserver<CoordinatorMessage> responseObserver = mock(StreamObserver.class);
+        StreamObserver<WorkerMessage> requestObserver = service.taskStream(responseObserver);
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setWorkerId("worker-1")
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId("worker-2")
+                        .setHost("127.0.0.1")
+                        .setPort(9002)
+                        .build())
+                .build());
+
+        assertFalse(service.getStreamManagerForTesting().isAvailable("worker-1"));
+        assertFalse(service.getStreamManagerForTesting().isAvailable("worker-2"));
+        assertNull(store.getWorker("worker-1"));
+        assertNull(store.getWorker("worker-2"));
     }
 
     @Test
