@@ -170,6 +170,7 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
     public void heartbeat(WorkerHeartbeat request, StreamObserver<HeartbeatResponse> responseObserver) {
         double load = (request.getCpuLoad() + request.getMemLoad()) / 2.0;
         registry.updateHeartbeat(request.getId(), load);
+        persistHeartbeat(request.getId(), load);
         responseObserver.onNext(HeartbeatResponse.newBuilder().setAck(true).build());
         responseObserver.onCompleted();
     }
@@ -195,6 +196,16 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
         WorkerRecord existing = stateStore.getWorker(workerId);
         if (existing != null) {
             persistWorker(existing.withStreamConnected(false));
+        }
+    }
+
+    private void persistHeartbeat(String workerId, double load) {
+        if (stateStore == null || workerId == null || workerId.isEmpty()) {
+            return;
+        }
+        WorkerRecord existing = stateStore.getWorker(workerId);
+        if (existing != null) {
+            persistWorker(existing.withHeartbeat(load, System.currentTimeMillis()));
         }
     }
 

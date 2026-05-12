@@ -19,6 +19,8 @@ All notable public changes to Kuaia are tracked here.
   false update result instead of surfacing them as Raft write failures.
 - Coordinator worker streams now persist WorkerRecord online, paused, and
   offline states in StateStore for recovery-aware scheduling.
+- Worker heartbeat RPCs now update persisted WorkerRecord load score and
+  heartbeat timestamp.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
 - `kuaia benchmark` can now run caller-selected batch sizes with
   `--batch-sizes`.
