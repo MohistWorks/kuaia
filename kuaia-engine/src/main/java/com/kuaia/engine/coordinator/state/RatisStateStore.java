@@ -213,7 +213,17 @@ public class RatisStateStore implements StateStore {
         }
     }
 
+    @Override
+    @Deprecated
     public TaskState getTaskState(String taskId) {
+        TaskRecord record = getTask(taskId);
+        if (record != null) {
+            return record.getState();
+        }
+        return getLegacyTaskState(taskId);
+    }
+
+    private TaskState getLegacyTaskState(String taskId) {
         try {
             // Linearizable read via query
             RaftClientReply reply = raftClient.io().sendReadOnly(Message.valueOf(taskId + "_state"));
@@ -229,10 +239,9 @@ public class RatisStateStore implements StateStore {
         }
     }
 
+    @Override
+    @Deprecated
     public List<TaskDefinition> getTasksByState(TaskState state) {
-        // This is a complex query for Raft/RocksDB.
-        // For MVP, we can return an empty list or implement a scan.
-        // Let's return empty for now as defined in the simplified skeleton.
-        return Collections.emptyList();
+        return StateStore.super.getTasksByState(state);
     }
 }
