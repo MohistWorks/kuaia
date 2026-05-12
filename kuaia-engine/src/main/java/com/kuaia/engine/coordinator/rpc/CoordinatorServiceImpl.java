@@ -49,10 +49,11 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
 
             @Override
             public void onNext(WorkerMessage value) {
-                this.workerId = resolveWorkerId(value);
-                if (workerId == null || workerId.isEmpty()) {
+                String resolvedWorkerId = resolveWorkerId(value);
+                if (resolvedWorkerId == null || resolvedWorkerId.isEmpty()) {
                     return;
                 }
+                this.workerId = resolvedWorkerId;
                 streamManager.registerStream(workerId, responseObserver);
 
                 if (value.hasHello()) {
