@@ -27,7 +27,7 @@ public interface StateStore {
 
     @Deprecated
     default void saveTask(TaskDefinition task, TaskState state) {
-        TaskRecord record = TaskRecord.created(task);
+        TaskRecord record = TaskRecord.fromLegacyState(task, state);
         saveTask(record);
     }
 

@@ -92,6 +92,31 @@ class RatisStateStoreTest {
     }
 
     @Test
+    void legacySaveTaskNonCreatedSendsTaskRecordWithRequestedState() throws Exception {
+        RaftClient client = mock(RaftClient.class);
+        BlockingApi io = mock(BlockingApi.class);
+        RaftClientReply success = mock(RaftClientReply.class);
+        when(client.io()).thenReturn(io);
+        when(success.isSuccess()).thenReturn(true);
+        when(io.send(any(Message.class))).thenReturn(success);
+        ArgumentCaptor<Message> messageCaptor = forClass(Message.class);
+        TaskDefinition definition = new TaskDefinition();
+        definition.setTaskId("task-1");
+        definition.setJobName("job-1");
+        definition.setConfig(Collections.singletonMap("source", "file"));
+
+        new RatisStateStore(client).saveTask(definition, TaskState.FAILED);
+
+        verify(io).send(messageCaptor.capture());
+        RaftCommand command = RaftCommand.parseFrom(messageCaptor.getValue().getContent().toByteArray());
+        assertEquals(CommandType.SAVE_TASK_RECORD, command.getType());
+        TaskRecord record = deserialize(command.getTaskRecord().getRecord().toByteArray(), TaskRecord.class);
+        assertEquals("task-1", record.getTaskId());
+        assertEquals(TaskState.FAILED, record.getState());
+        assertEquals(definition, record.getDefinition());
+    }
+
+    @Test
     void compareAndSetTaskSendsCasTaskRecordCommand() throws Exception {
         RaftClient client = mock(RaftClient.class);
         BlockingApi io = mock(BlockingApi.class);

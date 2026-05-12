@@ -129,32 +129,7 @@ public class RatisStateStore implements StateStore {
     @Override
     @Deprecated
     public void saveTask(TaskDefinition task, TaskState state) {
-        if (state == TaskState.CREATED) {
-            saveTask(TaskRecord.created(task));
-            return;
-        }
-        try {
-            // Serialize TaskDefinition to bytes (using standard Java serialization for now as it implements Serializable)
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(bos);
-            oos.writeObject(task);
-            oos.flush();
-
-            RaftCommand cmd = RaftCommand.newBuilder()
-                    .setType(CommandType.SAVE_TASK)
-                    .setSaveTask(SaveTaskPayload.newBuilder()
-                            .setTaskId(task.getTaskId())
-                            .setDefinition(com.google.protobuf.ByteString.copyFrom(bos.toByteArray()))
-                            .build())
-                    .build();
-
-            sendWrite(cmd, "save task " + task.getTaskId());
-
-            // Also update state
-            updateTaskState(task.getTaskId(), state);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to save task via Raft", e);
-        }
+        saveTask(TaskRecord.fromLegacyState(task, state));
     }
 
     public void updateTaskState(String taskId, TaskState state) {

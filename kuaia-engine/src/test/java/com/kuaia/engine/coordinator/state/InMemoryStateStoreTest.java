@@ -30,6 +30,22 @@ class InMemoryStateStoreTest {
     }
 
     @Test
+    void legacySaveTaskHonorsRequestedState() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        TaskDefinition definition = new TaskDefinition();
+        definition.setTaskId("task-1");
+        definition.setJobName("job-1");
+        definition.setConfig(Collections.singletonMap("source", "file"));
+
+        store.saveTask(definition, TaskState.FAILED);
+
+        assertEquals(TaskState.FAILED, store.getTask("task-1").getState());
+        assertEquals(1, store.getTasksByState(TaskState.FAILED).size());
+        assertEquals(0, store.getTasksByState(TaskState.CREATED).size());
+        assertEquals(definition, store.getTask("task-1").getDefinition());
+    }
+
+    @Test
     void scansTasksByState() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1"));
