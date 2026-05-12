@@ -57,6 +57,7 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
                 streamManager.registerStream(workerId, responseObserver);
 
                 if (value.hasHello()) {
+                    streamManager.setPaused(workerId, false);
                     registerWorkerHello(value.getHello());
                     replayActiveAssignments(workerId);
                 }
