@@ -480,22 +480,23 @@ bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ## Benchmark Smoke
 
 Kuaia's benchmark smoke is a developer check for the local batch path. It
-generates CSV input, runs batch sizes `1`, `8`, `32`, and `128`, and writes
-counter output to `kuaia-engine/target/kuaia-benchmark/local-pipeline-batch.json`.
-The JSON includes row, embedding, checkpoint, source split, and sink batch
-counters.
+generates CSV input, runs batch sizes `1`, `8`, `32`, and `128`, prints a compact
+counter summary, and writes JSON output to
+`target/kuaia-benchmark/local-pipeline-batch.json`. The JSON includes row,
+embedding, checkpoint, source split, and sink batch counters.
 
 ```bash
-mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dsurefire.failIfNoSpecifiedTests=false test
+bin/kuaia benchmark
 ```
 
 For larger local runs, override the row count:
 
 ```bash
-mvn -q -pl kuaia-engine -am -Dtest=LocalPipelineBenchmarkTest -Dkuaia.benchmark.rows=10000 -Dsurefire.failIfNoSpecifiedTests=false test
+bin/kuaia benchmark --rows 10000
 ```
 
-To stress source split behavior, add `-Dkuaia.benchmark.maxRowsPerSplit=<rows>`.
+To stress source split behavior, add `--max-rows-per-split <rows>`. To choose a
+different JSON output path, add `--output <path>`.
 
 ## Error Messages
 

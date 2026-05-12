@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -17,6 +18,7 @@ class KuaiaPackagingTest {
     @Test
     void binKuaiaPrintsHelp() throws Exception {
         Path root = repoRoot();
+        deletePackagedCliJars(root);
         Process process = new ProcessBuilder(root.resolve("bin/kuaia").toString(), "help")
                 .directory(root.toFile())
                 .redirectErrorStream(true)
@@ -29,6 +31,7 @@ class KuaiaPackagingTest {
         assertEquals(0, process.exitValue(), output);
         assertTrue(output.contains("Usage: kuaia <command>"), output);
         assertTrue(output.contains("run -f PIPELINE"), output);
+        assertTrue(output.contains("benchmark"), output);
     }
 
     @Test
@@ -46,6 +49,7 @@ class KuaiaPackagingTest {
         assertTrue(read(script).contains("-pl kuaia-common -DskipTests install"));
 
         assertTrue(read(root.resolve("Makefile")).contains("run-vector"));
+        assertTrue(read(root.resolve("Makefile")).contains("benchmark"));
         assertTrue(read(root.resolve("Makefile")).contains("public-mvp-smoke"));
         assertTrue(read(root.resolve("Makefile")).contains("clean-state"));
         assertTrue(Files.exists(root.resolve("scripts/public-mvp-smoke.sh")), "public MVP smoke script should exist");
@@ -81,6 +85,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("docs/release-checklist.md"));
         assertTrue(read(root.resolve("README.md")).contains("CHANGELOG.md"));
         assertTrue(read(root.resolve("README.md")).contains("make public-mvp-smoke"));
+        assertTrue(read(root.resolve("README.md")).contains("bin/kuaia benchmark"));
+        assertTrue(read(root.resolve("README.md")).contains("target/kuaia-benchmark/local-pipeline-batch.json"));
         assertTrue(read(root.resolve("README.md")).contains("mvn -q package"));
         assertTrue(read(root.resolve("README.md")).contains("kuaia-engine/target/kuaia-engine-${VERSION}-cli.jar"));
         assertTrue(read(root.resolve("README.md")).contains("docker compose up --build"));
@@ -96,6 +102,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.postgres.yml"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: postgres"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("bin/kuaia benchmark"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--max-rows-per-split"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
         assertTrue(read(root.resolve("docs/README.md")).contains("product-scope.md"));
         assertTrue(read(root.resolve("docs/README.md")).contains("pipeline-yaml.md"));
@@ -155,6 +163,18 @@ class KuaiaPackagingTest {
             throw new IllegalArgumentException("Cannot read directory " + path);
         }
         return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+    }
+
+    private void deletePackagedCliJars(Path root) throws Exception {
+        Path target = root.resolve("kuaia-engine/target");
+        if (!Files.isDirectory(target)) {
+            return;
+        }
+        try (DirectoryStream<Path> jars = Files.newDirectoryStream(target, "kuaia-engine-*-cli.jar")) {
+            for (Path jar : jars) {
+                Files.deleteIfExists(jar);
+            }
+        }
     }
 
     private String read(InputStream input) throws Exception {

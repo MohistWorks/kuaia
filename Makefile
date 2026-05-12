@@ -1,4 +1,4 @@
-.PHONY: test run-local run-transform run-vector public-mvp-smoke clean-state
+.PHONY: test run-local run-transform run-vector benchmark public-mvp-smoke clean-state
 
 KUAIA ?= ./bin/kuaia
 
@@ -13,6 +13,9 @@ run-transform:
 
 run-vector:
 	$(KUAIA) run -f examples/local-file-to-vector.yaml
+
+benchmark:
+	$(KUAIA) benchmark
 
 public-mvp-smoke:
 	./scripts/public-mvp-smoke.sh

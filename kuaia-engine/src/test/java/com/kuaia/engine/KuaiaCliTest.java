@@ -32,6 +32,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("ai-demo"));
         assertTrue(result.output.contains("recover-demo"));
         assertTrue(result.output.contains("examples"));
+        assertTrue(result.output.contains("benchmark"));
         assertTrue(result.output.contains("Examples:"));
         assertTrue(result.output.contains("kuaia run -f examples/local-file-to-file.yaml"));
         assertTrue(result.output.contains("kuaia run -f examples/local-file-to-vector.yaml"));
@@ -52,6 +53,40 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/postgres-to-qdrant.yaml"));
+    }
+
+    @Test
+    void benchmarkRunsLocalBatchBenchmarkAndWritesJson() throws Exception {
+        Path output = tempDir.resolve("benchmark/local-pipeline-batch.json");
+
+        CliResult result = run(
+                "benchmark",
+                "--rows", "6",
+                "--max-rows-per-split", "4",
+                "--output", output.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Benchmark: local batch pipeline"));
+        assertTrue(result.output.contains("rows=6"));
+        assertTrue(result.output.contains("maxRowsPerSplit=4"));
+        assertTrue(result.output.contains("batchSize=1 rowsWritten=6 sourceSplits=2 sinkBatches=6"));
+        assertTrue(result.output.contains("batchSize=8 rowsWritten=6 sourceSplits=2 sinkBatches=2"));
+        assertTrue(result.output.contains("output=" + output));
+        assertTrue(Files.exists(output));
+        String json = new String(Files.readAllBytes(output), StandardCharsets.UTF_8);
+        assertTrue(json.contains("\"rowCount\":6"));
+        assertTrue(json.contains("\"batchSize\":1"));
+        assertTrue(json.contains("\"batchSize\":8"));
+        assertTrue(json.contains("\"sourceSplits\":2"));
+        assertTrue(json.contains("\"sinkBatches\":2"));
+    }
+
+    @Test
+    void benchmarkRejectsInvalidRows() throws Exception {
+        CliResult result = run("benchmark", "--rows", "0");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("benchmark --rows must be greater than zero"));
     }
 
     @Test

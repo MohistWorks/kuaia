@@ -18,6 +18,8 @@ Kuaia is useful when you want to:
 - generate mock or OpenAI-compatible embeddings,
 - write to console, local CSV files, mock vector output, or Qdrant,
 - resume local runs from checkpoint state,
+- run a local batch benchmark with split, checkpoint, embedding, and sink
+  counters,
 - inspect connector and runtime extension boundaries.
 
 Kuaia is not yet a production ETL platform. The MVP does not provide CDC,
@@ -76,6 +78,7 @@ Useful Make targets:
 make test
 make public-mvp-smoke
 make run-vector
+make benchmark
 make clean-state
 ```
 
@@ -125,6 +128,22 @@ checkpoint sequence, task state, source splits, sink batches, and duration.
 
 The full YAML contract is documented in
 [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md).
+
+## Local Benchmark
+
+Run the built-in local batch benchmark:
+
+```bash
+bin/kuaia benchmark
+```
+
+It generates CSV input, runs batch sizes `1`, `8`, `32`, and `128`, and writes
+JSON counters to `target/kuaia-benchmark/local-pipeline-batch.json`. For larger
+runs or split behavior checks:
+
+```bash
+bin/kuaia benchmark --rows 10000 --max-rows-per-split 1000
+```
 
 ## Examples
 

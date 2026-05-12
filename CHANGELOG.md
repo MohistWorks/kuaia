@@ -4,6 +4,11 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+### Added
+
+- `kuaia benchmark` CLI command for local batch benchmark counters and JSON
+  output.
+
 ### Changed
 
 - Main branch development version is now `0.1.1-SNAPSHOT` after the `v0.1.0`
