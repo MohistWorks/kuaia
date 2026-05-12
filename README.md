@@ -137,12 +137,18 @@ Run the built-in local batch benchmark:
 bin/kuaia benchmark
 ```
 
-It generates CSV input, runs batch sizes `1`, `8`, `32`, and `128`, and writes
-JSON counters to `target/kuaia-benchmark/local-pipeline-batch.json`. For larger
-runs or split behavior checks:
+It generates CSV input and writes JSON counters to
+`target/kuaia-benchmark/local-pipeline-batch.json`. By default it runs batch
+sizes `1`, `8`, `32`, and `128`. For larger runs or split behavior checks:
 
 ```bash
 bin/kuaia benchmark --rows 10000 --max-rows-per-split 1000
+```
+
+To compare specific transform and sink batch sizes:
+
+```bash
+bin/kuaia benchmark --rows 10000 --batch-sizes 16,64,256
 ```
 
 ## Examples
