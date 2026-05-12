@@ -62,6 +62,25 @@ public class WorkerRecord implements Serializable {
     }
 
     public WorkerRecord withState(WorkerState state) {
+        return withRuntime(state, streamConnected, backpressureLevel);
+    }
+
+    public WorkerRecord withStreamConnected(boolean connected) {
+        WorkerState nextState = connected
+                ? (backpressureLevel == BackpressureLevel.HIGH ? WorkerState.PAUSED : WorkerState.ONLINE)
+                : WorkerState.OFFLINE;
+        return withRuntime(nextState, connected, backpressureLevel);
+    }
+
+    public WorkerRecord withBackpressure(BackpressureLevel level) {
+        WorkerState nextState = level == BackpressureLevel.HIGH ? WorkerState.PAUSED : WorkerState.ONLINE;
+        return withRuntime(nextState, true, level);
+    }
+
+    private WorkerRecord withRuntime(
+            WorkerState state,
+            boolean streamConnected,
+            BackpressureLevel backpressureLevel) {
         return new WorkerRecord(
                 workerId,
                 host,

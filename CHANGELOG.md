@@ -17,6 +17,8 @@ All notable public changes to Kuaia are tracked here.
   instead of stale legacy keys.
 - Ratis-backed task compare-and-set now reports stale-version conflicts as a
   false update result instead of surfacing them as Raft write failures.
+- Coordinator worker streams now persist WorkerRecord online, paused, and
+  offline states in StateStore for recovery-aware scheduling.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
 - `kuaia benchmark` can now run caller-selected batch sizes with
   `--batch-sizes`.

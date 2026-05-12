@@ -2,6 +2,7 @@ package com.kuaia.engine.coordinator.rpc;
 
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
+import com.kuaia.common.model.WorkerRecord;
 import com.kuaia.common.rpc.AttemptStatus;
 import com.kuaia.common.rpc.BackpressureLevel;
 import com.kuaia.common.rpc.BackpressureSignal;
@@ -184,5 +185,100 @@ class CoordinatorServiceImplTest {
         assertEquals("task-1", message.getAssignment().getTaskId());
         assertEquals("attempt-1", message.getAssignment().getAttemptId());
         assertEquals(42L, message.getAssignment().getStartSeq());
+    }
+
+    @Test
+    void workerHelloPersistsOnlineWorkerRecord() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        CoordinatorServiceImpl service = new CoordinatorServiceImpl(
+                new WorkerRegistry(),
+                null,
+                null,
+                store);
+        StreamObserver<CoordinatorMessage> responseObserver = mock(StreamObserver.class);
+        StreamObserver<WorkerMessage> requestObserver = service.taskStream(responseObserver);
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId("worker-1")
+                        .setHost("127.0.0.1")
+                        .setPort(9001)
+                        .build())
+                .build());
+
+        WorkerRecord worker = store.getWorker("worker-1");
+        assertEquals(WorkerRecord.WorkerState.ONLINE, worker.getState());
+        assertTrue(worker.isStreamConnected());
+        assertEquals(WorkerRecord.BackpressureLevel.LOW, worker.getBackpressureLevel());
+        assertEquals("127.0.0.1", worker.getHost());
+        assertEquals(9001, worker.getPort());
+    }
+
+    @Test
+    void backpressurePersistsPausedAndOnlineWorkerStates() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        CoordinatorServiceImpl service = new CoordinatorServiceImpl(
+                new WorkerRegistry(),
+                null,
+                null,
+                store);
+        StreamObserver<CoordinatorMessage> responseObserver = mock(StreamObserver.class);
+        StreamObserver<WorkerMessage> requestObserver = service.taskStream(responseObserver);
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId("worker-1")
+                        .setHost("127.0.0.1")
+                        .setPort(9001)
+                        .build())
+                .build());
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setWorkerId("worker-1")
+                .setBackpressure(BackpressureSignal.newBuilder()
+                        .setLevel(BackpressureLevel.BACKPRESSURE_HIGH)
+                        .build())
+                .build());
+
+        WorkerRecord paused = store.getWorker("worker-1");
+        assertEquals(WorkerRecord.WorkerState.PAUSED, paused.getState());
+        assertTrue(paused.isStreamConnected());
+        assertEquals(WorkerRecord.BackpressureLevel.HIGH, paused.getBackpressureLevel());
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setWorkerId("worker-1")
+                .setBackpressure(BackpressureSignal.newBuilder()
+                        .setLevel(BackpressureLevel.BACKPRESSURE_LOW)
+                        .build())
+                .build());
+
+        WorkerRecord online = store.getWorker("worker-1");
+        assertEquals(WorkerRecord.WorkerState.ONLINE, online.getState());
+        assertTrue(online.isStreamConnected());
+        assertEquals(WorkerRecord.BackpressureLevel.LOW, online.getBackpressureLevel());
+    }
+
+    @Test
+    void streamCompletionPersistsOfflineWorkerRecord() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        CoordinatorServiceImpl service = new CoordinatorServiceImpl(
+                new WorkerRegistry(),
+                null,
+                null,
+                store);
+        StreamObserver<CoordinatorMessage> responseObserver = mock(StreamObserver.class);
+        StreamObserver<WorkerMessage> requestObserver = service.taskStream(responseObserver);
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId("worker-1")
+                        .setHost("127.0.0.1")
+                        .setPort(9001)
+                        .build())
+                .build());
+        requestObserver.onCompleted();
+
+        WorkerRecord worker = store.getWorker("worker-1");
+        assertEquals(WorkerRecord.WorkerState.OFFLINE, worker.getState());
+        assertFalse(worker.isStreamConnected());
     }
 }

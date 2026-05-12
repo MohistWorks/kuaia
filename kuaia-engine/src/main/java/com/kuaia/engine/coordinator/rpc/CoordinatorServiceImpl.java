@@ -2,6 +2,7 @@ package com.kuaia.engine.coordinator.rpc;
 
 import com.kuaia.common.model.NodeInfo;
 import com.kuaia.common.model.TaskRecord;
+import com.kuaia.common.model.WorkerRecord;
 import com.kuaia.common.rpc.*;
 import com.kuaia.engine.coordinator.registry.WorkerRegistry;
 import com.kuaia.engine.coordinator.state.BatchStateFlusher;
@@ -62,11 +63,13 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
                 if (value.hasBackpressure()) {
                     boolean paused = value.getBackpressure().getLevel() == BackpressureLevel.BACKPRESSURE_HIGH;
                     streamManager.setPaused(workerId, paused);
+                    persistBackpressure(workerId, paused);
                 }
 
                 if (value.hasSignal()) {
                     boolean paused = "BACKPRESSURE_HIGH".equals(value.getSignal().getType());
                     streamManager.setPaused(workerId, paused);
+                    persistBackpressure(workerId, paused);
                 }
 
                 if (value.hasRecordAck() && ackHandler != null) {
@@ -91,11 +94,13 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
 
             @Override
             public void onError(Throwable t) {
+                persistStreamDisconnected(workerId);
                 streamManager.unregisterStream(workerId);
             }
 
             @Override
             public void onCompleted() {
+                persistStreamDisconnected(workerId);
                 streamManager.unregisterStream(workerId);
             }
         };
@@ -134,6 +139,8 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
                 .type(NodeInfo.NodeType.WORKER)
                 .build();
         registry.register(node);
+        persistWorker(WorkerRecord.registered(hello.getWorkerId(), hello.getHost(), hello.getPort())
+                .withStreamConnected(true));
     }
 
     private void replayActiveAssignments(String workerId) {
@@ -154,6 +161,7 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
                 .type(NodeInfo.NodeType.WORKER)
                 .build();
         registry.register(node);
+        persistWorker(WorkerRecord.registered(request.getId(), request.getHost(), request.getPort()));
         responseObserver.onNext(RegistrationResponse.newBuilder().setSuccess(true).build());
         responseObserver.onCompleted();
     }
@@ -164,5 +172,35 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
         registry.updateHeartbeat(request.getId(), load);
         responseObserver.onNext(HeartbeatResponse.newBuilder().setAck(true).build());
         responseObserver.onCompleted();
+    }
+
+    private void persistBackpressure(String workerId, boolean paused) {
+        if (stateStore == null || workerId == null || workerId.isEmpty()) {
+            return;
+        }
+        WorkerRecord existing = stateStore.getWorker(workerId);
+        if (existing == null) {
+            return;
+        }
+        WorkerRecord.BackpressureLevel level = paused
+                ? WorkerRecord.BackpressureLevel.HIGH
+                : WorkerRecord.BackpressureLevel.LOW;
+        persistWorker(existing.withBackpressure(level));
+    }
+
+    private void persistStreamDisconnected(String workerId) {
+        if (stateStore == null || workerId == null || workerId.isEmpty()) {
+            return;
+        }
+        WorkerRecord existing = stateStore.getWorker(workerId);
+        if (existing != null) {
+            persistWorker(existing.withStreamConnected(false));
+        }
+    }
+
+    private void persistWorker(WorkerRecord worker) {
+        if (stateStore != null && worker != null) {
+            stateStore.saveWorker(worker);
+        }
     }
 }
