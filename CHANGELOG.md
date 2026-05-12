@@ -39,6 +39,9 @@ All notable public changes to Kuaia are tracked here.
 - Worker hello messages now clear stale stream-level backpressure so reconnects
   can become schedulable again without letting ack-only messages reset pause
   state.
+- Worker streams now ignore messages that try to switch an established stream
+  to a different worker id, preserving disconnect/offline bookkeeping for the
+  original worker.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
