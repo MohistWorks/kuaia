@@ -71,8 +71,8 @@ public class RatisStateStore implements StateStore {
                             .setExpectedVersion(expected.getVersion())
                             .build())
                     .build();
-            sendWrite(cmd, "compare-and-set task record " + updated.getTaskId());
-            return true;
+            RaftClientReply reply = sendWrite(cmd, "compare-and-set task record " + updated.getTaskId());
+            return !isCasRejected(reply);
         } catch (IOException e) {
             throw new RuntimeException("Failed to compare-and-set task record via Raft", e);
         }
@@ -167,12 +167,21 @@ public class RatisStateStore implements StateStore {
         }
     }
 
-    private void sendWrite(RaftCommand command, String description) throws IOException {
+    private RaftClientReply sendWrite(RaftCommand command, String description) throws IOException {
         RaftClientReply reply = raftClient.io().send(Message.valueOf(
                 org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(command.toByteArray())));
         if (!reply.isSuccess()) {
             throw new IOException("Raft write failed for " + description + ": " + reply.getException());
         }
+        return reply;
+    }
+
+    private boolean isCasRejected(RaftClientReply reply) {
+        Message message = reply.getMessage();
+        if (message == null) {
+            return false;
+        }
+        return RocksDBStateMachine.CAS_REJECTED.equals(message.getContent().toStringUtf8());
     }
 
     private byte[] serialize(Object value) throws IOException {
