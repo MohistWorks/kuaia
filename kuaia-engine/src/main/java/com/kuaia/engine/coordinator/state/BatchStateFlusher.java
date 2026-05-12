@@ -1,5 +1,6 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import java.util.*;
 import java.util.concurrent.*;
@@ -27,11 +28,29 @@ public class BatchStateFlusher {
         List<String> retry = new ArrayList<>();
         for (String taskId : toFlush) {
             try {
-                stateStore.updateTaskState(taskId, TaskState.COMPLETED);
+                completeTask(taskId);
             } catch (Exception e) {
                 retry.add(taskId);
             }
         }
         ackQueue.addAll(retry);
+    }
+
+    private void completeTask(String taskId) {
+        TaskRecord record = stateStore.getTask(taskId);
+        if (record == null) {
+            stateStore.updateTaskState(taskId, TaskState.COMPLETED);
+            return;
+        }
+        if (record.getState() == TaskState.COMPLETED) {
+            return;
+        }
+        if (record.getState() != TaskState.RUNNING) {
+            return;
+        }
+        TaskRecord completed = record.complete(record.getAttemptId());
+        if (!stateStore.compareAndSetTask(record, completed)) {
+            throw new IllegalStateException("Task " + taskId + " changed while flushing ack");
+        }
     }
 }

@@ -23,6 +23,8 @@ All notable public changes to Kuaia are tracked here.
   heartbeat timestamp.
 - Scheduler can use persisted WorkerRecord state to filter offline/paused
   workers and order available workers by stored load.
+- Legacy ack flushing now completes v2 TaskRecord state through compare-and-set
+  before falling back to deprecated state writes.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
 - `kuaia benchmark` can now run caller-selected batch sizes with
   `--batch-sizes`.
