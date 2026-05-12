@@ -133,6 +133,13 @@ public class RatisStateStore implements StateStore {
     }
 
     public void updateTaskState(String taskId, TaskState state) {
+        TaskRecord record = getTask(taskId);
+        if (record != null) {
+            if (!compareAndSetTask(record, record.withLegacyState(state))) {
+                throw new RuntimeException("Task " + taskId + " changed while updating state via Raft");
+            }
+            return;
+        }
         try {
             RaftCommand cmd = RaftCommand.newBuilder()
                     .setType(CommandType.UPDATE_STATE)
