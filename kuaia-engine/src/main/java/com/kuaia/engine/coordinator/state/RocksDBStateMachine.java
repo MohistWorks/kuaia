@@ -1,7 +1,8 @@
 package com.kuaia.engine.coordinator.state;
 
-import com.google.protobuf.ByteString;
 import com.kuaia.common.model.TaskRecord;
+import com.kuaia.common.model.TaskState;
+import com.kuaia.common.model.WorkerRecord;
 import com.kuaia.common.raft.*;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.statemachine.TransactionContext;
@@ -9,6 +10,7 @@ import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -16,10 +18,18 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 public class RocksDBStateMachine extends BaseStateMachine {
     private static final String TASK_PREFIX = "task/";
+    private static final String WORKER_PREFIX = "worker/";
+    private static final String TASK_STATE_SCAN_PREFIX = "scan/task_state/";
+    private static final String TASK_WORKER_SCAN_PREFIX = "scan/task_worker/";
+    private static final String WORKER_STATE_SCAN_PREFIX = "scan/worker_state/";
 
     private RocksDB db;
 
@@ -61,6 +71,10 @@ public class RocksDBStateMachine extends BaseStateMachine {
                 if (!accepted) {
                     throw new IOException("Rejected stale task record command for " + payload.getTaskId());
                 }
+            } else if (cmd.hasWorkerRecord()) {
+                WorkerRecordPayload payload = cmd.getWorkerRecord();
+                WorkerRecord record = deserialize(payload.getRecord().toByteArray(), WorkerRecord.class);
+                applyWorkerRecordForTesting(record);
             }
         } catch (Exception e) {
             return failedFuture(e);
@@ -72,6 +86,19 @@ public class RocksDBStateMachine extends BaseStateMachine {
     public CompletableFuture<Message> query(Message request) {
         String key = request.getContent().toStringUtf8();
         try {
+            if (key.startsWith(TASK_STATE_SCAN_PREFIX)) {
+                TaskState state = TaskState.valueOf(key.substring(TASK_STATE_SCAN_PREFIX.length()));
+                return completedBytes(serialize(scanTaskRecordsByStateForTesting(state)));
+            }
+            if (key.startsWith(TASK_WORKER_SCAN_PREFIX)) {
+                String workerId = key.substring(TASK_WORKER_SCAN_PREFIX.length());
+                return completedBytes(serialize(scanActiveTaskRecordsByWorkerForTesting(workerId)));
+            }
+            if (key.startsWith(WORKER_STATE_SCAN_PREFIX)) {
+                WorkerRecord.WorkerState state = WorkerRecord.WorkerState.valueOf(
+                        key.substring(WORKER_STATE_SCAN_PREFIX.length()));
+                return completedBytes(serialize(scanWorkerRecordsByStateForTesting(state)));
+            }
             byte[] val = db.get(bytes(key));
             if (val == null) {
                 return CompletableFuture.completedFuture(Message.valueOf(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.EMPTY));
@@ -80,6 +107,11 @@ public class RocksDBStateMachine extends BaseStateMachine {
         } catch (Exception e) {
             return failedFuture(e);
         }
+    }
+
+    private CompletableFuture<Message> completedBytes(byte[] value) {
+        return CompletableFuture.completedFuture(Message.valueOf(
+                org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(value)));
     }
 
     boolean applyTaskRecordForTesting(TaskRecord record, boolean cas, long expectedVersion) throws IOException {
@@ -103,12 +135,88 @@ public class RocksDBStateMachine extends BaseStateMachine {
         }
     }
 
+    void applyWorkerRecordForTesting(WorkerRecord record) throws IOException {
+        try {
+            db.put(bytes(workerKey(record.getWorkerId())), serialize(record));
+        } catch (RocksDBException e) {
+            throw new IOException("Failed to apply worker record " + record.getWorkerId(), e);
+        }
+    }
+
+    WorkerRecord getWorkerRecordForTesting(String workerId) throws IOException {
+        try {
+            return deserialize(db.get(bytes(workerKey(workerId))), WorkerRecord.class);
+        } catch (RocksDBException e) {
+            throw new IOException("Failed to get worker record " + workerId, e);
+        }
+    }
+
+    List<TaskRecord> scanTaskRecordsByStateForTesting(TaskState state) throws IOException {
+        return scanTaskRecords().stream()
+                .filter(record -> record.getState() == state)
+                .sorted(Comparator.comparing(TaskRecord::getTaskId))
+                .collect(Collectors.toList());
+    }
+
+    List<TaskRecord> scanActiveTaskRecordsByWorkerForTesting(String workerId) throws IOException {
+        return scanTaskRecords().stream()
+                .filter(record -> workerId.equals(record.getAssignedWorkerId()))
+                .filter(record -> isActive(record.getState()))
+                .sorted(Comparator.comparing(TaskRecord::getTaskId))
+                .collect(Collectors.toList());
+    }
+
+    List<WorkerRecord> scanWorkerRecordsByStateForTesting(WorkerRecord.WorkerState state) throws IOException {
+        return scanWorkerRecords().stream()
+                .filter(record -> record.getState() == state)
+                .sorted(Comparator.comparing(WorkerRecord::getWorkerId))
+                .collect(Collectors.toList());
+    }
+
+    private List<TaskRecord> scanTaskRecords() throws IOException {
+        return scanRecords(TASK_PREFIX, TaskRecord.class);
+    }
+
+    private List<WorkerRecord> scanWorkerRecords() throws IOException {
+        return scanRecords(WORKER_PREFIX, WorkerRecord.class);
+    }
+
+    private <T> List<T> scanRecords(String prefix, Class<T> type) throws IOException {
+        List<T> records = new ArrayList<>();
+        try (RocksIterator iterator = db.newIterator()) {
+            byte[] prefixBytes = bytes(prefix);
+            for (iterator.seek(prefixBytes); iterator.isValid(); iterator.next()) {
+                String key = string(iterator.key());
+                if (!key.startsWith(prefix)) {
+                    break;
+                }
+                records.add(deserialize(iterator.value(), type));
+            }
+            iterator.status();
+            return records;
+        } catch (RocksDBException e) {
+            throw new IOException("Failed to scan prefix " + prefix, e);
+        }
+    }
+
+    private boolean isActive(TaskState state) {
+        return state == TaskState.DISPATCHING || state == TaskState.RUNNING || state == TaskState.RETRYING;
+    }
+
     private String taskKey(String taskId) {
         return TASK_PREFIX + taskId;
     }
 
+    private String workerKey(String workerId) {
+        return WORKER_PREFIX + workerId;
+    }
+
     private byte[] bytes(String value) {
         return value.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String string(byte[] value) {
+        return new String(value, StandardCharsets.UTF_8);
     }
 
     private byte[] serialize(Object value) throws IOException {

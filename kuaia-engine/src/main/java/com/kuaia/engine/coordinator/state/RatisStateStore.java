@@ -13,6 +13,10 @@ import java.util.*;
 
 public class RatisStateStore implements StateStore {
     private static final String TASK_PREFIX = "task/";
+    private static final String WORKER_PREFIX = "worker/";
+    private static final String TASK_STATE_SCAN_PREFIX = "scan/task_state/";
+    private static final String TASK_WORKER_SCAN_PREFIX = "scan/task_worker/";
+    private static final String WORKER_STATE_SCAN_PREFIX = "scan/worker_state/";
 
     private final RaftClient raftClient;
 
@@ -76,27 +80,50 @@ public class RatisStateStore implements StateStore {
 
     @Override
     public List<TaskRecord> scanTasksByState(TaskState state) {
-        return Collections.emptyList();
+        return readList(TASK_STATE_SCAN_PREFIX + state.name(), TaskRecord.class);
     }
 
     @Override
     public List<TaskRecord> scanActiveTasksByWorker(String workerId) {
-        return Collections.emptyList();
+        return readList(TASK_WORKER_SCAN_PREFIX + workerId, TaskRecord.class);
     }
 
     @Override
     public void saveWorker(WorkerRecord record) {
-        throw new UnsupportedOperationException("Worker records require the Phase 4 Raft command model");
+        try {
+            RaftCommand cmd = RaftCommand.newBuilder()
+                    .setType(CommandType.SAVE_WORKER_RECORD)
+                    .setWorkerRecord(WorkerRecordPayload.newBuilder()
+                            .setWorkerId(record.getWorkerId())
+                            .setRecord(com.google.protobuf.ByteString.copyFrom(serialize(record)))
+                            .build())
+                    .build();
+            sendWrite(cmd, "save worker record " + record.getWorkerId());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to save worker record via Raft", e);
+        }
     }
 
     @Override
     public WorkerRecord getWorker(String workerId) {
-        return null;
+        try {
+            RaftClientReply reply = raftClient.io().sendReadOnly(Message.valueOf(WORKER_PREFIX + workerId));
+            if (!reply.isSuccess()) {
+                throw new IOException("Raft read failed: " + reply.getException());
+            }
+            byte[] data = reply.getMessage().getContent().toByteArray();
+            if (data.length == 0) {
+                return null;
+            }
+            return deserialize(data, WorkerRecord.class);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to get worker record via Raft", e);
+        }
     }
 
     @Override
     public List<WorkerRecord> scanWorkersByState(WorkerRecord.WorkerState state) {
-        return Collections.emptyList();
+        return readList(WORKER_STATE_SCAN_PREFIX + state.name(), WorkerRecord.class);
     }
 
     public void saveTask(TaskDefinition task, TaskState state) {
@@ -162,6 +189,27 @@ public class RatisStateStore implements StateStore {
             return type.cast(objectStream.readObject());
         } catch (ClassNotFoundException e) {
             throw new IOException("Failed to deserialize " + type.getSimpleName(), e);
+        }
+    }
+
+    private <T> List<T> readList(String queryKey, Class<T> elementType) {
+        try {
+            RaftClientReply reply = raftClient.io().sendReadOnly(Message.valueOf(queryKey));
+            if (!reply.isSuccess()) {
+                throw new IOException("Raft read failed: " + reply.getException());
+            }
+            byte[] data = reply.getMessage().getContent().toByteArray();
+            if (data.length == 0) {
+                return Collections.emptyList();
+            }
+            List<?> values = deserialize(data, List.class);
+            List<T> result = new ArrayList<>();
+            for (Object value : values) {
+                result.add(elementType.cast(value));
+            }
+            return result;
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to scan Raft state for " + queryKey, e);
         }
     }
 

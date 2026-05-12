@@ -7,6 +7,7 @@ enum CommandType {
   UPDATE_STATE = 1;
   SAVE_TASK_RECORD = 2;
   CAS_TASK_RECORD = 3;
+  SAVE_WORKER_RECORD = 4;
 }
 
 message RaftCommand {
@@ -15,6 +16,7 @@ message RaftCommand {
     SaveTaskPayload save_task = 2;
     UpdateStatePayload update_state = 3;
     TaskRecordPayload task_record = 4;
+    WorkerRecordPayload worker_record = 5;
   }
 }
 
@@ -32,4 +34,9 @@ message TaskRecordPayload {
   string task_id = 1;
   bytes record = 2;
   int64 expected_version = 3;
+}
+
+message WorkerRecordPayload {
+  string worker_id = 1;
+  bytes record = 2;
 }
