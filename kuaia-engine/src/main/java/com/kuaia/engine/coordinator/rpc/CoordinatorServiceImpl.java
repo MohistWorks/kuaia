@@ -49,6 +49,9 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
 
             @Override
             public void onNext(WorkerMessage value) {
+                if (hasConflictingWorkerIds(value)) {
+                    return;
+                }
                 String resolvedWorkerId = resolveWorkerId(value);
                 if (resolvedWorkerId == null || resolvedWorkerId.isEmpty()) {
                     return;
@@ -111,10 +114,17 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
         };
     }
 
-    private String resolveWorkerId(WorkerMessage value) {
-        if (!value.getWorkerId().isEmpty()) {
-            return value.getWorkerId();
+    private boolean hasConflictingWorkerIds(WorkerMessage value) {
+        if (value.getWorkerId().isEmpty()) {
+            return false;
         }
+        String payloadWorkerId = payloadWorkerId(value);
+        return payloadWorkerId != null
+                && !payloadWorkerId.isEmpty()
+                && !value.getWorkerId().equals(payloadWorkerId);
+    }
+
+    private String payloadWorkerId(WorkerMessage value) {
         if (value.hasHello()) {
             return value.getHello().getWorkerId();
         }
@@ -131,6 +141,13 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
             return value.getTaskResult().getWorkerId();
         }
         return "";
+    }
+
+    private String resolveWorkerId(WorkerMessage value) {
+        if (!value.getWorkerId().isEmpty()) {
+            return value.getWorkerId();
+        }
+        return payloadWorkerId(value);
     }
 
     private void registerWorkerHello(WorkerHello hello) {
