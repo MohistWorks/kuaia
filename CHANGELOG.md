@@ -31,6 +31,8 @@ All notable public changes to Kuaia are tracked here.
   v2 TaskRecord path.
 - Deprecated task-state updates now update existing v2 TaskRecord state before
   falling back to legacy Ratis state keys.
+- Legacy ack flushing now drops unknown-task acknowledgements when the backing
+  StateStore has no legacy state path to update.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.

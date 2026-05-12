@@ -35,6 +35,18 @@ class BatchStateFlusherTest {
         assertEquals(TaskState.COMPLETED, store.lastState);
     }
 
+    @Test
+    void missingTaskAckIsDroppedWhenStoreHasNoLegacyState() {
+        MissingTaskStateStore store = new MissingTaskStateStore();
+        BatchStateFlusher flusher = new BatchStateFlusher(store);
+
+        flusher.addAck("missing-task");
+        flusher.flushOnceForTesting();
+        flusher.flushOnceForTesting();
+
+        assertEquals(1, store.attempts);
+    }
+
     private static class RetryableLegacyStateStore extends InMemoryStateStore {
         private int attempts;
         private String lastTaskId;
@@ -48,6 +60,16 @@ class BatchStateFlusherTest {
             }
             lastTaskId = taskId;
             lastState = state;
+        }
+    }
+
+    private static class MissingTaskStateStore extends InMemoryStateStore {
+        private int attempts;
+
+        @Override
+        public void updateTaskState(String taskId, TaskState state) {
+            attempts++;
+            super.updateTaskState(taskId, state);
         }
     }
 }
