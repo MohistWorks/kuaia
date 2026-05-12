@@ -208,7 +208,7 @@ public class RocksDbStateStore implements StateStore, Closeable {
     }
 
     private boolean isActive(TaskState state) {
-        return state == TaskState.DISPATCHING || state == TaskState.RUNNING || state == TaskState.RETRYING;
+        return state == TaskState.DISPATCHING || state == TaskState.RUNNING;
     }
 
     private String taskKey(String taskId) {

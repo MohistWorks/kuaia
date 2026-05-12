@@ -205,7 +205,7 @@ public class RocksDBStateMachine extends BaseStateMachine {
     }
 
     private boolean isActive(TaskState state) {
-        return state == TaskState.DISPATCHING || state == TaskState.RUNNING || state == TaskState.RETRYING;
+        return state == TaskState.DISPATCHING || state == TaskState.RUNNING;
     }
 
     private String taskKey(String taskId) {

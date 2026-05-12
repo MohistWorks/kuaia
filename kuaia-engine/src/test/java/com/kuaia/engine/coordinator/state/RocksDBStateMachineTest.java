@@ -101,6 +101,22 @@ class RocksDBStateMachineTest {
         stateMachine.close();
     }
 
+    @Test
+    void retryingTasksAreNotReturnedAsActiveWorkerAssignments() throws Exception {
+        RocksDBStateMachine stateMachine = new RocksDBStateMachine();
+        stateMachine.initialize(tempDir.toString());
+        TaskRecord retrying = TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", 10_000L)
+                .running()
+                .retrying("TRANSIENT", "temporary failure");
+
+        assertTrue(stateMachine.applyTaskRecordForTesting(retrying, false, -1L));
+
+        assertEquals(0, stateMachine.scanActiveTaskRecordsByWorkerForTesting("worker-1").size());
+        assertEquals(1, stateMachine.scanTaskRecordsByStateForTesting(TaskState.RETRYING).size());
+        stateMachine.close();
+    }
+
     private <T> List<T> deserializeList(Message message, Class<T> elementType) throws Exception {
         ObjectInputStream objects = new ObjectInputStream(new ByteArrayInputStream(
                 message.getContent().toByteArray()));
