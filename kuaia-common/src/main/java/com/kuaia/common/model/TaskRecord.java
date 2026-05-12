@@ -52,12 +52,20 @@ public class TaskRecord implements Serializable {
     }
 
     public static TaskRecord created(String jobId, String taskId) {
+        return created(jobId, taskId, null);
+    }
+
+    public static TaskRecord created(TaskDefinition definition) {
+        return created(definition.getJobName(), definition.getTaskId(), definition);
+    }
+
+    private static TaskRecord created(String jobId, String taskId, TaskDefinition definition) {
         long now = System.currentTimeMillis();
         return new TaskRecord(
                 taskId,
                 jobId,
                 TaskState.CREATED,
-                null,
+                definition,
                 null,
                 null,
                 0,

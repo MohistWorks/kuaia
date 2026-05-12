@@ -1,15 +1,34 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.common.model.WorkerRecord;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class InMemoryStateStoreTest {
+    @Test
+    void legacySaveTaskPreservesTaskDefinitionForStateScans() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        TaskDefinition definition = new TaskDefinition();
+        definition.setTaskId("task-1");
+        definition.setJobName("job-1");
+        definition.setConfig(Collections.singletonMap("source", "file"));
+
+        store.saveTask(definition, TaskState.CREATED);
+
+        List<TaskDefinition> definitions = store.getTasksByState(TaskState.CREATED);
+        assertEquals(1, definitions.size());
+        assertEquals("task-1", definitions.get(0).getTaskId());
+        assertEquals("file", definitions.get(0).getConfig().get("source"));
+        assertEquals(definition, store.getTask("task-1").getDefinition());
+    }
+
     @Test
     void scansTasksByState() {
         InMemoryStateStore store = new InMemoryStateStore();

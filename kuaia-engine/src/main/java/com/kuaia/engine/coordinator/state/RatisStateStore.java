@@ -126,7 +126,13 @@ public class RatisStateStore implements StateStore {
         return readList(WORKER_STATE_SCAN_PREFIX + state.name(), WorkerRecord.class);
     }
 
+    @Override
+    @Deprecated
     public void saveTask(TaskDefinition task, TaskState state) {
+        if (state == TaskState.CREATED) {
+            saveTask(TaskRecord.created(task));
+            return;
+        }
         try {
             // Serialize TaskDefinition to bytes (using standard Java serialization for now as it implements Serializable)
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
