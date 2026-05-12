@@ -39,7 +39,11 @@ public class BatchStateFlusher {
     private void completeTask(String taskId) {
         TaskRecord record = stateStore.getTask(taskId);
         if (record == null) {
-            stateStore.updateTaskState(taskId, TaskState.COMPLETED);
+            try {
+                stateStore.updateTaskState(taskId, TaskState.COMPLETED);
+            } catch (UnsupportedOperationException e) {
+                return;
+            }
             return;
         }
         if (record.getState() == TaskState.COMPLETED) {
