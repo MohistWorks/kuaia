@@ -1,11 +1,26 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class BatchStateFlusherTest {
+    @Test
+    void successfulFlushCompletesV2TaskRecordWithCas() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        store.saveTask(TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", 10_000L)
+                .running());
+        BatchStateFlusher flusher = new BatchStateFlusher(store);
+
+        flusher.addAck("task-1");
+        flusher.flushOnceForTesting();
+
+        assertEquals(TaskState.COMPLETED, store.getTask("task-1").getState());
+    }
+
     @Test
     void failedFlushIsRetriedOnNextFlush() {
         RetryableLegacyStateStore store = new RetryableLegacyStateStore();
