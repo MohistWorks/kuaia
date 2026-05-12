@@ -496,11 +496,17 @@ bin/kuaia benchmark --rows 10000
 ```
 
 To stress source split behavior, add `--max-rows-per-split <rows>`. To choose a
-different JSON output path, add `--output <path>`. To compare specific batch
-sizes, add a comma-separated list:
+different output path, add `--output <path>`. To compare specific batch sizes,
+add a comma-separated list:
 
 ```bash
 bin/kuaia benchmark --batch-sizes 16,64,256
+```
+
+To write CSV instead of JSON, add `--format csv`:
+
+```bash
+bin/kuaia benchmark --format csv --output target/kuaia-benchmark/local-pipeline-batch.csv
 ```
 
 ## Error Messages

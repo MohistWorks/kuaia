@@ -87,6 +87,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("make public-mvp-smoke"));
         assertTrue(read(root.resolve("README.md")).contains("bin/kuaia benchmark"));
         assertTrue(read(root.resolve("README.md")).contains("--batch-sizes 16,64,256"));
+        assertTrue(read(root.resolve("README.md")).contains("--format csv"));
         assertTrue(read(root.resolve("README.md")).contains("target/kuaia-benchmark/local-pipeline-batch.json"));
         assertTrue(read(root.resolve("README.md")).contains("mvn -q package"));
         assertTrue(read(root.resolve("README.md")).contains("kuaia-engine/target/kuaia-engine-${VERSION}-cli.jar"));
@@ -106,6 +107,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("bin/kuaia benchmark"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--max-rows-per-split"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--batch-sizes 16,64,256"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--format csv"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
         assertTrue(read(root.resolve("docs/README.md")).contains("product-scope.md"));
         assertTrue(read(root.resolve("docs/README.md")).contains("pipeline-yaml.md"));

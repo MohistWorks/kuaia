@@ -151,6 +151,12 @@ To compare specific transform and sink batch sizes:
 bin/kuaia benchmark --rows 10000 --batch-sizes 16,64,256
 ```
 
+To write spreadsheet-friendly CSV instead of JSON:
+
+```bash
+bin/kuaia benchmark --format csv --output target/kuaia-benchmark/local-pipeline-batch.csv
+```
+
 ## Examples
 
 List available examples:

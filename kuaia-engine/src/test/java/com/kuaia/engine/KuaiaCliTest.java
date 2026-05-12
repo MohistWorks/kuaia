@@ -119,6 +119,36 @@ class KuaiaCliTest {
     }
 
     @Test
+    void benchmarkWritesCsvWhenConfigured() throws Exception {
+        Path output = tempDir.resolve("benchmark/custom-batches.csv");
+
+        CliResult result = run(
+                "benchmark",
+                "--rows", "6",
+                "--batch-sizes", "2,3",
+                "--format", "csv",
+                "--output", output.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("format=csv"));
+        assertTrue(result.output.contains("output=" + output));
+        String csv = new String(Files.readAllBytes(output), StandardCharsets.UTF_8);
+        assertTrue(csv.startsWith("rowCount,batchSize,durationMs,rowsPerSecond,"));
+        assertTrue(csv.contains("6,2,"));
+        assertTrue(csv.contains(",3,0,6,3,6,"));
+        assertTrue(csv.contains("6,3,"));
+        assertFalse(csv.contains("\"batchSize\""));
+    }
+
+    @Test
+    void benchmarkRejectsInvalidFormat() throws Exception {
+        CliResult result = run("benchmark", "--format", "xml");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("benchmark --format must be json or csv: xml"));
+    }
+
+    @Test
     void unknownCommandReturnsError() throws Exception {
         CliResult result = run("missing");
 
