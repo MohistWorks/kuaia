@@ -380,6 +380,38 @@ class CoordinatorServiceImplTest {
     }
 
     @Test
+    void mismatchedWorkerMessageDoesNotReplaceStreamIdentityBeforeCompletion() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        CoordinatorServiceImpl service = new CoordinatorServiceImpl(
+                new WorkerRegistry(),
+                null,
+                null,
+                store);
+        StreamObserver<CoordinatorMessage> responseObserver = mock(StreamObserver.class);
+        StreamObserver<WorkerMessage> requestObserver = service.taskStream(responseObserver);
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId("worker-1")
+                        .setHost("127.0.0.1")
+                        .setPort(9001)
+                        .build())
+                .build());
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setWorkerId("worker-2")
+                .setBackpressure(BackpressureSignal.newBuilder()
+                        .setLevel(BackpressureLevel.BACKPRESSURE_HIGH)
+                        .build())
+                .build());
+        requestObserver.onCompleted();
+
+        assertFalse(service.getStreamManagerForTesting().isAvailable("worker-1"));
+        WorkerRecord worker = store.getWorker("worker-1");
+        assertEquals(WorkerRecord.WorkerState.OFFLINE, worker.getState());
+        assertFalse(worker.isStreamConnected());
+    }
+
+    @Test
     void heartbeatPersistsWorkerLoadAndHeartbeatTime() {
         InMemoryStateStore store = new InMemoryStateStore();
         CoordinatorServiceImpl service = new CoordinatorServiceImpl(

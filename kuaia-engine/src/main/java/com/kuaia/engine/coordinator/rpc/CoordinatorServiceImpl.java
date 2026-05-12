@@ -53,6 +53,9 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
                 if (resolvedWorkerId == null || resolvedWorkerId.isEmpty()) {
                     return;
                 }
+                if (this.workerId != null && !this.workerId.equals(resolvedWorkerId)) {
+                    return;
+                }
                 this.workerId = resolvedWorkerId;
                 streamManager.registerStream(workerId, responseObserver);
 
