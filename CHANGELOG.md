@@ -29,6 +29,8 @@ All notable public changes to Kuaia are tracked here.
   scans, including the Ratis CREATED-task path.
 - Deprecated task-definition saves now honor the requested TaskState through the
   v2 TaskRecord path.
+- Deprecated task-state updates now update existing v2 TaskRecord state before
+  falling back to legacy Ratis state keys.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.

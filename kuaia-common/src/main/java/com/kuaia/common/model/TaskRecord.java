@@ -181,6 +181,18 @@ public class TaskRecord implements Serializable {
                 errorMessage);
     }
 
+    public TaskRecord withLegacyState(TaskState state) {
+        return copy(
+                state,
+                assignedWorkerId,
+                attemptId,
+                attemptNo,
+                leaseUntilMillis,
+                lastCheckpointSeq,
+                lastErrorCode,
+                lastErrorMessage);
+    }
+
     public TaskRecord fail(String attemptId, String errorCode, String errorMessage) {
         requireCurrentAttempt(attemptId);
         if (state != TaskState.RUNNING && state != TaskState.RETRYING) {

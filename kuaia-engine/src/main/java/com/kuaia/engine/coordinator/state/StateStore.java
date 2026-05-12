@@ -33,7 +33,13 @@ public interface StateStore {
 
     @Deprecated
     default void updateTaskState(String taskId, TaskState state) {
-        throw new UnsupportedOperationException("Task state updates require a TaskRecord in the v2 state model");
+        TaskRecord record = getTask(taskId);
+        if (record == null) {
+            throw new UnsupportedOperationException("Task state updates require an existing TaskRecord");
+        }
+        if (!compareAndSetTask(record, record.withLegacyState(state))) {
+            throw new IllegalStateException("Task " + taskId + " changed while updating state");
+        }
     }
 
     @Deprecated

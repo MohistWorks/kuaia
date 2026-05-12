@@ -37,13 +37,39 @@ class RatisStateStoreTest {
         RaftClient client = mock(RaftClient.class);
         BlockingApi io = mock(BlockingApi.class);
         RaftClientReply failedReply = mock(RaftClientReply.class);
+        RaftClientReply emptyReply = emptyReply();
         when(client.io()).thenReturn(io);
         when(failedReply.isSuccess()).thenReturn(false);
+        when(io.sendReadOnly(any(Message.class))).thenReturn(emptyReply);
         when(io.send(any(Message.class))).thenReturn(failedReply);
 
         RatisStateStore store = new RatisStateStore(client);
 
         assertThrows(RuntimeException.class, () -> store.updateTaskState("task-1", TaskState.CREATED));
+    }
+
+    @Test
+    void updateTaskStateUpdatesExistingTaskRecordWithCas() throws Exception {
+        RaftClient client = mock(RaftClient.class);
+        BlockingApi io = mock(BlockingApi.class);
+        TaskRecord existing = TaskRecord.created("job-1", "task-1");
+        RaftClientReply readReply = successReply(existing);
+        RaftClientReply writeReply = successMessageReply("OK");
+        when(client.io()).thenReturn(io);
+        when(io.sendReadOnly(any(Message.class))).thenReturn(readReply);
+        when(io.send(any(Message.class))).thenReturn(writeReply);
+        ArgumentCaptor<Message> writeCaptor = forClass(Message.class);
+
+        new RatisStateStore(client).updateTaskState("task-1", TaskState.FAILED);
+
+        verify(io).send(writeCaptor.capture());
+        RaftCommand command = RaftCommand.parseFrom(writeCaptor.getValue().getContent().toByteArray());
+        assertEquals(CommandType.CAS_TASK_RECORD, command.getType());
+        assertEquals(existing.getVersion(), command.getTaskRecord().getExpectedVersion());
+        TaskRecord updated = deserialize(command.getTaskRecord().getRecord().toByteArray(), TaskRecord.class);
+        assertEquals(TaskState.FAILED, updated.getState());
+        assertEquals(existing.getTaskId(), updated.getTaskId());
+        assertEquals(existing.getDefinition(), updated.getDefinition());
     }
 
     @Test
@@ -295,6 +321,14 @@ class RatisStateStoreTest {
         RaftClientReply reply = mock(RaftClientReply.class);
         when(reply.isSuccess()).thenReturn(true);
         when(reply.getMessage()).thenReturn(Message.valueOf(value));
+        return reply;
+    }
+
+    private RaftClientReply emptyReply() {
+        RaftClientReply reply = mock(RaftClientReply.class);
+        when(reply.isSuccess()).thenReturn(true);
+        when(reply.getMessage()).thenReturn(Message.valueOf(
+                org.apache.ratis.thirdparty.com.google.protobuf.ByteString.EMPTY));
         return reply;
     }
 
