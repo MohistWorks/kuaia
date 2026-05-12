@@ -77,6 +77,19 @@ public class WorkerRecord implements Serializable {
         return withRuntime(nextState, true, level);
     }
 
+    public WorkerRecord withHeartbeat(double loadScore, long heartbeatMillis) {
+        return new WorkerRecord(
+                workerId,
+                host,
+                port,
+                state,
+                loadScore,
+                activeTaskCount,
+                heartbeatMillis,
+                streamConnected,
+                backpressureLevel);
+    }
+
     private WorkerRecord withRuntime(
             WorkerState state,
             boolean streamConnected,

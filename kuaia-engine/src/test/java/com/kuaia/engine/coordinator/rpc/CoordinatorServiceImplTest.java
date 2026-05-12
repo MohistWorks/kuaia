@@ -7,9 +7,11 @@ import com.kuaia.common.rpc.AttemptStatus;
 import com.kuaia.common.rpc.BackpressureLevel;
 import com.kuaia.common.rpc.BackpressureSignal;
 import com.kuaia.common.rpc.CoordinatorMessage;
+import com.kuaia.common.rpc.HeartbeatResponse;
 import com.kuaia.common.rpc.RecordAck;
 import com.kuaia.common.rpc.TaskAck;
 import com.kuaia.common.rpc.TaskAttemptResult;
+import com.kuaia.common.rpc.WorkerHeartbeat;
 import com.kuaia.common.rpc.WorkerHello;
 import com.kuaia.common.rpc.WorkerMessage;
 import com.kuaia.engine.coordinator.registry.WorkerRegistry;
@@ -280,5 +282,40 @@ class CoordinatorServiceImplTest {
         WorkerRecord worker = store.getWorker("worker-1");
         assertEquals(WorkerRecord.WorkerState.OFFLINE, worker.getState());
         assertFalse(worker.isStreamConnected());
+    }
+
+    @Test
+    void heartbeatPersistsWorkerLoadAndHeartbeatTime() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        CoordinatorServiceImpl service = new CoordinatorServiceImpl(
+                new WorkerRegistry(),
+                null,
+                null,
+                store);
+        StreamObserver<CoordinatorMessage> responseObserver = mock(StreamObserver.class);
+        StreamObserver<WorkerMessage> requestObserver = service.taskStream(responseObserver);
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId("worker-1")
+                        .setHost("127.0.0.1")
+                        .setPort(9001)
+                        .build())
+                .build());
+        long previousHeartbeat = store.getWorker("worker-1").getLastHeartbeatMillis();
+        StreamObserver<HeartbeatResponse> heartbeatObserver = mock(StreamObserver.class);
+
+        service.heartbeat(WorkerHeartbeat.newBuilder()
+                        .setId("worker-1")
+                        .setCpuLoad(0.2)
+                        .setMemLoad(0.6)
+                        .build(),
+                heartbeatObserver);
+
+        WorkerRecord worker = store.getWorker("worker-1");
+        assertEquals(0.4, worker.getLoadScore(), 0.0001);
+        assertTrue(worker.getLastHeartbeatMillis() >= previousHeartbeat);
+        assertEquals(WorkerRecord.WorkerState.ONLINE, worker.getState());
+        assertTrue(worker.isStreamConnected());
     }
 }
