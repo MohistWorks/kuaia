@@ -23,10 +23,30 @@ public class BinaryRowTest {
     }
 
     @Test
+    public void growsVariableSectionForLargeStrings() {
+        BinaryRow row = new BinaryRow(2);
+        String large = repeat("x", 4096);
+
+        row.setString(0, large);
+        row.setString(1, large);
+
+        assertEquals(large, row.getString(0));
+        assertEquals(large, row.getString(1));
+    }
+
+    @Test
     public void testSetGetVector() {
         BinaryRow row = new BinaryRow(1);
         float[] vector = new float[]{0.1f, -0.2f, 3.14f};
         row.setVector(0, vector);
         assertArrayEquals(vector, row.getVector(0));
+    }
+
+    private String repeat(String value, int count) {
+        StringBuilder builder = new StringBuilder(value.length() * count);
+        for (int i = 0; i < count; i++) {
+            builder.append(value);
+        }
+        return builder.toString();
     }
 }

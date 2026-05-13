@@ -1,0 +1,22 @@
+name: local-jsonl-chunk-to-vector
+source:
+  type: file
+  path: data/articles.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: chunk
+    input: content
+    output: chunk
+    chunkSize: 12
+    overlap: 2
+  - type: mock-embedding
+    input: chunk
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: mock-vector
+checkpoint:
+  stateDir: .kuaia/state/local-jsonl-chunk-to-vector

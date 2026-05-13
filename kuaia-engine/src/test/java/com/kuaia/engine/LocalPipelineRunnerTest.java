@@ -110,6 +110,56 @@ class LocalPipelineRunnerTest {
     }
 
     @Test
+    void chunkedJsonlPipelineCountsSourceRowsAndWrittenChunksSeparately() throws Exception {
+        Path data = tempDir.resolve("chunked-documents.jsonl");
+        Files.write(data, "{\"id\":1,\"content\":\"abcdefghij\"}".getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("chunked-state");
+        Path configPath = tempDir.resolve("chunked-jsonl-vector.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: chunked-jsonl-vector",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "    chunkSize: 5",
+                "    overlap: 1",
+                "  - type: mock-embedding",
+                "    input: chunk",
+                "    output: embedding",
+                "    dimensions: 4",
+                "    batchSize: 10",
+                "sink:",
+                "  type: mock-vector",
+                "checkpoint:",
+                "  stateDir: " + stateDir).getBytes(StandardCharsets.UTF_8));
+        CapturingSink sink = new CapturingSink();
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+        SinkFactoryRegistry registry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PipelineRunSummary summary = new LocalPipelineRunner(registry)
+                .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(java.util.Arrays.asList(3), sink.batchSizes);
+        assertEquals(1L, summary.getRowsRead());
+        assertEquals(3L, summary.getRowsWritten());
+        assertEquals(1L, summary.getCheckpointSeq());
+        assertEquals(TaskState.COMPLETED, summary.getTaskState());
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-chunked-jsonl-vector");
+            assertNotNull(record);
+            assertEquals(TaskState.COMPLETED, record.getState());
+            assertEquals(1L, record.getLastCheckpointSeq());
+        }
+    }
+
+    @Test
     void checkpointsOncePerSuccessfulSinkBatch() throws Exception {
         Path data = tempDir.resolve("checkpointed-documents.csv");
         Files.write(data, String.join("\n",

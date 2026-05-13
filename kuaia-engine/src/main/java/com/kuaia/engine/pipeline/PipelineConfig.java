@@ -184,6 +184,8 @@ public class PipelineConfig {
         private final String apiKeyEnv;
         private final int timeoutMs;
         private final int batchSize;
+        private final int chunkSize;
+        private final int overlap;
 
         public TransformConfig(String type, List<String> fields, String from, String to) {
             this(type, fields, from, to, null, null, 4);
@@ -245,6 +247,26 @@ public class PipelineConfig {
                 String apiKeyEnv,
                 int timeoutMs,
                 int batchSize) {
+            this(type, fields, from, to, input, output, dimensions, provider, baseUrl, model, apiKeyEnv,
+                    timeoutMs, batchSize, 0, 0);
+        }
+
+        public TransformConfig(
+                String type,
+                List<String> fields,
+                String from,
+                String to,
+                String input,
+                String output,
+                int dimensions,
+                String provider,
+                String baseUrl,
+                String model,
+                String apiKeyEnv,
+                int timeoutMs,
+                int batchSize,
+                int chunkSize,
+                int overlap) {
             this.type = type;
             this.fields = Collections.unmodifiableList(new ArrayList<>(fields));
             this.from = from;
@@ -258,6 +280,8 @@ public class PipelineConfig {
             this.apiKeyEnv = apiKeyEnv;
             this.timeoutMs = timeoutMs;
             this.batchSize = batchSize;
+            this.chunkSize = chunkSize;
+            this.overlap = overlap;
         }
 
         public String getType() {
@@ -310,6 +334,14 @@ public class PipelineConfig {
 
         public int getBatchSize() {
             return batchSize;
+        }
+
+        public int getChunkSize() {
+            return chunkSize;
+        }
+
+        public int getOverlap() {
+            return overlap;
         }
     }
 

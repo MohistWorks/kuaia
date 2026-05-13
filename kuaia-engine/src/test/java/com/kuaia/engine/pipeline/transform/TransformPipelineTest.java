@@ -18,6 +18,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TransformPipelineTest {
     @Test
@@ -40,6 +41,114 @@ class TransformPipelineTest {
         assertArrayEquals(new float[]{4.0f, 2.0f}, outputs.get(1).getVector(2), 0.00001f);
     }
 
+    @Test
+    void chunkTransformExpandsRowsAndPreservesInputFields() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(chunkConfig(5, 1)));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Collections.singletonList(row(7L, "abcdefghij")));
+
+        assertArrayEquals(
+                new String[]{"id", "content", "chunk", "chunk_index"},
+                pipeline.getOutputType().getFieldNames());
+        assertArrayEquals(
+                new DataType[]{DataType.LONG, DataType.STRING, DataType.STRING, DataType.LONG},
+                pipeline.getOutputType().getFieldTypes());
+        assertEquals(3, outputs.size());
+        assertEquals(7L, outputs.get(0).getLong(0));
+        assertEquals("abcdefghij", outputs.get(0).getString(1));
+        assertEquals("abcde", outputs.get(0).getString(2));
+        assertEquals(0L, outputs.get(0).getLong(3));
+        assertEquals("efghi", outputs.get(1).getString(2));
+        assertEquals(1L, outputs.get(1).getLong(3));
+        assertEquals("ij", outputs.get(2).getString(2));
+        assertEquals(2L, outputs.get(2).getLong(3));
+    }
+
+    @Test
+    void chunkTransformEmitsNoRowsForEmptyText() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(chunkConfig(5, 1)));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Collections.singletonList(row(7L, "")));
+
+        assertEquals(0, outputs.size());
+    }
+
+    @Test
+    void chunkTransformRejectsUnknownInputField() {
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(rowType(), Collections.singletonList(
+                        new PipelineConfig.TransformConfig(
+                                "chunk",
+                                Collections.emptyList(),
+                                null,
+                                null,
+                                "missing",
+                                "chunk",
+                                0,
+                                null,
+                                null,
+                                null,
+                                null,
+                                30000,
+                                32,
+                                5,
+                                1))));
+
+        assertEquals("Unknown transform field: missing", error.getMessage());
+    }
+
+    @Test
+    void chunkTransformRejectsNonStringInputField() {
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(rowType(), Collections.singletonList(
+                        new PipelineConfig.TransformConfig(
+                                "chunk",
+                                Collections.emptyList(),
+                                null,
+                                null,
+                                "id",
+                                "chunk",
+                                0,
+                                null,
+                                null,
+                                null,
+                                null,
+                                30000,
+                                32,
+                                5,
+                                1))));
+
+        assertEquals("Transform field must be STRING: id", error.getMessage());
+    }
+
+    @Test
+    void chunkTransformRejectsDuplicateOutputField() {
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(rowType(), Collections.singletonList(chunkConfig("content", 5, 1))));
+
+        assertEquals("Duplicate transform field: content", error.getMessage());
+    }
+
+    @Test
+    void chunkTransformRejectsExistingChunkIndexField() {
+        KuaiaRowType inputType = new KuaiaRowType(
+                new String[]{"id", "content", "chunk_index"},
+                new DataType[]{DataType.LONG, DataType.STRING, DataType.LONG});
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(inputType, Collections.singletonList(chunkConfig(5, 1))));
+
+        assertEquals("Duplicate transform field: chunk_index", error.getMessage());
+    }
+
     private PipelineConfig.TransformConfig embeddingConfig(int batchSize) {
         return new PipelineConfig.TransformConfig(
                 "embedding",
@@ -55,6 +164,29 @@ class TransformPipelineTest {
                 null,
                 30000,
                 batchSize);
+    }
+
+    private PipelineConfig.TransformConfig chunkConfig(int chunkSize, int overlap) {
+        return chunkConfig("chunk", chunkSize, overlap);
+    }
+
+    private PipelineConfig.TransformConfig chunkConfig(String output, int chunkSize, int overlap) {
+        return new PipelineConfig.TransformConfig(
+                "chunk",
+                Collections.emptyList(),
+                null,
+                null,
+                "content",
+                output,
+                0,
+                null,
+                null,
+                null,
+                null,
+                30000,
+                32,
+                chunkSize,
+                overlap);
     }
 
     private KuaiaRowType rowType() {

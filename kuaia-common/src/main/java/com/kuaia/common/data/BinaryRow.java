@@ -28,11 +28,12 @@ public class BinaryRow {
     public void setString(int ordinal, String value) {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         int length = bytes.length;
+        ensureVariableCapacity(length);
         int offset = cursor;
-        
+
         System.arraycopy(bytes, 0, buffer, offset, length);
         cursor += length;
-        
+
         // Encode offset and length into the 8-byte slot
         long encoded = ((long) offset << 32) | (long) length;
         setLong(ordinal, encoded);
@@ -47,6 +48,7 @@ public class BinaryRow {
 
     public void setVector(int ordinal, float[] values) {
         int length = values.length * 4; // float is 4 bytes
+        ensureVariableCapacity(length);
         int offset = cursor;
 
         java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(buffer, offset, length).order(java.nio.ByteOrder.LITTLE_ENDIAN);
@@ -65,5 +67,19 @@ public class BinaryRow {
         java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(buffer, offset, lengthInElements * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < lengthInElements; i++) result[i] = bb.getFloat();
         return result;
+    }
+
+    private void ensureVariableCapacity(int length) {
+        int required = cursor + length;
+        if (required <= buffer.length) {
+            return;
+        }
+        int newLength = buffer.length;
+        while (newLength < required) {
+            newLength *= 2;
+        }
+        byte[] expanded = new byte[newLength];
+        System.arraycopy(buffer, 0, expanded, 0, cursor);
+        buffer = expanded;
     }
 }

@@ -149,6 +149,8 @@ public class PipelineConfigLoader {
                         parseBatchSize(transform.get("batchSize"))));
             } else if ("embedding".equals(type)) {
                 configs.add(loadEmbeddingTransform(transform, fieldPrefix));
+            } else if ("chunk".equals(type)) {
+                configs.add(loadChunkTransform(transform, fieldPrefix));
             } else {
                 throw new PipelineConfigException("Unsupported transform.type: " + type);
             }
@@ -234,6 +236,31 @@ public class PipelineConfigLoader {
                 require(transform, fieldPrefix + ".apiKeyEnv"),
                 timeoutMs,
                 batchSize);
+    }
+
+    private PipelineConfig.TransformConfig loadChunkTransform(Map<String, String> transform, String fieldPrefix)
+            throws PipelineConfigException {
+        int chunkSize = parseChunkSize(require(transform, fieldPrefix + ".chunkSize"));
+        int overlap = parseChunkOverlap(transform.get("overlap"));
+        if (overlap >= chunkSize) {
+            throw new PipelineConfigException("transform.overlap must be smaller than transform.chunkSize");
+        }
+        return new PipelineConfig.TransformConfig(
+                "chunk",
+                new ArrayList<>(),
+                null,
+                null,
+                require(transform, fieldPrefix + ".input"),
+                require(transform, fieldPrefix + ".output"),
+                0,
+                null,
+                null,
+                null,
+                null,
+                DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS,
+                DEFAULT_EMBEDDING_BATCH_SIZE,
+                chunkSize,
+                overlap);
     }
 
     private PipelineConfig.SinkConfig loadSink(Path configPath, String sinkType, Map<String, String> sink)
@@ -389,6 +416,33 @@ public class PipelineConfigLoader {
             return batchSize;
         } catch (NumberFormatException e) {
             throw new PipelineConfigException("Invalid transform.batchSize: " + value, e);
+        }
+    }
+
+    private int parseChunkSize(String value) throws PipelineConfigException {
+        try {
+            int chunkSize = Integer.parseInt(value.trim());
+            if (chunkSize <= 0) {
+                throw new PipelineConfigException("Invalid transform.chunkSize: " + value);
+            }
+            return chunkSize;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid transform.chunkSize: " + value, e);
+        }
+    }
+
+    private int parseChunkOverlap(String value) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return 0;
+        }
+        try {
+            int overlap = Integer.parseInt(value.trim());
+            if (overlap < 0) {
+                throw new PipelineConfigException("Invalid transform.overlap: " + value);
+            }
+            return overlap;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid transform.overlap: " + value, e);
         }
     }
 

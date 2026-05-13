@@ -93,6 +93,13 @@ public class TransformPipeline {
                     embeddingProviders.create(config),
                     config.getBatchSize());
         }
+        if ("chunk".equals(config.getType())) {
+            return new TextChunkTransform(
+                    config.getInput(),
+                    config.getOutput(),
+                    config.getChunkSize(),
+                    config.getOverlap());
+        }
         throw new PipelineExecutionException("Unsupported transform.type: " + config.getType());
     }
 

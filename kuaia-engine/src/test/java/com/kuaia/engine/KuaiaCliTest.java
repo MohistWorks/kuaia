@@ -49,6 +49,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/local-file-to-file.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-to-vector.yaml"));
+        assertTrue(result.output.contains("examples/local-jsonl-chunk-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-skip-bad-records.yaml"));
         assertTrue(result.output.contains("External service examples:"));
         assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));

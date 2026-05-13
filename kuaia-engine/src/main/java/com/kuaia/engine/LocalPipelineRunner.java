@@ -307,16 +307,16 @@ public class LocalPipelineRunner {
         }
         List<Long> seqIds = batch.seqIds();
         List<BinaryRow> outputs = transforms.applyBatch(batch.rows());
-        sink.writeBatch(outputs);
         long maxSeqId = maxSeqId(seqIds);
-        sink.committer().commit(new BatchCommit(split.getSplitId(), maxSeqId, outputs.size()));
-        counters.recordSinkBatch();
+        if (!outputs.isEmpty()) {
+            sink.writeBatch(outputs);
+            sink.committer().commit(new BatchCommit(split.getSplitId(), maxSeqId, outputs.size()));
+            counters.recordSinkBatch();
+        }
         if (committer != null) {
             committer.commit(maxSeqId);
         }
-        for (Long seqId : seqIds) {
-            counters.recordWritten(seqId);
-        }
+        counters.recordWrittenBatch(seqIds.size(), outputs.size(), maxSeqId);
         batch.clear();
     }
 
@@ -387,10 +387,10 @@ public class LocalPipelineRunner {
             sinkBatches++;
         }
 
-        private void recordWritten(long seqId) {
-            rowsRead++;
-            rowsWritten++;
-            checkpointSeq = seqId;
+        private void recordWrittenBatch(int sourceRows, int outputRows, long maxSeqId) {
+            rowsRead += sourceRows;
+            rowsWritten += outputRows;
+            checkpointSeq = maxSeqId;
         }
 
         private void recordFailed(long seqId) {
