@@ -315,6 +315,49 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsTrimTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("trim-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: trim-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: trim",
+                "    field: content",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig trim = config.getTransforms().get(0);
+        assertEquals("trim", trim.getType());
+        assertEquals("content", trim.getInput());
+    }
+
+    @Test
+    void rejectsMissingTrimTransformField() throws Exception {
+        Path configPath = tempDir.resolve("missing-trim-field.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-trim-field",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: trim",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].field", error.getMessage());
+    }
+
+    @Test
     void loadsFilterTransformConfig() throws Exception {
         Path configPath = tempDir.resolve("filter-transform.yaml");
         Files.write(configPath, String.join("\n",

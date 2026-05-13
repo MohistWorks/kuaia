@@ -148,6 +148,24 @@ Rules:
 - `from` must exist,
 - `to` must not duplicate another field name unless it is the same field.
 
+### trim
+
+```yaml
+transforms:
+  - type: trim
+    field: content
+```
+
+`trim` removes leading and trailing whitespace from a string field while
+preserving the row schema. It is useful before `filter`, `chunk`, or
+`embedding` in JSONL/RAG-style pipelines.
+
+Rules:
+
+- `field` must exist and be `STRING`,
+- the configured field is updated in place,
+- field names, field order, and field types are preserved.
+
 ### filter
 
 ```yaml

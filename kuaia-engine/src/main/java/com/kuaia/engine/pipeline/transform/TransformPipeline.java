@@ -93,6 +93,9 @@ public class TransformPipeline {
                     embeddingProviders.create(config),
                     config.getBatchSize());
         }
+        if ("trim".equals(config.getType())) {
+            return new TrimTransform(config.getInput());
+        }
         if ("filter".equals(config.getType())) {
             return new FilterTransform(config.getInput(), config.getOp());
         }

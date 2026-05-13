@@ -15,7 +15,7 @@ Kuaia is useful when you want to:
 
 - run a local CSV, JSONL, or Postgres batch pipeline from YAML,
 - transform records through a typed `BinaryRow` model,
-- filter empty text before embedding or chunking,
+- trim and filter empty text before embedding or chunking,
 - split JSONL document text into embed-ready chunks,
 - generate mock or OpenAI-compatible embeddings,
 - write to console, local CSV files, mock vector output, or Qdrant,
@@ -225,7 +225,7 @@ service requirements.
 | Area | Current support |
 | --- | --- |
 | Sources | `file` CSV and JSONL, batch `postgres` queries |
-| Transforms | `select`, `rename`, `filter`, `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
+| Transforms | `select`, `rename`, `trim`, `filter`, `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
 | Sinks | `console`, CSV `file`, `mock-vector`, `qdrant` |
 | Runtime | Linear batch pipeline, checkpoint resume, bad-record skip mode |
 | State | Local checkpoint state, in-memory and RocksDB state stores |
