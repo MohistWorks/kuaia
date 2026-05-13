@@ -109,7 +109,8 @@ For a transform:
 
 1. Add a `PipelineTransform` implementation.
 2. Add schema tests for `outputType`.
-3. Add row and batch tests for `apply` or `applyBatch`.
+3. Add row and batch tests for `apply` or `applyBatch`. Transforms that expand
+   one input row into multiple output rows should implement `applyBatch`.
 4. Wire the transform into `PipelineConfigLoader` and `TransformPipeline`.
 5. Document the YAML fields and unsupported cases.
 

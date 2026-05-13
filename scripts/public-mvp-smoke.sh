@@ -11,11 +11,13 @@ mkdir -p "$WORK_DIR/data" "$WORK_DIR/output" "$WORK_DIR/state"
 cp "$ROOT_DIR/examples/data/users.csv" "$WORK_DIR/data/users.csv"
 cp "$ROOT_DIR/examples/data/documents.csv" "$WORK_DIR/data/documents.csv"
 cp "$ROOT_DIR/examples/data/documents.jsonl" "$WORK_DIR/data/documents.jsonl"
+cp "$ROOT_DIR/examples/data/articles.jsonl" "$WORK_DIR/data/articles.jsonl"
 cp "$ROOT_DIR/examples/data/users-with-bad-row.csv" "$WORK_DIR/data/users-with-bad-row.csv"
 
 CSV_TO_FILE="$WORK_DIR/csv-to-file.yaml"
 CSV_TO_VECTOR="$WORK_DIR/csv-to-vector.yaml"
 JSONL_TO_VECTOR="$WORK_DIR/jsonl-to-vector.yaml"
+JSONL_CHUNK_TO_VECTOR="$WORK_DIR/jsonl-chunk-to-vector.yaml"
 SKIP_BAD_RECORDS="$WORK_DIR/skip-bad-records.yaml"
 
 cat > "$CSV_TO_FILE" <<EOF
@@ -79,6 +81,31 @@ checkpoint:
   stateDir: $WORK_DIR/state/jsonl-to-vector
 EOF
 
+cat > "$JSONL_CHUNK_TO_VECTOR" <<EOF
+name: public-mvp-jsonl-chunk-to-vector
+source:
+  type: file
+  path: data/articles.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: chunk
+    input: content
+    output: chunk
+    chunkSize: 12
+    overlap: 2
+  - type: mock-embedding
+    input: chunk
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: mock-vector
+checkpoint:
+  stateDir: $WORK_DIR/state/jsonl-chunk-to-vector
+EOF
+
 cat > "$SKIP_BAD_RECORDS" <<EOF
 name: public-mvp-skip-bad-records
 source:
@@ -135,6 +162,7 @@ fi
 
 run_pipeline "CSV to mock vector" "$CSV_TO_VECTOR"
 run_pipeline "JSONL to mock vector" "$JSONL_TO_VECTOR"
+run_pipeline "JSONL chunk to mock vector" "$JSONL_CHUNK_TO_VECTOR"
 run_pipeline "Skip malformed CSV records" "$SKIP_BAD_RECORDS"
 
 printf '\nPublic MVP smoke passed. Work dir: %s\n' "$WORK_DIR"

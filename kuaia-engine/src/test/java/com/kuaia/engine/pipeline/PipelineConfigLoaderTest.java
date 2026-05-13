@@ -212,6 +212,128 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsChunkTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("chunk-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: chunk-transform",
+                "source:",
+                "  type: file",
+                "  path: data/documents.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "    chunkSize: 5",
+                "    overlap: 1",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig chunk = config.getTransforms().get(0);
+        assertEquals("chunk", chunk.getType());
+        assertEquals("content", chunk.getInput());
+        assertEquals("chunk", chunk.getOutput());
+        assertEquals(5, chunk.getChunkSize());
+        assertEquals(1, chunk.getOverlap());
+    }
+
+    @Test
+    void defaultsChunkTransformOverlapToZero() throws Exception {
+        Path configPath = tempDir.resolve("chunk-transform-default-overlap.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: chunk-transform-default-overlap",
+                "source:",
+                "  type: file",
+                "  path: data/documents.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "    chunkSize: 5",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals(0, config.getTransforms().get(0).getOverlap());
+    }
+
+    @Test
+    void rejectsMissingChunkTransformChunkSize() throws Exception {
+        Path configPath = tempDir.resolve("missing-chunk-size.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-chunk-size",
+                "source:",
+                "  type: file",
+                "  path: data/documents.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].chunkSize", error.getMessage());
+    }
+
+    @Test
+    void rejectsInvalidChunkTransformChunkSize() throws Exception {
+        Path configPath = tempDir.resolve("invalid-chunk-size.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-chunk-size",
+                "source:",
+                "  type: file",
+                "  path: data/documents.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "    chunkSize: zero",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid transform.chunkSize: zero", error.getMessage());
+    }
+
+    @Test
+    void rejectsChunkTransformOverlapAtOrAboveChunkSize() throws Exception {
+        Path configPath = tempDir.resolve("invalid-chunk-overlap.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-chunk-overlap",
+                "source:",
+                "  type: file",
+                "  path: data/documents.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "    chunkSize: 5",
+                "    overlap: 5",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("transform.overlap must be smaller than transform.chunkSize", error.getMessage());
+    }
+
+    @Test
     void defaultsOpenAICompatibleEmbeddingBaseUrl() throws Exception {
         Path configPath = tempDir.resolve("default-openai-compatible-base-url.yaml");
         Files.write(configPath, String.join("\n",

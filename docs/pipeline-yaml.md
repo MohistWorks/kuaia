@@ -148,6 +148,37 @@ Rules:
 - `from` must exist,
 - `to` must not duplicate another field name unless it is the same field.
 
+### chunk
+
+```yaml
+transforms:
+  - type: chunk
+    input: content
+    output: chunk
+    chunkSize: 500
+    overlap: 50
+```
+
+`chunk` splits a string field into character-based text chunks. It preserves the
+original row fields and appends:
+
+- the configured `output` string field containing the chunk text,
+- `chunk_index` as a `LONG`, starting at `0` for each input row.
+
+Rules:
+
+- `input` must exist and be `STRING`,
+- `output` must not already exist,
+- `chunk_index` must not already exist,
+- `chunkSize` is required and must be a positive integer,
+- `overlap` is optional, defaults to `0`, and must be smaller than
+  `chunkSize`,
+- empty input text emits zero output rows,
+- chunking is character-based, not token-based.
+
+`chunk` can expand one source row into multiple output rows. Run summaries keep
+`rowsRead` as source rows and count `rowsWritten` as emitted output rows.
+
 ### mock-embedding
 
 ```yaml
@@ -481,6 +512,12 @@ Run JSONL through mock embedding to mock vector sink:
 bin/kuaia run -f examples/local-jsonl-to-vector.yaml
 ```
 
+Run JSONL through `chunk` and mock embedding:
+
+```bash
+bin/kuaia run -f examples/local-jsonl-chunk-to-vector.yaml
+```
+
 Run CSV through an OpenAI-compatible embedding provider:
 
 ```bash
@@ -552,6 +589,9 @@ Common examples:
 - `Invalid transform.dimensions: <value>`
 - `Invalid transform.timeoutMs: <value>`
 - `Invalid transform.batchSize: <value>`
+- `Invalid transform.chunkSize: <value>`
+- `Invalid transform.overlap: <value>`
+- `transform.overlap must be smaller than transform.chunkSize`
 - `Local path escapes allowed directories: <field>`
 - `Missing API key environment variable: <name>`
 - `Missing Postgres environment variable: <name>`
@@ -584,6 +624,8 @@ The current YAML contract does not support:
 - generic YAML features beyond the documented shape,
 - quoted CSV parsing,
 - nested JSONL objects, arrays, or null values,
+- token-based or semantic text chunking,
+- generated unique vector ids for chunked Qdrant writes,
 - transform DAGs,
 - filters, joins, casts, or aggregations,
 - CDC offsets,

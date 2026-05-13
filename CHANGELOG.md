@@ -8,6 +8,8 @@ All notable public changes to Kuaia are tracked here.
 
 - File sources now support `source.format: jsonl` for local JSON Lines
   pipelines, including a public JSONL-to-vector example and smoke coverage.
+- Added a `chunk` transform for character-based text chunking before embedding,
+  including a public JSONL chunk-to-vector example and smoke coverage.
 
 ### Changed
 
