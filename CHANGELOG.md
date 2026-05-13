@@ -30,6 +30,8 @@ All notable public changes to Kuaia are tracked here.
   release.
 - CSV file sinks now quote string values containing commas, quotes, or line
   breaks instead of rejecting them.
+- CSV file sources now parse quoted fields with commas, escaped quotes, and
+  line breaks as one logical source record.
 
 ## 0.1.1 - 2026-05-13
 

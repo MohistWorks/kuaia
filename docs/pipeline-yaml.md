@@ -61,7 +61,8 @@ CSV rules:
 - every data row must have the same number of columns as the header,
 - a field named `id` is parsed as `LONG`,
 - other fields are parsed as `STRING`,
-- quoted CSV fields are not supported in this MVP.
+- quoted CSV fields are supported for commas, escaped quotes, and line breaks
+  inside quoted values.
 
 JSONL rules:
 
@@ -722,7 +723,6 @@ Common examples:
 The current YAML contract does not support:
 
 - generic YAML features beyond the documented shape,
-- quoted CSV parsing,
 - nested JSONL objects, arrays, or null values,
 - token-based or semantic text chunking,
 - transform DAGs,
