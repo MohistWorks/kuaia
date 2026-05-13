@@ -52,7 +52,7 @@ public class FileSink implements SinkWriter {
                         StandardOpenOption.TRUNCATE_EXISTING};
         writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8, options);
         if (writeHeader) {
-            writer.write(String.join(",", rowType.getFieldNames()));
+            writer.write(formatCsvHeader());
             writer.newLine();
         }
     }
@@ -90,12 +90,24 @@ public class FileSink implements SinkWriter {
             case LONG:
                 return Long.toString(row.getLong(field));
             case STRING:
-                return validateCsvCell(row.getString(field));
+                return formatCsvCell(row.getString(field));
             case VECTOR:
                 return formatVector(row.getVector(field));
             default:
                 throw new PipelineExecutionException("File sink does not support field type: " + type);
         }
+    }
+
+    private String formatCsvHeader() {
+        StringBuilder line = new StringBuilder();
+        String[] fieldNames = rowType.getFieldNames();
+        for (int i = 0; i < fieldNames.length; i++) {
+            if (i > 0) {
+                line.append(',');
+            }
+            line.append(formatCsvCell(fieldNames[i]));
+        }
+        return line.toString();
     }
 
     private String formatJsonlRow(BinaryRow row) throws PipelineExecutionException {
@@ -142,11 +154,14 @@ public class FileSink implements SinkWriter {
         json.append("]");
     }
 
-    private String validateCsvCell(String value) throws PipelineExecutionException {
-        if (value.indexOf(',') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
-            throw new PipelineExecutionException("File sink does not support quoted CSV fields");
+    private String formatCsvCell(String value) {
+        if (value.indexOf(',') < 0
+                && value.indexOf('"') < 0
+                && value.indexOf('\n') < 0
+                && value.indexOf('\r') < 0) {
+            return value;
         }
-        return value;
+        return "\"" + value.replace("\"", "\"\"") + "\"";
     }
 
     private String formatVector(float[] vector) {
