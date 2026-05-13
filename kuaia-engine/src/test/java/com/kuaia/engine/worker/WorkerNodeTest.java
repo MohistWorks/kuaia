@@ -104,7 +104,7 @@ class WorkerNodeTest {
                                                     .setAttemptId("attempt-1")
                                                     .setDefinition(serializedDefinition("task-1"))
                                                     .setStartSeq(1L)
-                                                    .setLeaseUntilMillis(10_000L)
+                                                    .setLeaseUntilMillis(System.currentTimeMillis() + 10_000L)
                                                     .build())
                                             .build());
                                 }
@@ -148,6 +148,69 @@ class WorkerNodeTest {
     }
 
     @Test
+    void workerRejectsExpiredTypedTaskAssignmentLease() throws Exception {
+        CountDownLatch completed = new CountDownLatch(1);
+        AtomicReference<WorkerMessage> resultMessage = new AtomicReference<>();
+        Server server = ServerBuilder.forPort(0)
+                .addService(new CoordinatorServiceGrpc.CoordinatorServiceImplBase() {
+                    @Override
+                    public StreamObserver<WorkerMessage> taskStream(
+                            StreamObserver<CoordinatorMessage> responseObserver) {
+                        return new StreamObserver<WorkerMessage>() {
+                            @Override
+                            public void onNext(WorkerMessage value) {
+                                if (value.hasHello()) {
+                                    responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                            .setAssignment(TaskAssignment.newBuilder()
+                                                    .setTaskId("task-1")
+                                                    .setAttemptId("attempt-1")
+                                                    .setDefinition(serializedDefinition("task-1"))
+                                                    .setStartSeq(1L)
+                                                    .setLeaseUntilMillis(System.currentTimeMillis() - 1_000L)
+                                                    .build())
+                                            .build());
+                                }
+                                if (value.hasTaskResult()) {
+                                    resultMessage.compareAndSet(null, value);
+                                    completed.countDown();
+                                }
+                            }
+
+                            @Override
+                            public void onError(Throwable t) {
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                            }
+                        };
+                    }
+                })
+                .build()
+                .start();
+        String workerId = "worker-expired-assignment-test-" + System.nanoTime();
+        WorkerNode worker = new WorkerNode(workerId);
+
+        try {
+            worker.start("127.0.0.1", server.getPort());
+
+            assertTrue(completed.await(3, TimeUnit.SECONDS), "worker should reject expired assignment lease");
+            WorkerMessage message = resultMessage.get();
+            assertEquals(workerId, message.getWorkerId());
+            assertTrue(message.hasTaskResult());
+            assertEquals("task-1", message.getTaskResult().getTaskId());
+            assertEquals("attempt-1", message.getTaskResult().getAttemptId());
+            assertEquals(workerId, message.getTaskResult().getWorkerId());
+            assertEquals(AttemptStatus.ATTEMPT_FAILED, message.getTaskResult().getStatus());
+            assertEquals("INVALID_ASSIGNMENT", message.getTaskResult().getErrorCode());
+        } finally {
+            worker.stop();
+            server.shutdownNow();
+            server.awaitTermination(3, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
     void workerRejectsMalformedTypedTaskAssignment() throws Exception {
         CountDownLatch completed = new CountDownLatch(1);
         AtomicReference<WorkerMessage> resultMessage = new AtomicReference<>();
@@ -164,7 +227,7 @@ class WorkerNodeTest {
                                             .setAssignment(TaskAssignment.newBuilder()
                                                     .setTaskId("task-1")
                                                     .setStartSeq(1L)
-                                                    .setLeaseUntilMillis(10_000L)
+                                                    .setLeaseUntilMillis(System.currentTimeMillis() + 10_000L)
                                                     .build())
                                             .build());
                                 }
@@ -225,7 +288,7 @@ class WorkerNodeTest {
                                                     .setTaskId("task-1")
                                                     .setAttemptId("attempt-1")
                                                     .setStartSeq(1L)
-                                                    .setLeaseUntilMillis(10_000L)
+                                                    .setLeaseUntilMillis(System.currentTimeMillis() + 10_000L)
                                                     .build())
                                             .build());
                                 }
@@ -288,7 +351,7 @@ class WorkerNodeTest {
                                                     .setAttemptId("attempt-1")
                                                     .setDefinition(ByteString.copyFromUtf8("not-a-serialized-task-definition"))
                                                     .setStartSeq(1L)
-                                                    .setLeaseUntilMillis(10_000L)
+                                                    .setLeaseUntilMillis(System.currentTimeMillis() + 10_000L)
                                                     .build())
                                             .build());
                                 }
@@ -351,7 +414,7 @@ class WorkerNodeTest {
                                                     .setAttemptId("attempt-1")
                                                     .setDefinition(serializedDefinition("other-task"))
                                                     .setStartSeq(1L)
-                                                    .setLeaseUntilMillis(10_000L)
+                                                    .setLeaseUntilMillis(System.currentTimeMillis() + 10_000L)
                                                     .build())
                                             .build());
                                 }
