@@ -18,7 +18,7 @@ class TaskAckHandlerTest {
     void staleAttemptResultDoesNotCompleteTask() {
         InMemoryStateStore store = new InMemoryStateStore();
         TaskRecord current = TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-2", "attempt-2", 20_000L)
+                .dispatching("worker-2", "attempt-2", System.currentTimeMillis() + 20_000L)
                 .running();
         store.saveTask(current);
         TaskAckHandler handler = new TaskAckHandler(store);
@@ -38,7 +38,7 @@ class TaskAckHandlerTest {
     void currentAttemptSuccessCompletesTask() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running());
         TaskAckHandler handler = new TaskAckHandler(store);
 
@@ -54,10 +54,29 @@ class TaskAckHandlerTest {
     }
 
     @Test
+    void expiredAttemptResultDoesNotCompleteTask() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        store.saveTask(TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() - 1_000L)
+                .running());
+        TaskAckHandler handler = new TaskAckHandler(store);
+
+        boolean accepted = handler.handleTaskAttemptResult(TaskAttemptResult.newBuilder()
+                .setTaskId("task-1")
+                .setAttemptId("attempt-1")
+                .setWorkerId("worker-1")
+                .setStatus(AttemptStatus.ATTEMPT_SUCCESS)
+                .build());
+
+        assertFalse(accepted);
+        assertEquals(TaskState.RUNNING, store.getTask("task-1").getState());
+    }
+
+    @Test
     void duplicateTaskAttemptResultDoesNotMutateCompletedTask() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running());
         TaskAckHandler handler = new TaskAckHandler(store);
         TaskAttemptResult result = TaskAttemptResult.newBuilder()
@@ -79,7 +98,7 @@ class TaskAckHandlerTest {
     void currentAttemptFailureFailsTask() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running());
         TaskAckHandler handler = new TaskAckHandler(store);
 
@@ -103,7 +122,7 @@ class TaskAckHandlerTest {
     void currentAttemptCancellationCancelsTask() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running());
         TaskAckHandler handler = new TaskAckHandler(store);
 
@@ -125,7 +144,7 @@ class TaskAckHandlerTest {
     void checkpointAckOnlyAdvancesForCurrentAttempt() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running());
         TaskAckHandler handler = new TaskAckHandler(store);
 
@@ -150,7 +169,7 @@ class TaskAckHandlerTest {
     void recordAckDoesNotCompleteTask() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running());
         TaskAckHandler handler = new TaskAckHandler(store);
 
