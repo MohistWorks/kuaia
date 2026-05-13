@@ -125,16 +125,18 @@ public class WorkerNode {
             private boolean isInvalidAssignment(TaskAssignment assignment) {
                 return assignment.getTaskId().isEmpty()
                         || assignment.getAttemptId().isEmpty()
-                        || !hasValidDefinition(assignment);
+                        || !hasMatchingDefinition(assignment);
             }
 
-            private boolean hasValidDefinition(TaskAssignment assignment) {
+            private boolean hasMatchingDefinition(TaskAssignment assignment) {
                 if (assignment.getDefinition().isEmpty()) {
                     return false;
                 }
                 try (ObjectInputStream objectStream = new ObjectInputStream(
                         new ByteArrayInputStream(assignment.getDefinition().toByteArray()))) {
-                    return objectStream.readObject() instanceof TaskDefinition;
+                    Object value = objectStream.readObject();
+                    return value instanceof TaskDefinition
+                            && assignment.getTaskId().equals(((TaskDefinition) value).getTaskId());
                 } catch (IOException | ClassNotFoundException e) {
                     return false;
                 }
