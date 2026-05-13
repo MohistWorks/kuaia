@@ -64,6 +64,8 @@ All notable public changes to Kuaia are tracked here.
   success after the assignment lease has elapsed.
 - Worker hello replay now moves expired active assignments back to retrying
   instead of resending stale leases to reconnecting workers.
+- Coordinator ack handling now rejects expired attempts before applying typed
+  record, checkpoint, or task-result acknowledgements.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.

@@ -40,7 +40,7 @@ class CoordinatorServiceImplTest {
     void typedAckOnlyMessageDoesNotClearHighBackpressure() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running());
         CoordinatorServiceImpl service = new CoordinatorServiceImpl(
                 new WorkerRegistry(),
@@ -76,7 +76,7 @@ class CoordinatorServiceImplTest {
     void typedTaskAttemptResultUpdatesTaskState() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running());
         CoordinatorServiceImpl service = new CoordinatorServiceImpl(
                 new WorkerRegistry(),

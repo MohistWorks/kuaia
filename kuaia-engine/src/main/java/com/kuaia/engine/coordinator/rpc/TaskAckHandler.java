@@ -66,6 +66,7 @@ public class TaskAckHandler {
     private boolean isCurrentRunningAttempt(TaskRecord record, String attemptId, String workerId) {
         return record != null
                 && record.getState() == TaskState.RUNNING
+                && record.getLeaseUntilMillis() > System.currentTimeMillis()
                 && attemptId.equals(record.getAttemptId())
                 && workerId.equals(record.getAssignedWorkerId());
     }
