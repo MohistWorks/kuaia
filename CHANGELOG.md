@@ -4,6 +4,11 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+### Changed
+
+- Main branch development version is now `0.1.2-SNAPSHOT` after the `v0.1.1`
+  release.
+
 ## 0.1.1 - 2026-05-13
 
 ### Added
