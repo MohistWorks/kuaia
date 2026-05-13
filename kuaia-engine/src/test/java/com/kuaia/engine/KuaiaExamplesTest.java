@@ -55,6 +55,9 @@ class KuaiaExamplesTest {
         PipelineConfig postgresToQdrant = new PipelineConfigLoader().load(postgresToQdrantPath);
 
         assertTrue(read(fileToQdrantPath).contains("timeoutMs: 30000"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-vector.yaml")).contains("op: not-empty"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-chunk-to-vector.yaml")).contains("op: not-empty"));
+        assertTrue(read(chunkToQdrantPath).contains("op: not-empty"));
         assertTrue(read(chunkToQdrantPath).contains("chunkIndexField: chunk_index"));
         assertTrue(read(chunkToQdrantPath).contains("chunkIdMultiplier: 1000000"));
         assertTrue(read(chunkToQdrantPath).contains("dropInput: true"));

@@ -18,8 +18,9 @@ work directory:
 
 - CSV source through `select` and `rename` transforms into a local CSV file,
 - CSV source through `mock-embedding` into the mock vector sink,
-- JSONL source through `mock-embedding` into the mock vector sink,
-- JSONL source through `chunk` and `mock-embedding` into the mock vector sink,
+- JSONL source through `filter` and `mock-embedding` into the mock vector sink,
+- JSONL source through `filter`, `chunk`, and `mock-embedding` into the mock
+  vector sink,
 - malformed CSV handling with `errorPolicy.mode: skip-bad-records`.
 
 After that, run individual examples below when you want to inspect one pipeline
@@ -89,9 +90,9 @@ external model or vector database.
 bin/kuaia run -f examples/local-jsonl-to-vector.yaml
 ```
 
-Reads `examples/data/documents.jsonl`, creates deterministic local embeddings,
-and prints mock vector sink summaries. This is useful for document or event
-data that is already stored as JSON Lines.
+Reads `examples/data/documents.jsonl`, filters empty `content` values, creates
+deterministic local embeddings, and prints mock vector sink summaries. This is
+useful for document or event data that is already stored as JSON Lines.
 
 ## JSONL Chunked Vector Pipeline
 
@@ -99,11 +100,11 @@ data that is already stored as JSON Lines.
 bin/kuaia run -f examples/local-jsonl-chunk-to-vector.yaml
 ```
 
-Reads `examples/data/articles.jsonl`, splits each `content` field into
-character-based chunks, creates deterministic local embeddings for each chunk,
-and prints mock vector sink summaries. It is the recommended no-service path for
-checking document chunking before using a real embedding provider or vector
-database.
+Reads `examples/data/articles.jsonl`, filters empty `content` values, splits
+each remaining `content` field into character-based chunks, creates
+deterministic local embeddings for each chunk, and prints mock vector sink
+summaries. It is the recommended no-service path for checking document chunking
+before using a real embedding provider or vector database.
 
 ## OpenAI-Compatible Embedding Pipeline
 
@@ -157,12 +158,13 @@ Then run:
 bin/kuaia run -f examples/local-jsonl-chunk-to-qdrant.yaml
 ```
 
-This example reads `examples/data/articles.jsonl`, splits each document into
-chunks, generates deterministic mock embeddings, and writes Qdrant point ids as
-`id * 1000000 + chunk_index` so chunks from the same document do not overwrite
-each other. It also sets `dropInput: true` and `includeOffsets: true` so Qdrant
-payloads keep `chunk`, `chunk_index`, `chunk_start`, and `chunk_end` without
-repeating the full source document text on every point.
+This example reads `examples/data/articles.jsonl`, filters empty `content`
+values, splits each remaining document into chunks, generates deterministic mock
+embeddings, and writes Qdrant point ids as `id * 1000000 + chunk_index` so chunks
+from the same document do not overwrite each other. It also sets
+`dropInput: true` and `includeOffsets: true` so Qdrant payloads keep `chunk`,
+`chunk_index`, `chunk_start`, and `chunk_end` without repeating the full source
+document text on every point.
 
 ## Postgres To Qdrant
 

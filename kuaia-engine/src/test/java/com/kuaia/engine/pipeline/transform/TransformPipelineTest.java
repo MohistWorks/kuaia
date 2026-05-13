@@ -42,6 +42,45 @@ class TransformPipelineTest {
     }
 
     @Test
+    void filterTransformDropsEmptyAndWhitespaceStrings() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(filterConfig("content", "not-empty")));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Arrays.asList(
+                row(1L, "Alpha"),
+                row(2L, ""),
+                row(3L, "   "),
+                row(4L, "Beta")));
+
+        assertArrayEquals(new String[]{"id", "content"}, pipeline.getOutputType().getFieldNames());
+        assertArrayEquals(new DataType[]{DataType.LONG, DataType.STRING}, pipeline.getOutputType().getFieldTypes());
+        assertEquals(2, outputs.size());
+        assertEquals(1L, outputs.get(0).getLong(0));
+        assertEquals("Alpha", outputs.get(0).getString(1));
+        assertEquals(4L, outputs.get(1).getLong(0));
+        assertEquals("Beta", outputs.get(1).getString(1));
+    }
+
+    @Test
+    void filterTransformRejectsUnknownField() {
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(rowType(), Collections.singletonList(filterConfig("missing", "not-empty"))));
+
+        assertEquals("Unknown transform field: missing", error.getMessage());
+    }
+
+    @Test
+    void filterTransformRejectsNonStringField() {
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(rowType(), Collections.singletonList(filterConfig("id", "not-empty"))));
+
+        assertEquals("Transform field must be STRING: id", error.getMessage());
+    }
+
+    @Test
     void chunkTransformExpandsRowsAndPreservesInputFields() throws Exception {
         TransformPipeline pipeline = TransformPipeline.from(
                 rowType(),
@@ -194,6 +233,28 @@ class TransformPipelineTest {
                 null,
                 30000,
                 batchSize);
+    }
+
+    private PipelineConfig.TransformConfig filterConfig(String field, String op) {
+        return new PipelineConfig.TransformConfig(
+                "filter",
+                Collections.emptyList(),
+                null,
+                null,
+                field,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null,
+                30000,
+                32,
+                0,
+                0,
+                false,
+                false,
+                op);
     }
 
     private PipelineConfig.TransformConfig chunkConfig(int chunkSize, int overlap) {

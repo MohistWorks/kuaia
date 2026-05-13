@@ -46,6 +46,7 @@ Supported transforms:
 
 - `select`,
 - `rename`,
+- `filter` with `op: not-empty`,
 - `chunk`,
 - deterministic local `mock-embedding`,
 - OpenAI-compatible `embedding` requests.
@@ -63,6 +64,7 @@ Supported runtime behavior:
 - linear transform chains,
 - RocksDB-backed local checkpoints,
 - bad-record skipping for malformed CSV or JSONL rows,
+- empty-text filtering before embedding or chunking,
 - character-based text chunking for local document pipelines,
 - chunk payload controls for omitting repeated source text and keeping
   character offsets,

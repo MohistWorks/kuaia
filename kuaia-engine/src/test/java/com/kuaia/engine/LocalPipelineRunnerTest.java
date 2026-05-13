@@ -160,6 +160,57 @@ class LocalPipelineRunnerTest {
     }
 
     @Test
+    void filteredJsonlPipelineCountsSourceRowsAndWrittenRowsSeparately() throws Exception {
+        Path data = tempDir.resolve("filtered-documents.jsonl");
+        Files.write(data, String.join("\n",
+                "{\"id\":1,\"content\":\"Alpha\"}",
+                "{\"id\":2,\"content\":\"\"}",
+                "{\"id\":3,\"content\":\"   \"}").getBytes(StandardCharsets.UTF_8));
+        Path stateDir = tempDir.resolve("filtered-state");
+        Path configPath = tempDir.resolve("filtered-jsonl-vector.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: filtered-jsonl-vector",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: not-empty",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "    batchSize: 10",
+                "sink:",
+                "  type: mock-vector",
+                "checkpoint:",
+                "  stateDir: " + stateDir).getBytes(StandardCharsets.UTF_8));
+        CapturingSink sink = new CapturingSink();
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+        SinkFactoryRegistry registry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PipelineRunSummary summary = new LocalPipelineRunner(registry)
+                .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(java.util.Arrays.asList(1), sink.batchSizes);
+        assertEquals(3L, summary.getRowsRead());
+        assertEquals(1L, summary.getRowsWritten());
+        assertEquals(3L, summary.getCheckpointSeq());
+        assertEquals(TaskState.COMPLETED, summary.getTaskState());
+        try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
+            TaskRecord record = store.getTask("local-pipeline-filtered-jsonl-vector");
+            assertNotNull(record);
+            assertEquals(TaskState.COMPLETED, record.getState());
+            assertEquals(3L, record.getLastCheckpointSeq());
+        }
+    }
+
+    @Test
     void checkpointsOncePerSuccessfulSinkBatch() throws Exception {
         Path data = tempDir.resolve("checkpointed-documents.csv");
         Files.write(data, String.join("\n",

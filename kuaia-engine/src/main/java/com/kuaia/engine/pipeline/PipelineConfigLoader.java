@@ -150,6 +150,8 @@ public class PipelineConfigLoader {
                         parseBatchSize(transform.get("batchSize"))));
             } else if ("embedding".equals(type)) {
                 configs.add(loadEmbeddingTransform(transform, fieldPrefix));
+            } else if ("filter".equals(type)) {
+                configs.add(loadFilterTransform(transform, fieldPrefix));
             } else if ("chunk".equals(type)) {
                 configs.add(loadChunkTransform(transform, fieldPrefix));
             } else {
@@ -237,6 +239,31 @@ public class PipelineConfigLoader {
                 require(transform, fieldPrefix + ".apiKeyEnv"),
                 timeoutMs,
                 batchSize);
+    }
+
+    private PipelineConfig.TransformConfig loadFilterTransform(Map<String, String> transform, String fieldPrefix)
+            throws PipelineConfigException {
+        String op = require(transform, fieldPrefix + ".op");
+        requireSupported(fieldPrefix + ".op", op, "not-empty");
+        return new PipelineConfig.TransformConfig(
+                "filter",
+                new ArrayList<>(),
+                null,
+                null,
+                require(transform, fieldPrefix + ".field"),
+                null,
+                0,
+                null,
+                null,
+                null,
+                null,
+                DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS,
+                DEFAULT_EMBEDDING_BATCH_SIZE,
+                0,
+                0,
+                false,
+                false,
+                op);
     }
 
     private PipelineConfig.TransformConfig loadChunkTransform(Map<String, String> transform, String fieldPrefix)
