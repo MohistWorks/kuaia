@@ -54,6 +54,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("External service examples:"));
         assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-qdrant.yaml"));
+        assertTrue(result.output.contains("examples/local-jsonl-chunk-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/postgres-to-qdrant.yaml"));
     }
 

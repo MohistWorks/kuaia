@@ -1,0 +1,30 @@
+name: local-jsonl-chunk-to-qdrant
+source:
+  type: file
+  path: data/articles.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: chunk
+    input: content
+    output: chunk
+    chunkSize: 12
+    overlap: 2
+  - type: mock-embedding
+    input: chunk
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: qdrant
+  url: http://localhost:6333
+  collection: kuaia_article_chunks
+  idField: id
+  vectorField: embedding
+  chunkIndexField: chunk_index
+  chunkIdMultiplier: 1000000
+  wait: true
+  timeoutMs: 30000
+checkpoint:
+  stateDir: .kuaia/state/local-jsonl-chunk-to-qdrant

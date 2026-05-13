@@ -14,6 +14,7 @@ public class PipelineConfigLoader {
     private static final String DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
     private static final int DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS = 30_000;
     private static final int DEFAULT_QDRANT_TIMEOUT_MS = 30_000;
+    private static final long DEFAULT_QDRANT_CHUNK_ID_MULTIPLIER = 1_000_000L;
     private static final int DEFAULT_EMBEDDING_BATCH_SIZE = 32;
     private static final String RESTRICT_LOCAL_PATHS_ENV = "KUAIA_RESTRICT_LOCAL_PATHS";
 
@@ -271,6 +272,12 @@ public class PipelineConfigLoader {
         if (hasText(sink.get("timeoutMs"))) {
             throw new PipelineConfigException("sink.timeoutMs is only supported for sink.type: qdrant");
         }
+        if (hasText(sink.get("chunkIndexField"))) {
+            throw new PipelineConfigException("sink.chunkIndexField is only supported for sink.type: qdrant");
+        }
+        if (hasText(sink.get("chunkIdMultiplier"))) {
+            throw new PipelineConfigException("sink.chunkIdMultiplier is only supported for sink.type: qdrant");
+        }
         if (!"file".equals(sinkType)) {
             return new PipelineConfig.SinkConfig(sinkType);
         }
@@ -295,6 +302,13 @@ public class PipelineConfigLoader {
             requireSupported("sink.wait", wait, "true", "false");
             waitForCommit = Boolean.parseBoolean(wait);
         }
+        String chunkIndexField = sink.get("chunkIndexField");
+        if (!hasText(chunkIndexField) && hasText(sink.get("chunkIdMultiplier"))) {
+            throw new PipelineConfigException("sink.chunkIdMultiplier requires sink.chunkIndexField");
+        }
+        long chunkIdMultiplier = hasText(chunkIndexField)
+                ? parseQdrantChunkIdMultiplier(sink.get("chunkIdMultiplier"), DEFAULT_QDRANT_CHUNK_ID_MULTIPLIER)
+                : 0L;
         return new PipelineConfig.SinkConfig(
                 "qdrant",
                 null,
@@ -306,7 +320,9 @@ public class PipelineConfigLoader {
                 require(sink, "sink.idField"),
                 require(sink, "sink.vectorField"),
                 waitForCommit,
-                parseSinkTimeoutMs(sink.get("timeoutMs"), DEFAULT_QDRANT_TIMEOUT_MS));
+                parseSinkTimeoutMs(sink.get("timeoutMs"), DEFAULT_QDRANT_TIMEOUT_MS),
+                hasText(chunkIndexField) ? chunkIndexField : null,
+                chunkIdMultiplier);
     }
 
     private PipelineConfig.ErrorPolicyConfig loadErrorPolicy(Map<String, String> errorPolicy)
@@ -458,6 +474,21 @@ public class PipelineConfigLoader {
             return timeoutMs;
         } catch (NumberFormatException e) {
             throw new PipelineConfigException("Invalid sink.timeoutMs: " + value, e);
+        }
+    }
+
+    private long parseQdrantChunkIdMultiplier(String value, long defaultMultiplier) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return defaultMultiplier;
+        }
+        try {
+            long multiplier = Long.parseLong(value.trim());
+            if (multiplier <= 0L) {
+                throw new PipelineConfigException("Invalid sink.chunkIdMultiplier: " + value);
+            }
+            return multiplier;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid sink.chunkIdMultiplier: " + value, e);
         }
     }
 

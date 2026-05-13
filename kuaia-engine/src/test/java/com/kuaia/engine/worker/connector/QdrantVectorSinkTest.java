@@ -78,6 +78,70 @@ class QdrantVectorSinkTest {
     }
 
     @Test
+    void writesChunkedRowsWithGeneratedPointIds() throws Exception {
+        CapturedRequest captured = startServer(200, "{\"status\":\"ok\"}");
+        PipelineConfig.SinkConfig config = configWithChunkIds(
+                baseUrl(),
+                "docs",
+                "id",
+                "embedding",
+                "chunk_index",
+                1000L);
+        QdrantVectorSink sink = new QdrantVectorSink(chunkedRowType(), config, Collections.emptyMap());
+
+        sink.open();
+        sink.writeBatch(Arrays.asList(
+                chunkedRow(7L, "Alpha chunk 0", 0L, new float[]{1.0f, 2.0f}),
+                chunkedRow(7L, "Alpha chunk 1", 1L, new float[]{3.0f, 4.0f})));
+        sink.close();
+
+        assertEquals(
+                "{\"points\":["
+                        + "{\"id\":7000,\"vector\":[1.0,2.0],\"payload\":{\"id\":7,\"chunk\":\"Alpha chunk 0\",\"chunk_index\":0}},"
+                        + "{\"id\":7001,\"vector\":[3.0,4.0],\"payload\":{\"id\":7,\"chunk\":\"Alpha chunk 1\",\"chunk_index\":1}}"
+                        + "]}",
+                captured.body);
+    }
+
+    @Test
+    void requiresLongChunkIndexField() {
+        KuaiaRowType rowType = new KuaiaRowType(
+                new String[]{"id", "chunk_index", "embedding"},
+                new DataType[]{DataType.LONG, DataType.STRING, DataType.VECTOR});
+        PipelineConfig.SinkConfig config = configWithChunkIds(
+                "http://localhost:6333",
+                "docs",
+                "id",
+                "embedding",
+                "chunk_index",
+                1000L);
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> new QdrantVectorSink(rowType, config, Collections.emptyMap()));
+
+        assertEquals("Qdrant sink requires LONG field: chunk_index", error.getMessage());
+    }
+
+    @Test
+    void rejectsGeneratedPointIdOverflow() throws Exception {
+        PipelineConfig.SinkConfig config = configWithChunkIds(
+                "http://localhost:6333",
+                "docs",
+                "id",
+                "embedding",
+                "chunk_index",
+                2L);
+        QdrantVectorSink sink = new QdrantVectorSink(chunkedRowType(), config, Collections.emptyMap());
+        BinaryRow row = chunkedRow(Long.MAX_VALUE, "Alpha", 1L, new float[]{1.0f, 2.0f});
+
+        PipelineExecutionException error = assertThrows(PipelineExecutionException.class, () -> sink.write(row));
+
+        assertEquals("Qdrant generated point id overflow for id 9223372036854775807 and chunk index 1",
+                error.getMessage());
+    }
+
+    @Test
     void appliesConfiguredTimeoutToUpsertConnection() throws Exception {
         CapturingConnection connection = new CapturingConnection();
         PipelineConfig.SinkConfig config = config(
@@ -225,6 +289,12 @@ class QdrantVectorSinkTest {
                 new DataType[]{DataType.LONG, DataType.STRING, DataType.VECTOR});
     }
 
+    private KuaiaRowType chunkedRowType() {
+        return new KuaiaRowType(
+                new String[]{"id", "chunk", "chunk_index", "embedding"},
+                new DataType[]{DataType.LONG, DataType.STRING, DataType.LONG, DataType.VECTOR});
+    }
+
     private BinaryRow row() {
         return row(7L, "Alpha", new float[]{1.0f, 2.0f});
     }
@@ -234,6 +304,15 @@ class QdrantVectorSinkTest {
         row.setLong(0, id);
         row.setString(1, content);
         row.setVector(2, vector);
+        return row;
+    }
+
+    private BinaryRow chunkedRow(long id, String chunk, long chunkIndex, float[] vector) {
+        BinaryRow row = new BinaryRow(4);
+        row.setLong(0, id);
+        row.setString(1, chunk);
+        row.setLong(2, chunkIndex);
+        row.setVector(3, vector);
         return row;
     }
 
@@ -267,6 +346,29 @@ class QdrantVectorSinkTest {
                 vectorField,
                 wait,
                 timeoutMs);
+    }
+
+    private PipelineConfig.SinkConfig configWithChunkIds(
+            String url,
+            String collection,
+            String idField,
+            String vectorField,
+            String chunkIndexField,
+            long chunkIdMultiplier) {
+        return new PipelineConfig.SinkConfig(
+                "qdrant",
+                null,
+                null,
+                null,
+                url,
+                collection,
+                null,
+                idField,
+                vectorField,
+                true,
+                0,
+                chunkIndexField,
+                chunkIdMultiplier);
     }
 
     private Map<String, String> env(String key, String value) {

@@ -48,14 +48,20 @@ class KuaiaExamplesTest {
     @Test
     void externalServiceExamplesIncludeTuningOptions() throws Exception {
         Path fileToQdrantPath = repoRoot().resolve("examples/local-file-to-qdrant.yaml");
+        Path chunkToQdrantPath = repoRoot().resolve("examples/local-jsonl-chunk-to-qdrant.yaml");
         Path postgresToQdrantPath = repoRoot().resolve("examples/postgres-to-qdrant.yaml");
         PipelineConfig fileToQdrant = new PipelineConfigLoader().load(fileToQdrantPath);
+        PipelineConfig chunkToQdrant = new PipelineConfigLoader().load(chunkToQdrantPath);
         PipelineConfig postgresToQdrant = new PipelineConfigLoader().load(postgresToQdrantPath);
 
         assertTrue(read(fileToQdrantPath).contains("timeoutMs: 30000"));
+        assertTrue(read(chunkToQdrantPath).contains("chunkIndexField: chunk_index"));
+        assertTrue(read(chunkToQdrantPath).contains("chunkIdMultiplier: 1000000"));
         assertTrue(read(postgresToQdrantPath).contains("fetchSize: 1000"));
         assertTrue(read(postgresToQdrantPath).contains("timeoutMs: 30000"));
         assertEquals(30000, fileToQdrant.getSink().getTimeoutMs());
+        assertEquals("chunk_index", chunkToQdrant.getSink().getChunkIndexField());
+        assertEquals(1_000_000L, chunkToQdrant.getSink().getChunkIdMultiplier());
         assertEquals(1000, postgresToQdrant.getSource().getFetchSize());
         assertEquals(30000, postgresToQdrant.getSink().getTimeoutMs());
     }

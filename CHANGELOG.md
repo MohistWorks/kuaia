@@ -10,6 +10,9 @@ All notable public changes to Kuaia are tracked here.
   pipelines, including a public JSONL-to-vector example and smoke coverage.
 - Added a `chunk` transform for character-based text chunking before embedding,
   including a public JSONL chunk-to-vector example and smoke coverage.
+- Qdrant sinks can now generate stable chunk point ids with
+  `chunkIndexField` and `chunkIdMultiplier`, with a public JSONL
+  chunk-to-Qdrant example.
 
 ### Changed
 
