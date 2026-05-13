@@ -47,6 +47,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("make public-mvp-smoke"));
         assertTrue(result.output.contains("No external services:"));
         assertTrue(result.output.contains("examples/local-file-to-file.yaml"));
+        assertTrue(result.output.contains("examples/local-jsonl-to-file.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-chunk-to-vector.yaml"));
@@ -228,6 +229,42 @@ class KuaiaCliTest {
                         "1,Alice",
                         "2,Bob"),
                 String.join("\n", Files.readAllLines(output, StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void runWritesDeclarativePipelineToJsonlFile() throws Exception {
+        Path data = tempDir.resolve("documents-file-sink.jsonl");
+        Files.write(data, String.join("\n",
+                "{\"id\":1,\"content\":\"  Alpha  \"}",
+                "{\"id\":2,\"content\":\"   \"}").getBytes(StandardCharsets.UTF_8));
+        Path output = tempDir.resolve("out/documents.jsonl");
+        Path config = tempDir.resolve("local-jsonl-to-file.yaml");
+        Files.write(config, String.join("\n",
+                "name: local-jsonl-to-file",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: jsonl",
+                "transforms:",
+                "  - type: trim",
+                "    field: content",
+                "  - type: filter",
+                "    field: content",
+                "    op: not-empty",
+                "sink:",
+                "  type: file",
+                "  path: " + output,
+                "  format: jsonl",
+                "  mode: overwrite").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Starting pipeline: local-jsonl-to-file"));
+        assertTrue(result.output.contains("Pipeline Finished. rows=1"));
+        assertEquals(
+                java.util.Collections.singletonList("{\"id\":1,\"content\":\"Alpha\"}"),
+                Files.readAllLines(output, StandardCharsets.UTF_8));
     }
 
     @Test

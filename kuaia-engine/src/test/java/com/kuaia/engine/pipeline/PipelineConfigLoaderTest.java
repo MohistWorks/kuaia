@@ -677,6 +677,29 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsJsonlFileSinkConfig() throws Exception {
+        Path configPath = tempDir.resolve("jsonl-file-sink.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: jsonl-file-sink",
+                "source:",
+                "  type: file",
+                "  path: data/documents.jsonl",
+                "  format: jsonl",
+                "sink:",
+                "  type: file",
+                "  path: out/documents.jsonl",
+                "  format: jsonl",
+                "  mode: overwrite").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("file", config.getSink().getType());
+        assertEquals(tempDir.resolve("out/documents.jsonl").normalize().toString(), sinkValue(config, "getPath"));
+        assertEquals("jsonl", sinkValue(config, "getFormat"));
+        assertEquals("overwrite", sinkValue(config, "getMode"));
+    }
+
+    @Test
     void defaultLoaderPreservesExistingPathBehavior() throws Exception {
         Path configDir = tempDir.resolve("pipelines");
         Files.createDirectories(configDir);

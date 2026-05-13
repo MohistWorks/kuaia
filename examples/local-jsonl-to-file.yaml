@@ -1,0 +1,18 @@
+name: local-jsonl-to-file
+source:
+  type: file
+  path: data/documents.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: trim
+    field: content
+  - type: filter
+    field: content
+    op: not-empty
+sink:
+  type: file
+  path: ../.kuaia/output/local-jsonl-to-file.jsonl
+  format: jsonl
+  mode: overwrite

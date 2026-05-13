@@ -17,6 +17,7 @@ It validates these public MVP paths in an isolated `.kuaia/public-mvp-smoke`
 work directory:
 
 - CSV source through `select` and `rename` transforms into a local CSV file,
+- JSONL source through `trim` and `filter` transforms into a local JSONL file,
 - CSV source through `mock-embedding` into the mock vector sink,
 - JSONL source through `trim`, `filter`, and `mock-embedding` into the mock
   vector sink,
@@ -63,6 +64,24 @@ id,name
 
 This is the default Docker quickstart example because the output is easy to
 inspect.
+
+## Local JSONL To File
+
+```bash
+bin/kuaia run -f examples/local-jsonl-to-file.yaml
+cat .kuaia/output/local-jsonl-to-file.jsonl
+```
+
+Reads `examples/data/documents.jsonl`, selects `id` and `content`, trims and
+filters empty `content` values, and writes deterministic JSON Lines output:
+
+```json
+{"id":1,"content":"Alpha"}
+{"id":2,"content":"Beta"}
+```
+
+This is the no-service path for checking JSONL cleanup before embedding,
+chunking, or writing to a vector sink.
 
 ## Skip Bad Records
 

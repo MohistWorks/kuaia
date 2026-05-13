@@ -274,6 +274,7 @@ public class LocalPipelineRunner {
             sink = new FileSink(
                     rowType,
                     Paths.get(config.getSink().getPath()),
+                    config.getSink().getFormat(),
                     config.getSink().getMode());
         } else {
             throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);

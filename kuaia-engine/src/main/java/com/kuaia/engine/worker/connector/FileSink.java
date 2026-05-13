@@ -17,12 +17,18 @@ import java.util.Locale;
 public class FileSink implements SinkWriter {
     private final KuaiaRowType rowType;
     private final Path path;
+    private final String format;
     private final String mode;
     private BufferedWriter writer;
 
     public FileSink(KuaiaRowType rowType, Path path, String mode) {
+        this(rowType, path, "csv", mode);
+    }
+
+    public FileSink(KuaiaRowType rowType, Path path, String format, String mode) {
         this.rowType = rowType;
         this.path = path;
+        this.format = format;
         this.mode = mode;
     }
 
@@ -34,7 +40,7 @@ public class FileSink implements SinkWriter {
         }
 
         boolean append = "append".equals(mode);
-        boolean writeHeader = !append || !Files.exists(path) || Files.size(path) == 0L;
+        boolean writeHeader = "csv".equals(format) && (!append || !Files.exists(path) || Files.size(path) == 0L);
         OpenOption[] options = append
                 ? new OpenOption[]{
                         StandardOpenOption.CREATE,
@@ -53,6 +59,12 @@ public class FileSink implements SinkWriter {
 
     @Override
     public void write(BinaryRow row) throws Exception {
+        if ("jsonl".equals(format)) {
+            writer.write(formatJsonlRow(row));
+            writer.newLine();
+            return;
+        }
+
         StringBuilder line = new StringBuilder();
         DataType[] fieldTypes = rowType.getFieldTypes();
         for (int i = 0; i < fieldTypes.length; i++) {
@@ -86,6 +98,50 @@ public class FileSink implements SinkWriter {
         }
     }
 
+    private String formatJsonlRow(BinaryRow row) throws PipelineExecutionException {
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        String[] names = rowType.getFieldNames();
+        DataType[] types = rowType.getFieldTypes();
+        for (int i = 0; i < names.length; i++) {
+            if (i > 0) {
+                json.append(",");
+            }
+            json.append("\"").append(escapeJson(names[i])).append("\":");
+            appendJsonValue(json, row, i, types[i]);
+        }
+        json.append("}");
+        return json.toString();
+    }
+
+    private void appendJsonValue(StringBuilder json, BinaryRow row, int field, DataType type)
+            throws PipelineExecutionException {
+        switch (type) {
+            case LONG:
+                json.append(row.getLong(field));
+                break;
+            case STRING:
+                json.append("\"").append(escapeJson(row.getString(field))).append("\"");
+                break;
+            case VECTOR:
+                appendJsonVector(json, row.getVector(field));
+                break;
+            default:
+                throw new PipelineExecutionException("File sink does not support field type: " + type);
+        }
+    }
+
+    private void appendJsonVector(StringBuilder json, float[] vector) {
+        json.append("[");
+        for (int i = 0; i < vector.length; i++) {
+            if (i > 0) {
+                json.append(",");
+            }
+            json.append(Float.toString(vector[i]));
+        }
+        json.append("]");
+    }
+
     private String validateCsvCell(String value) throws PipelineExecutionException {
         if (value.indexOf(',') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
             throw new PipelineExecutionException("File sink does not support quoted CSV fields");
@@ -103,5 +159,36 @@ public class FileSink implements SinkWriter {
         }
         value.append(']');
         return value.toString();
+    }
+
+    private String escapeJson(String value) {
+        StringBuilder escaped = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\':
+                    escaped.append("\\\\");
+                    break;
+                case '"':
+                    escaped.append("\\\"");
+                    break;
+                case '\n':
+                    escaped.append("\\n");
+                    break;
+                case '\r':
+                    escaped.append("\\r");
+                    break;
+                case '\t':
+                    escaped.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20) {
+                        escaped.append(String.format(Locale.ROOT, "\\u%04x", (int) c));
+                    } else {
+                        escaped.append(c);
+                    }
+            }
+        }
+        return escaped.toString();
     }
 }

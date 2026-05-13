@@ -329,7 +329,7 @@ public class PipelineConfigLoader {
 
         String sinkPath = resolveLocalPath(configPath, require(sink, "sink.path"), "sink.path");
         String sinkFormat = require(sink, "sink.format");
-        requireSupported("sink.format", sinkFormat, "csv");
+        requireSupported("sink.format", sinkFormat, "csv", "jsonl");
 
         String mode = sink.get("mode");
         if (mode == null || mode.trim().isEmpty()) {
