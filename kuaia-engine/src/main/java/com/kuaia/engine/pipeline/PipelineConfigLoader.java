@@ -150,6 +150,8 @@ public class PipelineConfigLoader {
                         parseBatchSize(transform.get("batchSize"))));
             } else if ("embedding".equals(type)) {
                 configs.add(loadEmbeddingTransform(transform, fieldPrefix));
+            } else if ("trim".equals(type)) {
+                configs.add(loadTrimTransform(transform, fieldPrefix));
             } else if ("filter".equals(type)) {
                 configs.add(loadFilterTransform(transform, fieldPrefix));
             } else if ("chunk".equals(type)) {
@@ -264,6 +266,18 @@ public class PipelineConfigLoader {
                 false,
                 false,
                 op);
+    }
+
+    private PipelineConfig.TransformConfig loadTrimTransform(Map<String, String> transform, String fieldPrefix)
+            throws PipelineConfigException {
+        return new PipelineConfig.TransformConfig(
+                "trim",
+                new ArrayList<>(),
+                null,
+                null,
+                require(transform, fieldPrefix + ".field"),
+                null,
+                0);
     }
 
     private PipelineConfig.TransformConfig loadChunkTransform(Map<String, String> transform, String fieldPrefix)

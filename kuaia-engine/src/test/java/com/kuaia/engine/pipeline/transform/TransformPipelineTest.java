@@ -42,6 +42,43 @@ class TransformPipelineTest {
     }
 
     @Test
+    void trimTransformTrimsStringInPlaceAndPreservesSchema() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(trimConfig("content")));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Arrays.asList(
+                row(1L, "  Alpha  "),
+                row(2L, "\tBeta\n")));
+
+        assertArrayEquals(new String[]{"id", "content"}, pipeline.getOutputType().getFieldNames());
+        assertArrayEquals(new DataType[]{DataType.LONG, DataType.STRING}, pipeline.getOutputType().getFieldTypes());
+        assertEquals(2, outputs.size());
+        assertEquals(1L, outputs.get(0).getLong(0));
+        assertEquals("Alpha", outputs.get(0).getString(1));
+        assertEquals(2L, outputs.get(1).getLong(0));
+        assertEquals("Beta", outputs.get(1).getString(1));
+    }
+
+    @Test
+    void trimTransformRejectsUnknownField() {
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(rowType(), Collections.singletonList(trimConfig("missing"))));
+
+        assertEquals("Unknown transform field: missing", error.getMessage());
+    }
+
+    @Test
+    void trimTransformRejectsNonStringField() {
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(rowType(), Collections.singletonList(trimConfig("id"))));
+
+        assertEquals("Transform field must be STRING: id", error.getMessage());
+    }
+
+    @Test
     void filterTransformDropsEmptyAndWhitespaceStrings() throws Exception {
         TransformPipeline pipeline = TransformPipeline.from(
                 rowType(),
@@ -233,6 +270,17 @@ class TransformPipelineTest {
                 null,
                 30000,
                 batchSize);
+    }
+
+    private PipelineConfig.TransformConfig trimConfig(String field) {
+        return new PipelineConfig.TransformConfig(
+                "trim",
+                Collections.emptyList(),
+                null,
+                null,
+                field,
+                null,
+                0);
     }
 
     private PipelineConfig.TransformConfig filterConfig(String field, String op) {

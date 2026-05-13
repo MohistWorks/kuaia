@@ -17,6 +17,8 @@ All notable public changes to Kuaia are tracked here.
   vector payloads can omit repeated source text while keeping character offsets.
 - Added a minimal `filter` transform with `op: not-empty` for dropping empty
   text rows before embedding or chunking.
+- Added a `trim` transform for cleaning leading and trailing string whitespace
+  before filtering, chunking, or embedding.
 
 ### Changed
 
