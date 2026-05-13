@@ -4,6 +4,8 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+## 0.1.1 - 2026-05-13
+
 ### Added
 
 - `kuaia benchmark` CLI command for local batch benchmark counters and JSON
@@ -73,8 +75,6 @@ All notable public changes to Kuaia are tracked here.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
 - `kuaia benchmark` can now run caller-selected batch sizes with
   `--batch-sizes`.
-- Main branch development version is now `0.1.1-SNAPSHOT` after the `v0.1.0`
-  release.
 - Runtime packaging examples resolve the shaded CLI jar without hard-coding the
   release version.
 
