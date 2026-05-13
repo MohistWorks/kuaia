@@ -48,8 +48,9 @@ source:
 Fields:
 
 - `type`: must be `file`
-- `path`: local CSV path. Relative paths are resolved from the YAML file directory.
-- `format`: must be `csv`
+- `path`: local CSV or JSONL path. Relative paths are resolved from the YAML
+  file directory.
+- `format`: must be `csv` or `jsonl`
 - `maxRowsPerSplit`: optional internal source split size. Defaults to `10000`
   and must be a positive integer when configured.
 
@@ -61,6 +62,19 @@ CSV rules:
 - a field named `id` is parsed as `LONG`,
 - other fields are parsed as `STRING`,
 - quoted CSV fields are not supported in this MVP.
+
+JSONL rules:
+
+- each non-empty line must be one JSON object,
+- the row schema is inferred from the first non-empty JSON object,
+- field order follows the first JSON object's field order,
+- every later JSON object must contain the same fields and no extra fields,
+- a field named `id` or a field inferred from an integer value is parsed as
+  `LONG`,
+- other non-null scalar fields are parsed as `STRING`,
+- JSON arrays, nested objects, and null values are not supported in this MVP,
+- malformed JSONL rows are source row errors and can be skipped with
+  `errorPolicy.mode: skip-bad-records`.
 
 ### postgres
 
@@ -370,7 +384,7 @@ checkpoint:
 ```
 
 When `checkpoint.stateDir` is set, Kuaia persists local task progress with
-RocksDB. CSV data rows use 1-based source `seqId` values. For non-batched
+RocksDB. File data rows use 1-based source `seqId` values. For non-batched
 pipelines, a checkpoint advances after a transformed row is successfully written
 to the sink. For batch-aware vector pipelines, a successful sink batch advances
 the checkpoint once to the highest source `seqId` in that batch. If the batch
@@ -459,6 +473,12 @@ Run CSV through mock embedding to mock vector sink:
 
 ```bash
 bin/kuaia run -f examples/local-file-to-vector.yaml
+```
+
+Run JSONL through mock embedding to mock vector sink:
+
+```bash
+bin/kuaia run -f examples/local-jsonl-to-vector.yaml
 ```
 
 Run CSV through an OpenAI-compatible embedding provider:
@@ -552,6 +572,10 @@ Common examples:
 - `File sink does not support quoted CSV fields`
 - `File sink does not support field type: <type>`
 - `Invalid CSV row at line <line>: expected <n> columns but found <m>`
+- `Invalid JSONL row at line <line>: malformed JSON`
+- `Invalid JSONL row at line <line>: field <field> must be a scalar value`
+- `Invalid JSONL row at line <line>: unexpected field <field>`
+- `Invalid JSONL row at line <line>: missing field <field>`
 
 ## Non-Goals
 
@@ -559,6 +583,7 @@ The current YAML contract does not support:
 
 - generic YAML features beyond the documented shape,
 - quoted CSV parsing,
+- nested JSONL objects, arrays, or null values,
 - transform DAGs,
 - filters, joins, casts, or aggregations,
 - CDC offsets,

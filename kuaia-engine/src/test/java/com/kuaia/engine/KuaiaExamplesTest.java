@@ -23,6 +23,7 @@ class KuaiaExamplesTest {
                 "examples/local-file-to-console.yaml",
                 "examples/local-file-transform-to-console.yaml",
                 "examples/local-file-to-vector.yaml",
+                "examples/local-jsonl-to-vector.yaml",
                 "examples/local-file-to-file.yaml",
                 "examples/local-file-skip-bad-records.yaml");
 

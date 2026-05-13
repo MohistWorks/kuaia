@@ -220,6 +220,7 @@ public class KuaiaCli {
         out.println("  kuaia run -f examples/local-file-transform-to-console.yaml");
         out.println("  kuaia run -f examples/local-file-to-file.yaml");
         out.println("  kuaia run -f examples/local-file-to-vector.yaml");
+        out.println("  kuaia run -f examples/local-jsonl-to-vector.yaml");
         out.println("  kuaia run -f examples/local-file-skip-bad-records.yaml");
         out.println();
         out.println("External service examples:");

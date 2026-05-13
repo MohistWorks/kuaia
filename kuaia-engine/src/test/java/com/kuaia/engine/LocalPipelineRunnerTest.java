@@ -70,6 +70,46 @@ class LocalPipelineRunnerTest {
     }
 
     @Test
+    void writesJsonlVectorPipelineRowsInConfiguredBatches() throws Exception {
+        Path data = tempDir.resolve("documents.jsonl");
+        Files.write(data, String.join("\n",
+                "{\"id\":1,\"content\":\"Alpha\"}",
+                "{\"id\":2,\"content\":\"Beta\"}",
+                "{\"id\":3,\"content\":\"Gamma\"}").getBytes(StandardCharsets.UTF_8));
+        Path configPath = tempDir.resolve("jsonl-vector.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: jsonl-vector",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: jsonl",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "    batchSize: 2",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+        CapturingSink sink = new CapturingSink();
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+        SinkFactoryRegistry registry = new SinkFactoryRegistry(Collections.singletonMap(
+                "mock-vector",
+                (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PipelineRunSummary summary = new LocalPipelineRunner(registry)
+                .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(0, sink.singleWrites);
+        assertEquals(2, sink.batchWrites);
+        assertEquals(java.util.Arrays.asList(2, 1), sink.batchSizes);
+        assertEquals(3L, summary.getRowsWritten());
+        assertEquals(1L, summary.getSourceSplits());
+        assertEquals(2L, summary.getSinkBatches());
+    }
+
+    @Test
     void checkpointsOncePerSuccessfulSinkBatch() throws Exception {
         Path data = tempDir.resolve("checkpointed-documents.csv");
         Files.write(data, String.join("\n",

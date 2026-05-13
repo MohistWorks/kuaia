@@ -10,10 +10,12 @@ WORK_DIR="$ROOT_DIR/.kuaia/public-mvp-smoke/$RUN_ID"
 mkdir -p "$WORK_DIR/data" "$WORK_DIR/output" "$WORK_DIR/state"
 cp "$ROOT_DIR/examples/data/users.csv" "$WORK_DIR/data/users.csv"
 cp "$ROOT_DIR/examples/data/documents.csv" "$WORK_DIR/data/documents.csv"
+cp "$ROOT_DIR/examples/data/documents.jsonl" "$WORK_DIR/data/documents.jsonl"
 cp "$ROOT_DIR/examples/data/users-with-bad-row.csv" "$WORK_DIR/data/users-with-bad-row.csv"
 
 CSV_TO_FILE="$WORK_DIR/csv-to-file.yaml"
 CSV_TO_VECTOR="$WORK_DIR/csv-to-vector.yaml"
+JSONL_TO_VECTOR="$WORK_DIR/jsonl-to-vector.yaml"
 SKIP_BAD_RECORDS="$WORK_DIR/skip-bad-records.yaml"
 
 cat > "$CSV_TO_FILE" <<EOF
@@ -55,6 +57,26 @@ sink:
   type: mock-vector
 checkpoint:
   stateDir: $WORK_DIR/state/csv-to-vector
+EOF
+
+cat > "$JSONL_TO_VECTOR" <<EOF
+name: public-mvp-jsonl-to-vector
+source:
+  type: file
+  path: data/documents.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: mock-vector
+checkpoint:
+  stateDir: $WORK_DIR/state/jsonl-to-vector
 EOF
 
 cat > "$SKIP_BAD_RECORDS" <<EOF
@@ -112,6 +134,7 @@ if ! diff -u "$EXPECTED_USERS" "$WORK_DIR/output/users.csv"; then
 fi
 
 run_pipeline "CSV to mock vector" "$CSV_TO_VECTOR"
+run_pipeline "JSONL to mock vector" "$JSONL_TO_VECTOR"
 run_pipeline "Skip malformed CSV records" "$SKIP_BAD_RECORDS"
 
 printf '\nPublic MVP smoke passed. Work dir: %s\n' "$WORK_DIR"

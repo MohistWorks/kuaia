@@ -1,0 +1,17 @@
+name: local-jsonl-to-vector
+source:
+  type: file
+  path: data/documents.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: mock-vector
+checkpoint:
+  stateDir: .kuaia/state/local-jsonl-to-vector

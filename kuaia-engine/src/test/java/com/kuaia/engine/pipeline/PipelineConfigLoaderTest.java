@@ -53,6 +53,23 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsJsonlFileSourceFormat() throws Exception {
+        Path configPath = tempDir.resolve("jsonl-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: jsonl-source",
+                "source:",
+                "  type: file",
+                "  path: data/documents.jsonl",
+                "  format: jsonl",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("jsonl", config.getSource().getFormat());
+    }
+
+    @Test
     void rejectsInvalidFileSourceMaxRowsPerSplit() throws Exception {
         Path configPath = tempDir.resolve("invalid-file-source-split.yaml");
         Files.write(configPath, String.join("\n",
