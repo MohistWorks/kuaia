@@ -100,16 +100,22 @@ public class WorkerNode {
             }
 
             private void completeAssignment(TaskAssignment assignment) {
-                WorkerMessage result = WorkerMessage.newBuilder()
-                        .setWorkerId(id)
-                        .setTaskResult(TaskAttemptResult.newBuilder()
+                TaskAttemptResult.Builder result = TaskAttemptResult.newBuilder()
                                 .setTaskId(assignment.getTaskId())
                                 .setAttemptId(assignment.getAttemptId())
-                                .setWorkerId(id)
-                                .setStatus(AttemptStatus.ATTEMPT_SUCCESS)
-                                .build())
+                                .setWorkerId(id);
+                if (assignment.getTaskId().isEmpty() || assignment.getAttemptId().isEmpty()) {
+                    result.setStatus(AttemptStatus.ATTEMPT_FAILED)
+                            .setErrorCode("INVALID_ASSIGNMENT")
+                            .setErrorMessage("Task assignment requires taskId and attemptId");
+                } else {
+                    result.setStatus(AttemptStatus.ATTEMPT_SUCCESS);
+                }
+                WorkerMessage message = WorkerMessage.newBuilder()
+                        .setWorkerId(id)
+                        .setTaskResult(result.build())
                         .build();
-                sendMessage(result);
+                sendMessage(message);
             }
 
             @Override public void onError(Throwable t) {
