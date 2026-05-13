@@ -28,7 +28,7 @@ Kuaia is currently useful for:
 - developers evaluating AI/RAG data preparation flows,
 - contributors exploring source, transform, and sink connector boundaries,
 - users who want a small local pipeline from CSV, JSONL, or Postgres into
-  files, console output, mock vector output, or Qdrant,
+  CSV/JSONL files, console output, mock vector output, or Qdrant,
 - maintainers validating checkpoint and state-store behavior before broader
   distributed execution work.
 
@@ -55,7 +55,7 @@ Supported transforms:
 Supported sinks:
 
 - `console`,
-- local CSV `file`,
+- local CSV or JSONL `file`,
 - `mock-vector`,
 - Qdrant vector upserts.
 

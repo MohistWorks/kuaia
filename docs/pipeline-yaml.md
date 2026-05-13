@@ -335,13 +335,13 @@ sink:
   mode: overwrite
 ```
 
-Writes output rows as a local CSV file.
+Writes output rows as a local CSV or JSONL file.
 
 Fields:
 
 - `type`: must be `file`
 - `path`: output path. Relative paths are resolved from the YAML file directory.
-- `format`: must be `csv`
+- `format`: must be `csv` or `jsonl`
 - `mode`: optional, defaults to `overwrite`; supported values are `overwrite`
   and `append`
 
@@ -356,6 +356,14 @@ CSV output rules:
   fields are not part of this MVP contract,
 - vector fields are written as bracketed, space-delimited values such as
   `[5.0000 6.0000 7.0000 8.0000]`.
+
+JSONL output rules:
+
+- one JSON object is written per output row,
+- no header row is written,
+- `LONG`, `STRING`, and `VECTOR` output fields are supported,
+- string field names and values are JSON-escaped,
+- vector fields are written as JSON arrays.
 
 ### mock-vector
 
@@ -557,6 +565,13 @@ Run CSV to a local output file:
 ```bash
 bin/kuaia run -f examples/local-file-to-file.yaml
 cat .kuaia/output/local-file-to-file.csv
+```
+
+Run JSONL to a local JSONL output file:
+
+```bash
+bin/kuaia run -f examples/local-jsonl-to-file.yaml
+cat .kuaia/output/local-jsonl-to-file.jsonl
 ```
 
 Run CSV while skipping malformed rows:

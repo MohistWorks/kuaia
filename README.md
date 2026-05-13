@@ -18,7 +18,7 @@ Kuaia is useful when you want to:
 - trim and filter empty text before embedding or chunking,
 - split JSONL document text into embed-ready chunks,
 - generate mock or OpenAI-compatible embeddings,
-- write to console, local CSV files, mock vector output, or Qdrant,
+- write to console, local CSV or JSONL files, mock vector output, or Qdrant,
 - resume local runs from checkpoint state,
 - run a local batch benchmark with split, checkpoint, embedding, and sink
   counters,
@@ -47,11 +47,15 @@ Run the CLI and the default local example:
 bin/kuaia help
 bin/kuaia examples
 bin/kuaia run -f examples/local-file-to-file.yaml
+bin/kuaia run -f examples/local-jsonl-to-file.yaml
 cat .kuaia/output/local-file-to-file.csv
+cat .kuaia/output/local-jsonl-to-file.jsonl
 ```
 
 The example reads `examples/data/users.csv` and writes a deterministic CSV file
-under `.kuaia/output/local-file-to-file.csv`.
+under `.kuaia/output/local-file-to-file.csv`. The JSONL file example reads
+`examples/data/documents.jsonl`, trims and filters `content`, and writes
+`.kuaia/output/local-jsonl-to-file.jsonl`.
 
 Validate the public MVP paths without external services:
 
@@ -226,7 +230,7 @@ service requirements.
 | --- | --- |
 | Sources | `file` CSV and JSONL, batch `postgres` queries |
 | Transforms | `select`, `rename`, `trim`, `filter`, `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
-| Sinks | `console`, CSV `file`, `mock-vector`, `qdrant` |
+| Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant` |
 | Runtime | Linear batch pipeline, checkpoint resume, bad-record skip mode |
 | State | Local checkpoint state, in-memory and RocksDB state stores |
 | Extension points | Source, transform, sink, split reader, and batch writer boundaries |

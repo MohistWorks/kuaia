@@ -26,10 +26,13 @@ class KuaiaExamplesTest {
                 "examples/local-jsonl-to-vector.yaml",
                 "examples/local-jsonl-chunk-to-vector.yaml",
                 "examples/local-file-to-file.yaml",
+                "examples/local-jsonl-to-file.yaml",
                 "examples/local-file-skip-bad-records.yaml");
 
         Path fileSinkOutput = repoRoot().resolve(".kuaia/output/local-file-to-file.csv");
+        Path jsonlSinkOutput = repoRoot().resolve(".kuaia/output/local-jsonl-to-file.jsonl");
         Files.deleteIfExists(fileSinkOutput);
+        Files.deleteIfExists(jsonlSinkOutput);
 
         for (String example : examples) {
             CliResult result = run("run", "-f", repoRoot().resolve(example).toString());
@@ -43,6 +46,11 @@ class KuaiaExamplesTest {
         assertEquals(
                 Arrays.asList("id,name", "1,Alice", "2,Bob"),
                 Files.readAllLines(fileSinkOutput, StandardCharsets.UTF_8));
+        assertEquals(
+                Arrays.asList(
+                        "{\"id\":1,\"content\":\"Alpha\"}",
+                        "{\"id\":2,\"content\":\"Beta\"}"),
+                Files.readAllLines(jsonlSinkOutput, StandardCharsets.UTF_8));
     }
 
     @Test

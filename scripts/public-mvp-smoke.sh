@@ -16,6 +16,7 @@ cp "$ROOT_DIR/examples/data/users-with-bad-row.csv" "$WORK_DIR/data/users-with-b
 
 CSV_TO_FILE="$WORK_DIR/csv-to-file.yaml"
 CSV_TO_VECTOR="$WORK_DIR/csv-to-vector.yaml"
+JSONL_TO_FILE="$WORK_DIR/jsonl-to-file.yaml"
 JSONL_TO_VECTOR="$WORK_DIR/jsonl-to-vector.yaml"
 JSONL_CHUNK_TO_VECTOR="$WORK_DIR/jsonl-chunk-to-vector.yaml"
 SKIP_BAD_RECORDS="$WORK_DIR/skip-bad-records.yaml"
@@ -62,6 +63,29 @@ sink:
   type: mock-vector
 checkpoint:
   stateDir: $WORK_DIR/state/csv-to-vector
+EOF
+
+cat > "$JSONL_TO_FILE" <<EOF
+name: public-mvp-jsonl-to-file
+source:
+  type: file
+  path: data/documents.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: trim
+    field: content
+  - type: filter
+    field: content
+    op: not-empty
+sink:
+  type: file
+  path: $WORK_DIR/output/documents.jsonl
+  format: jsonl
+  mode: overwrite
+checkpoint:
+  stateDir: $WORK_DIR/state/jsonl-to-file
 EOF
 
 cat > "$JSONL_TO_VECTOR" <<EOF
@@ -170,6 +194,19 @@ EXPECTED_USERS="$WORK_DIR/expected-users.csv"
 
 if ! diff -u "$EXPECTED_USERS" "$WORK_DIR/output/users.csv"; then
   printf '%s\n' "CSV file output did not match expected rows" >&2
+  exit 1
+fi
+
+run_pipeline "JSONL to file" "$JSONL_TO_FILE"
+
+EXPECTED_DOCUMENTS="$WORK_DIR/expected-documents.jsonl"
+{
+  printf '%s\n' '{"id":1,"content":"Alpha"}'
+  printf '%s\n' '{"id":2,"content":"Beta"}'
+} > "$EXPECTED_DOCUMENTS"
+
+if ! diff -u "$EXPECTED_DOCUMENTS" "$WORK_DIR/output/documents.jsonl"; then
+  printf '%s\n' "JSONL file output did not match expected rows" >&2
   exit 1
 fi
 
