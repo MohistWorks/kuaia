@@ -62,6 +62,8 @@ All notable public changes to Kuaia are tracked here.
   assignment envelope before the worker reports success.
 - Worker nodes now reject expired typed assignments instead of reporting
   success after the assignment lease has elapsed.
+- Worker hello replay now moves expired active assignments back to retrying
+  instead of resending stale leases to reconnecting workers.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
