@@ -9,6 +9,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -22,18 +23,21 @@ public class WorkerNode {
     private final AtomicInteger memoryQueueSize = new AtomicInteger(0);
     private static final int THRESHOLD = 1000;
 
+    private ManagedChannel channel;
     private StreamObserver<WorkerMessage> requestObserver;
+    private volatile boolean stopping;
 
     public WorkerNode(String id) { this.id = id; }
 
     public void start(String host, int port) {
+        stopping = false;
         try {
             dbBuffer.open("/tmp/kuaia-rocksdb-" + id);
         } catch (Exception e) {
             throw new RuntimeException("Failed to open RocksDB", e);
         }
 
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+        this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
         CoordinatorServiceGrpc.CoordinatorServiceStub stub = CoordinatorServiceGrpc.newStub(channel);
 
         this.requestObserver = stub.taskStream(new StreamObserver<CoordinatorMessage>() {
@@ -80,9 +84,7 @@ public class WorkerNode {
                             .build())
                         .build();
                     
-                    synchronized (requestObserver) {
-                        requestObserver.onNext(ackMsg);
-                    }
+                    sendMessage(ackMsg);
 
                     // Optional: Try to pull from disk if memory is available
                     tryToPullFromDisk();
@@ -95,15 +97,43 @@ public class WorkerNode {
             }
 
             @Override public void onError(Throwable t) {
-                LOG.log(Level.WARNING, "Worker stream failed", t);
+                if (!stopping) {
+                    LOG.log(Level.WARNING, "Worker stream failed", t);
+                }
             }
 
             @Override public void onCompleted() {
-                LOG.info("Worker stream completed");
+                if (!stopping) {
+                    LOG.info("Worker stream completed");
+                }
             }
         });
-        
-        // Initial registration via heartbeat or separate call (omitted for skeleton)
+
+        sendHello();
+    }
+
+    public void stop() {
+        stopping = true;
+        StreamObserver<WorkerMessage> observer = requestObserver;
+        requestObserver = null;
+        if (observer != null) {
+            synchronized (observer) {
+                observer.onCompleted();
+            }
+        }
+        if (channel != null) {
+            channel.shutdown();
+            try {
+                if (!channel.awaitTermination(1, TimeUnit.SECONDS)) {
+                    channel.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                channel.shutdownNow();
+            }
+            channel = null;
+        }
+        dbBuffer.close();
     }
 
     private void sendSignal(String type) {
@@ -111,8 +141,26 @@ public class WorkerNode {
             .setWorkerId(id)
             .setSignal(ControlSignal.newBuilder().setType(type).build())
             .build();
-        synchronized (requestObserver) {
-            requestObserver.onNext(signal);
+        sendMessage(signal);
+    }
+
+    private void sendHello() {
+        WorkerMessage hello = WorkerMessage.newBuilder()
+                .setWorkerId(id)
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId(id)
+                        .build())
+                .build();
+        sendMessage(hello);
+    }
+
+    private void sendMessage(WorkerMessage message) {
+        StreamObserver<WorkerMessage> observer = requestObserver;
+        if (observer == null) {
+            return;
+        }
+        synchronized (observer) {
+            observer.onNext(message);
         }
     }
 }

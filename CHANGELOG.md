@@ -47,6 +47,8 @@ All notable public changes to Kuaia are tracked here.
 - Worker stream messages with conflicting envelope and payload worker ids are
   now ignored to keep stream identity, registry, and persisted worker state
   aligned.
+- Worker nodes now send a typed `WorkerHello` immediately after opening the
+  task stream, enabling coordinator recovery replay and stream state tracking.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
