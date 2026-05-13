@@ -4,6 +4,7 @@ import com.kuaia.common.model.NodeInfo;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.WorkerRecord;
 import com.kuaia.common.rpc.*;
+import com.kuaia.engine.coordinator.recovery.CoordinatorRecoveryPlanner;
 import com.kuaia.engine.coordinator.registry.WorkerRegistry;
 import com.kuaia.engine.coordinator.state.BatchStateFlusher;
 import com.kuaia.engine.coordinator.state.StateStore;
@@ -169,9 +170,21 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
         if (stateStore == null) {
             return;
         }
+        long nowMillis = System.currentTimeMillis();
         for (TaskRecord task : stateStore.scanActiveTasksByWorker(workerId)) {
+            if (task.getLeaseUntilMillis() <= nowMillis) {
+                recoverExpiredAssignment(task);
+                continue;
+            }
             streamManager.sendAssignment(workerId, task);
         }
+    }
+
+    private void recoverExpiredAssignment(TaskRecord task) {
+        TaskRecord updated = task.retryingAfterLeaseExpiration(
+                CoordinatorRecoveryPlanner.LEASE_EXPIRED,
+                "Task lease expired at " + task.getLeaseUntilMillis());
+        stateStore.compareAndSetTask(task, updated);
     }
 
     @Override

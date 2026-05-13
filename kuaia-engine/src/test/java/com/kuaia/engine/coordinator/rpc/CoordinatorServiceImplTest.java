@@ -172,7 +172,7 @@ class CoordinatorServiceImplTest {
         definition.setJobName("job-1");
         definition.setConfig(Collections.singletonMap("source", "file"));
         store.saveTask(TaskRecord.created(definition)
-                .dispatching("worker-1", "attempt-1", 10_000L)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
                 .running()
                 .checkpoint("attempt-1", 41L));
         CoordinatorServiceImpl service = new CoordinatorServiceImpl(
@@ -201,6 +201,41 @@ class CoordinatorServiceImplTest {
         assertTrue(message.getAssignment().getDefinition().size() > 0,
                 "replayed assignment should carry the task definition bytes");
         assertEquals(definition, deserializeDefinition(message.getAssignment().getDefinition().toByteArray()));
+    }
+
+    @Test
+    void workerHelloRecoversExpiredActiveAssignmentInsteadOfReplayingIt() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        TaskDefinition definition = new TaskDefinition();
+        definition.setTaskId("task-1");
+        definition.setJobName("job-1");
+        store.saveTask(TaskRecord.created(definition)
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() - 1_000L)
+                .running()
+                .checkpoint("attempt-1", 41L));
+        CoordinatorServiceImpl service = new CoordinatorServiceImpl(
+                new WorkerRegistry(),
+                null,
+                new TaskAckHandler(store),
+                store);
+        StreamObserver<CoordinatorMessage> responseObserver = mock(StreamObserver.class);
+        StreamObserver<WorkerMessage> requestObserver = service.taskStream(responseObserver);
+
+        requestObserver.onNext(WorkerMessage.newBuilder()
+                .setHello(WorkerHello.newBuilder()
+                        .setWorkerId("worker-1")
+                        .setHost("127.0.0.1")
+                        .setPort(9001)
+                        .build())
+                .build());
+
+        verify(responseObserver, never()).onNext(any(CoordinatorMessage.class));
+        TaskRecord recovered = store.getTask("task-1");
+        assertEquals(TaskState.RETRYING, recovered.getState());
+        assertEquals(41L, recovered.getLastCheckpointSeq());
+        assertEquals("LEASE_EXPIRED", recovered.getLastErrorCode());
+        assertNull(recovered.getAssignedWorkerId());
+        assertNull(recovered.getAttemptId());
     }
 
     @Test
