@@ -49,6 +49,9 @@ All notable public changes to Kuaia are tracked here.
   aligned.
 - Worker nodes now send a typed `WorkerHello` immediately after opening the
   task stream, enabling coordinator recovery replay and stream state tracking.
+- Worker nodes now respond to typed `TaskAssignment` messages with typed
+  attempt results, closing the coordinator replay path beyond legacy task
+  payloads.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
