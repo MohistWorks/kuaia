@@ -179,7 +179,7 @@ public class PipelineConfigLoader {
         }
         String sourcePath = resolveLocalPath(configPath, require(source, "source.path"), "source.path");
         String sourceFormat = require(source, "source.format");
-        requireSupported("source.format", sourceFormat, "csv");
+        requireSupported("source.format", sourceFormat, "csv", "jsonl");
         return new PipelineConfig.SourceConfig(
                 sourceType,
                 sourcePath,

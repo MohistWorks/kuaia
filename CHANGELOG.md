@@ -4,6 +4,11 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+### Added
+
+- File sources now support `source.format: jsonl` for local JSON Lines
+  pipelines, including a public JSONL-to-vector example and smoke coverage.
+
 ### Changed
 
 - Main branch development version is now `0.1.2-SNAPSHOT` after the `v0.1.1`

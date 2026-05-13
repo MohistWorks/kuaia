@@ -27,8 +27,8 @@ Kuaia is currently useful for:
 
 - developers evaluating AI/RAG data preparation flows,
 - contributors exploring source, transform, and sink connector boundaries,
-- users who want a small local pipeline from CSV or Postgres into files,
-  console output, mock vector output, or Qdrant,
+- users who want a small local pipeline from CSV, JSONL, or Postgres into
+  files, console output, mock vector output, or Qdrant,
 - maintainers validating checkpoint and state-store behavior before broader
   distributed execution work.
 
@@ -39,7 +39,7 @@ control plane, RBAC, lineage, Kubernetes operation, or a large connector catalog
 
 Supported sources:
 
-- local CSV files through `source.type: file`,
+- local CSV and JSONL files through `source.type: file`,
 - batch PostgreSQL queries through `source.type: postgres`.
 
 Supported transforms:
@@ -61,7 +61,7 @@ Supported runtime behavior:
 - declarative YAML pipelines,
 - linear transform chains,
 - RocksDB-backed local checkpoints,
-- bad-record skipping for malformed CSV rows,
+- bad-record skipping for malformed CSV or JSONL rows,
 - batch-aware embedding and vector sink execution,
 - run summaries with row, checkpoint, split, and sink batch counters.
 

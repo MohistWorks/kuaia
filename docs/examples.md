@@ -18,6 +18,7 @@ work directory:
 
 - CSV source through `select` and `rename` transforms into a local CSV file,
 - CSV source through `mock-embedding` into the mock vector sink,
+- JSONL source through `mock-embedding` into the mock vector sink,
 - malformed CSV handling with `errorPolicy.mode: skip-bad-records`.
 
 After that, run individual examples below when you want to inspect one pipeline
@@ -80,6 +81,16 @@ bin/kuaia run -f examples/local-file-to-vector.yaml
 Reads `examples/data/documents.csv`, creates a deterministic local embedding
 with `mock-embedding`, and prints mock vector sink summaries. It does not call an
 external model or vector database.
+
+## JSONL Mock Vector Pipeline
+
+```bash
+bin/kuaia run -f examples/local-jsonl-to-vector.yaml
+```
+
+Reads `examples/data/documents.jsonl`, creates deterministic local embeddings,
+and prints mock vector sink summaries. This is useful for document or event
+data that is already stored as JSON Lines.
 
 ## OpenAI-Compatible Embedding Pipeline
 

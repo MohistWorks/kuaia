@@ -242,7 +242,7 @@ public class LocalPipelineRunner {
         String sourceType = config.getSource().getType();
         if ("file".equals(sourceType)) {
             return new FileSourceAdapter(
-                    new FileSource(Paths.get(config.getSource().getPath())),
+                    new FileSource(Paths.get(config.getSource().getPath()), config.getSource().getFormat()),
                     "file-0",
                     fileRowsPerSplit(config));
         }
