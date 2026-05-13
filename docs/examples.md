@@ -17,6 +17,8 @@ It validates these public MVP paths in an isolated `.kuaia/public-mvp-smoke`
 work directory:
 
 - CSV source through `select` and `rename` transforms into a local CSV file,
+- quoted CSV source fields with commas, quotes, and line breaks into a local
+  CSV file,
 - JSONL source through `trim` and `filter` transforms into a local JSONL file,
 - CSV source through `mock-embedding` into the mock vector sink,
 - JSONL source through `trim`, `filter`, and `mock-embedding` into the mock
@@ -64,6 +66,27 @@ id,name
 
 This is the default Docker quickstart example because the output is easy to
 inspect.
+
+## Quoted CSV To File
+
+```bash
+bin/kuaia run -f examples/local-quoted-csv-to-file.yaml
+cat .kuaia/output/local-quoted-csv-to-file.csv
+```
+
+Reads `examples/data/quoted-documents.csv`, which contains a comma, escaped
+quotes, and a multiline field inside quoted CSV values. It writes a deterministic
+CSV file using the same quoting rules:
+
+```text
+id,content
+1,"Alpha, ""Beta"""
+2,"Line one
+Line two"
+```
+
+This is the no-service path for checking quoted CSV parsing and file sink
+quoting together.
 
 ## Local JSONL To File
 

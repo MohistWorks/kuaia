@@ -47,15 +47,19 @@ Run the CLI and the default local example:
 bin/kuaia help
 bin/kuaia examples
 bin/kuaia run -f examples/local-file-to-file.yaml
+bin/kuaia run -f examples/local-quoted-csv-to-file.yaml
 bin/kuaia run -f examples/local-jsonl-to-file.yaml
 cat .kuaia/output/local-file-to-file.csv
+cat .kuaia/output/local-quoted-csv-to-file.csv
 cat .kuaia/output/local-jsonl-to-file.jsonl
 ```
 
 The example reads `examples/data/users.csv` and writes a deterministic CSV file
-under `.kuaia/output/local-file-to-file.csv`. The JSONL file example reads
-`examples/data/documents.jsonl`, trims and length-filters `content`, and writes
-`.kuaia/output/local-jsonl-to-file.jsonl`.
+under `.kuaia/output/local-file-to-file.csv`. The quoted CSV example reads
+`examples/data/quoted-documents.csv` and preserves commas, escaped quotes, and
+line breaks through `.kuaia/output/local-quoted-csv-to-file.csv`. The JSONL file
+example reads `examples/data/documents.jsonl`, trims and length-filters
+`content`, and writes `.kuaia/output/local-jsonl-to-file.jsonl`.
 
 Validate the public MVP paths without external services:
 
@@ -63,8 +67,8 @@ Validate the public MVP paths without external services:
 make public-mvp-smoke
 ```
 
-This smoke test runs file-to-file, mock-vector, and bad-record handling examples
-in an isolated local state directory.
+This smoke test runs file-to-file, quoted CSV, mock-vector, and bad-record
+handling examples in an isolated local state directory.
 
 ## Build A Packaged Runtime
 
@@ -177,6 +181,7 @@ Common local examples:
 bin/kuaia run -f examples/local-file-to-console.yaml
 bin/kuaia run -f examples/local-file-transform-to-console.yaml
 bin/kuaia run -f examples/local-file-skip-bad-records.yaml
+bin/kuaia run -f examples/local-quoted-csv-to-file.yaml
 bin/kuaia run -f examples/local-file-to-vector.yaml
 bin/kuaia run -f examples/local-jsonl-to-vector.yaml
 bin/kuaia run -f examples/local-jsonl-chunk-to-vector.yaml

@@ -32,6 +32,7 @@ All notable public changes to Kuaia are tracked here.
   breaks instead of rejecting them.
 - CSV file sources now parse quoted fields with commas, escaped quotes, and
   line breaks as one logical source record.
+- Added a public quoted CSV source-to-file example and smoke coverage.
 
 ## 0.1.1 - 2026-05-13
 
