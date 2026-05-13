@@ -332,6 +332,69 @@ class WorkerNodeTest {
         }
     }
 
+    @Test
+    void workerRejectsTaskAssignmentWhenDefinitionTaskIdDiffers() throws Exception {
+        CountDownLatch completed = new CountDownLatch(1);
+        AtomicReference<WorkerMessage> resultMessage = new AtomicReference<>();
+        Server server = ServerBuilder.forPort(0)
+                .addService(new CoordinatorServiceGrpc.CoordinatorServiceImplBase() {
+                    @Override
+                    public StreamObserver<WorkerMessage> taskStream(
+                            StreamObserver<CoordinatorMessage> responseObserver) {
+                        return new StreamObserver<WorkerMessage>() {
+                            @Override
+                            public void onNext(WorkerMessage value) {
+                                if (value.hasHello()) {
+                                    responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                            .setAssignment(TaskAssignment.newBuilder()
+                                                    .setTaskId("task-1")
+                                                    .setAttemptId("attempt-1")
+                                                    .setDefinition(serializedDefinition("other-task"))
+                                                    .setStartSeq(1L)
+                                                    .setLeaseUntilMillis(10_000L)
+                                                    .build())
+                                            .build());
+                                }
+                                if (value.hasTaskResult()) {
+                                    resultMessage.compareAndSet(null, value);
+                                    completed.countDown();
+                                }
+                            }
+
+                            @Override
+                            public void onError(Throwable t) {
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                            }
+                        };
+                    }
+                })
+                .build()
+                .start();
+        String workerId = "worker-mismatched-definition-test-" + System.nanoTime();
+        WorkerNode worker = new WorkerNode(workerId);
+
+        try {
+            worker.start("127.0.0.1", server.getPort());
+
+            assertTrue(completed.await(3, TimeUnit.SECONDS), "worker should reject mismatched definition task id");
+            WorkerMessage message = resultMessage.get();
+            assertEquals(workerId, message.getWorkerId());
+            assertTrue(message.hasTaskResult());
+            assertEquals("task-1", message.getTaskResult().getTaskId());
+            assertEquals("attempt-1", message.getTaskResult().getAttemptId());
+            assertEquals(workerId, message.getTaskResult().getWorkerId());
+            assertEquals(AttemptStatus.ATTEMPT_FAILED, message.getTaskResult().getStatus());
+            assertEquals("INVALID_ASSIGNMENT", message.getTaskResult().getErrorCode());
+        } finally {
+            worker.stop();
+            server.shutdownNow();
+            server.awaitTermination(3, TimeUnit.SECONDS);
+        }
+    }
+
     private Path repoRoot() {
         Path cwd = Paths.get("").toAbsolutePath();
         if (Files.exists(cwd.resolve("pom.xml")) && Files.exists(cwd.resolve("kuaia-engine"))) {

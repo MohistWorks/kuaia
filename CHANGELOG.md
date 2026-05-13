@@ -58,6 +58,8 @@ All notable public changes to Kuaia are tracked here.
   before reporting success.
 - Worker assignment definition bytes must now deserialize to `TaskDefinition`
   before the worker reports a typed assignment as successful.
+- Worker assignment definitions must now carry the same task id as the
+  assignment envelope before the worker reports success.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
