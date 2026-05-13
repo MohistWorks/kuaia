@@ -22,6 +22,39 @@ class FileSourceTest {
     Path tempDir;
 
     @Test
+    void csvReadsQuotedFieldsWithCommasQuotesAndNewlines() throws Exception {
+        Path csv = tempDir.resolve("quoted-documents.csv");
+        Files.write(csv, String.join("\n",
+                "id,content",
+                "1,\"Alpha, \"\"Beta\"\"",
+                "Next\"",
+                "2,Gamma").getBytes(StandardCharsets.UTF_8));
+        FileSource source = new FileSource(csv);
+        source.open();
+        List<Long> seqIds = new ArrayList<>();
+        List<BinaryRow> rows = new ArrayList<>();
+
+        int read = source.readFrom(
+                0L,
+                (seqId, row) -> {
+                    seqIds.add(seqId);
+                    rows.add(row);
+                },
+                (seqId, error) -> {
+                    throw new AssertionError("Unexpected row error for seq " + seqId, error);
+                });
+
+        assertEquals(2, read);
+        assertEquals(2L, source.getRecordCount());
+        assertEquals(Arrays.asList(1L, 2L), seqIds);
+        assertEquals(1L, rows.get(0).getLong(0));
+        assertEquals("Alpha, \"Beta\"\nNext", rows.get(0).getString(1));
+        assertEquals(2L, rows.get(1).getLong(0));
+        assertEquals("Gamma", rows.get(1).getString(1));
+        source.close();
+    }
+
+    @Test
     void rangeReadStopsBeforeUpperBoundWithoutParsingLaterRows() throws Exception {
         Path csv = tempDir.resolve("documents.csv");
         Files.write(csv, String.join("\n",

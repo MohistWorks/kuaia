@@ -21,6 +21,25 @@ class FileSourceAdapterTest {
     Path tempDir;
 
     @Test
+    void quotedMultilineCsvRecordsCountAsOneSourceSplitRow() throws Exception {
+        Path csv = tempDir.resolve("quoted-documents.csv");
+        Files.write(csv, String.join("\n",
+                "id,content",
+                "1,\"Alpha",
+                "Next\"",
+                "2,Beta").getBytes(StandardCharsets.UTF_8));
+        FileSourceAdapter adapter = new FileSourceAdapter(new FileSource(csv), "file-0", 1);
+
+        adapter.open();
+        List<SourceSplit> splits = adapter.enumerateSplits();
+
+        assertEquals(2, splits.size());
+        assertSplit(splits.get(0), "file-0-part-0", 1L, 1L);
+        assertSplit(splits.get(1), "file-0-part-1", 2L, 2L);
+        adapter.close();
+    }
+
+    @Test
     void enumeratesSplitsFromNonEmptyCsvRecordCountAndReadersHonorRanges() throws Exception {
         Path csv = tempDir.resolve("documents.csv");
         Files.write(csv, String.join("\n",
