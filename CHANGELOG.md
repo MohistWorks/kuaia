@@ -56,6 +56,8 @@ All notable public changes to Kuaia are tracked here.
   ids with `INVALID_ASSIGNMENT` instead of reporting success.
 - Worker nodes now also require typed assignments to include definition bytes
   before reporting success.
+- Worker assignment definition bytes must now deserialize to `TaskDefinition`
+  before the worker reports a typed assignment as successful.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
