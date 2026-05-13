@@ -65,6 +65,9 @@ public class WorkerNode {
                         executeTask(task);
                     }
                 }
+                if (value.hasAssignment()) {
+                    completeAssignment(value.getAssignment());
+                }
             }
 
             private void executeTask(TaskPayload task) {
@@ -94,6 +97,19 @@ public class WorkerNode {
             private void tryToPullFromDisk() {
                 // Simplified "pull back" logic for MVP
                 // In a real scenario, we'd need to track which seqIds are on disk
+            }
+
+            private void completeAssignment(TaskAssignment assignment) {
+                WorkerMessage result = WorkerMessage.newBuilder()
+                        .setWorkerId(id)
+                        .setTaskResult(TaskAttemptResult.newBuilder()
+                                .setTaskId(assignment.getTaskId())
+                                .setAttemptId(assignment.getAttemptId())
+                                .setWorkerId(id)
+                                .setStatus(AttemptStatus.ATTEMPT_SUCCESS)
+                                .build())
+                        .build();
+                sendMessage(result);
             }
 
             @Override public void onError(Throwable t) {
