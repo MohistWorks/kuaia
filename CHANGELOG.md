@@ -66,6 +66,8 @@ All notable public changes to Kuaia are tracked here.
   instead of resending stale leases to reconnecting workers.
 - Coordinator ack handling now rejects expired attempts before applying typed
   record, checkpoint, or task-result acknowledgements.
+- Transient typed task-attempt failures now move tasks to RETRYING while
+  preserving checkpoint progress instead of marking them permanently failed.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
