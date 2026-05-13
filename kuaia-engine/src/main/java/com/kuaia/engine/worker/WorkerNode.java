@@ -1,5 +1,6 @@
 package com.kuaia.engine.worker;
 
+import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.rpc.*;
 import com.kuaia.common.utils.PendingSet;
 import com.kuaia.engine.worker.buffer.RocksDBBuffer;
@@ -8,6 +9,9 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -104,9 +108,7 @@ public class WorkerNode {
                                 .setTaskId(assignment.getTaskId())
                                 .setAttemptId(assignment.getAttemptId())
                                 .setWorkerId(id);
-                if (assignment.getTaskId().isEmpty()
-                        || assignment.getAttemptId().isEmpty()
-                        || assignment.getDefinition().isEmpty()) {
+                if (isInvalidAssignment(assignment)) {
                     result.setStatus(AttemptStatus.ATTEMPT_FAILED)
                             .setErrorCode("INVALID_ASSIGNMENT")
                             .setErrorMessage("Task assignment requires taskId, attemptId, and definition");
@@ -118,6 +120,24 @@ public class WorkerNode {
                         .setTaskResult(result.build())
                         .build();
                 sendMessage(message);
+            }
+
+            private boolean isInvalidAssignment(TaskAssignment assignment) {
+                return assignment.getTaskId().isEmpty()
+                        || assignment.getAttemptId().isEmpty()
+                        || !hasValidDefinition(assignment);
+            }
+
+            private boolean hasValidDefinition(TaskAssignment assignment) {
+                if (assignment.getDefinition().isEmpty()) {
+                    return false;
+                }
+                try (ObjectInputStream objectStream = new ObjectInputStream(
+                        new ByteArrayInputStream(assignment.getDefinition().toByteArray()))) {
+                    return objectStream.readObject() instanceof TaskDefinition;
+                } catch (IOException | ClassNotFoundException e) {
+                    return false;
+                }
             }
 
             @Override public void onError(Throwable t) {
