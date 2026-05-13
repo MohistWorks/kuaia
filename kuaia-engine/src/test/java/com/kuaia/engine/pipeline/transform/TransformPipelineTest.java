@@ -100,6 +100,27 @@ class TransformPipelineTest {
     }
 
     @Test
+    void filterTransformDropsStringsShorterThanMinLength() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(filterConfig("content", "min-length", 5)));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Arrays.asList(
+                row(1L, "Alpha"),
+                row(2L, "Beta"),
+                row(3L, "  Gamma  "),
+                row(4L, "   ")));
+
+        assertArrayEquals(new String[]{"id", "content"}, pipeline.getOutputType().getFieldNames());
+        assertArrayEquals(new DataType[]{DataType.LONG, DataType.STRING}, pipeline.getOutputType().getFieldTypes());
+        assertEquals(2, outputs.size());
+        assertEquals(1L, outputs.get(0).getLong(0));
+        assertEquals("Alpha", outputs.get(0).getString(1));
+        assertEquals(3L, outputs.get(1).getLong(0));
+        assertEquals("  Gamma  ", outputs.get(1).getString(1));
+    }
+
+    @Test
     void filterTransformRejectsUnknownField() {
         PipelineExecutionException error = assertThrows(
                 PipelineExecutionException.class,
@@ -284,6 +305,10 @@ class TransformPipelineTest {
     }
 
     private PipelineConfig.TransformConfig filterConfig(String field, String op) {
+        return filterConfig(field, op, 0);
+    }
+
+    private PipelineConfig.TransformConfig filterConfig(String field, String op, int minLength) {
         return new PipelineConfig.TransformConfig(
                 "filter",
                 Collections.emptyList(),
@@ -302,7 +327,8 @@ class TransformPipelineTest {
                 0,
                 false,
                 false,
-                op);
+                op,
+                minLength);
     }
 
     private PipelineConfig.TransformConfig chunkConfig(int chunkSize, int overlap) {

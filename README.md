@@ -54,7 +54,7 @@ cat .kuaia/output/local-jsonl-to-file.jsonl
 
 The example reads `examples/data/users.csv` and writes a deterministic CSV file
 under `.kuaia/output/local-file-to-file.csv`. The JSONL file example reads
-`examples/data/documents.jsonl`, trims and filters `content`, and writes
+`examples/data/documents.jsonl`, trims and length-filters `content`, and writes
 `.kuaia/output/local-jsonl-to-file.jsonl`.
 
 Validate the public MVP paths without external services:
@@ -229,7 +229,7 @@ service requirements.
 | Area | Current support |
 | --- | --- |
 | Sources | `file` CSV and JSONL, batch `postgres` queries |
-| Transforms | `select`, `rename`, `trim`, `filter`, `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
+| Transforms | `select`, `rename`, `trim`, `filter` (`not-empty`, `min-length`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
 | Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant` |
 | Runtime | Linear batch pipeline, checkpoint resume, bad-record skip mode |
 | State | Local checkpoint state, in-memory and RocksDB state stores |

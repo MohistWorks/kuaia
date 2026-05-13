@@ -21,6 +21,8 @@ All notable public changes to Kuaia are tracked here.
   before filtering, chunking, or embedding.
 - File sinks now support `format: jsonl`, including a public JSONL clean-to-file
   example and smoke coverage.
+- `filter` now supports `op: min-length` for dropping too-short text before
+  file output, chunking, or embedding.
 
 ### Changed
 
