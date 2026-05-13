@@ -28,6 +28,8 @@ All notable public changes to Kuaia are tracked here.
 
 - Main branch development version is now `0.1.2-SNAPSHOT` after the `v0.1.1`
   release.
+- CSV file sinks now quote string values containing commas, quotes, or line
+  breaks instead of rejecting them.
 
 ## 0.1.1 - 2026-05-13
 

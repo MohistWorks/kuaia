@@ -368,8 +368,9 @@ CSV output rules:
 - `append` writes the header only when the target file does not exist or is
   empty,
 - `LONG`, `STRING`, and `VECTOR` output fields are supported,
-- string fields containing commas or newlines are rejected because quoted CSV
-  fields are not part of this MVP contract,
+- string fields and header fields containing commas, quotes, newlines, or
+  carriage returns are written as quoted CSV fields, with quotes escaped by
+  doubling them,
 - vector fields are written as bracketed, space-delimited values such as
   `[5.0000 6.0000 7.0000 8.0000]`.
 
@@ -709,7 +710,6 @@ Common examples:
 - `Missing Qdrant API key environment variable: <name>`
 - `Qdrant upsert failed with status <code>: <response>`
 - `Qdrant upsert failed: <message>`
-- `File sink does not support quoted CSV fields`
 - `File sink does not support field type: <type>`
 - `Invalid CSV row at line <line>: expected <n> columns but found <m>`
 - `Invalid JSONL row at line <line>: malformed JSON`
