@@ -157,22 +157,34 @@ transforms:
     output: chunk
     chunkSize: 500
     overlap: 50
+    dropInput: true
+    includeOffsets: true
 ```
 
-`chunk` splits a string field into character-based text chunks. It preserves the
-original row fields and appends:
+`chunk` splits a string field into character-based text chunks. By default it
+preserves the original row fields and appends:
 
 - the configured `output` string field containing the chunk text,
 - `chunk_index` as a `LONG`, starting at `0` for each input row.
+
+Optional payload controls:
+
+- `dropInput`: defaults to `false`; when `true`, removes the original input
+  text field from output rows. Other source fields are preserved.
+- `includeOffsets`: defaults to `false`; when `true`, appends `chunk_start` and
+  `chunk_end` as `LONG` character offsets.
 
 Rules:
 
 - `input` must exist and be `STRING`,
 - `output` must not already exist,
 - `chunk_index` must not already exist,
+- `chunk_start` and `chunk_end` must not already exist when `includeOffsets`
+  is `true`,
 - `chunkSize` is required and must be a positive integer,
 - `overlap` is optional, defaults to `0`, and must be smaller than
   `chunkSize`,
+- `dropInput` and `includeOffsets` must be `true` or `false` when configured,
 - empty input text emits zero output rows,
 - chunking is character-based, not token-based.
 
@@ -603,6 +615,8 @@ Common examples:
 - `Invalid transform.batchSize: <value>`
 - `Invalid transform.chunkSize: <value>`
 - `Invalid transform.overlap: <value>`
+- `Invalid transform.dropInput: <value>`
+- `Invalid transform.includeOffsets: <value>`
 - `transform.overlap must be smaller than transform.chunkSize`
 - `Local path escapes allowed directories: <field>`
 - `Missing API key environment variable: <name>`

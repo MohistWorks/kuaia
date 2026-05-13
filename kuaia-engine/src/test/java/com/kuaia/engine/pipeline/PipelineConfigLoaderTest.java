@@ -237,6 +237,34 @@ class PipelineConfigLoaderTest {
         assertEquals("chunk", chunk.getOutput());
         assertEquals(5, chunk.getChunkSize());
         assertEquals(1, chunk.getOverlap());
+        assertEquals(false, chunk.isDropInput());
+        assertEquals(false, chunk.isIncludeOffsets());
+    }
+
+    @Test
+    void loadsChunkTransformPayloadControls() throws Exception {
+        Path configPath = tempDir.resolve("chunk-transform-payload-controls.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: chunk-transform-payload-controls",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "    chunkSize: 500",
+                "    dropInput: true",
+                "    includeOffsets: true",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig chunk = config.getTransforms().get(0);
+        assertEquals(true, chunk.isDropInput());
+        assertEquals(true, chunk.isIncludeOffsets());
     }
 
     @Test
@@ -259,6 +287,31 @@ class PipelineConfigLoaderTest {
         PipelineConfig config = new PipelineConfigLoader().load(configPath);
 
         assertEquals(0, config.getTransforms().get(0).getOverlap());
+    }
+
+    @Test
+    void rejectsInvalidChunkTransformPayloadBoolean() throws Exception {
+        Path configPath = tempDir.resolve("invalid-chunk-transform-payload-boolean.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-chunk-transform-payload-boolean",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "    chunkSize: 500",
+                "    includeOffsets: yes",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid transform.includeOffsets: yes", error.getMessage());
     }
 
     @Test

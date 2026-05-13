@@ -160,7 +160,9 @@ bin/kuaia run -f examples/local-jsonl-chunk-to-qdrant.yaml
 This example reads `examples/data/articles.jsonl`, splits each document into
 chunks, generates deterministic mock embeddings, and writes Qdrant point ids as
 `id * 1000000 + chunk_index` so chunks from the same document do not overwrite
-each other.
+each other. It also sets `dropInput: true` and `includeOffsets: true` so Qdrant
+payloads keep `chunk`, `chunk_index`, `chunk_start`, and `chunk_end` without
+repeating the full source document text on every point.
 
 ## Postgres To Qdrant
 

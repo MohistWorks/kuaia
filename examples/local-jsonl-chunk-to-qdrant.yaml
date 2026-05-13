@@ -11,6 +11,8 @@ transforms:
     output: chunk
     chunkSize: 12
     overlap: 2
+    dropInput: true
+    includeOffsets: true
   - type: mock-embedding
     input: chunk
     output: embedding

@@ -64,6 +64,8 @@ Supported runtime behavior:
 - RocksDB-backed local checkpoints,
 - bad-record skipping for malformed CSV or JSONL rows,
 - character-based text chunking for local document pipelines,
+- chunk payload controls for omitting repeated source text and keeping
+  character offsets,
 - batch-aware embedding and vector sink execution,
 - Qdrant point id generation for chunked document pipelines,
 - run summaries with row, checkpoint, split, and sink batch counters.

@@ -57,6 +57,8 @@ class KuaiaExamplesTest {
         assertTrue(read(fileToQdrantPath).contains("timeoutMs: 30000"));
         assertTrue(read(chunkToQdrantPath).contains("chunkIndexField: chunk_index"));
         assertTrue(read(chunkToQdrantPath).contains("chunkIdMultiplier: 1000000"));
+        assertTrue(read(chunkToQdrantPath).contains("dropInput: true"));
+        assertTrue(read(chunkToQdrantPath).contains("includeOffsets: true"));
         assertTrue(read(postgresToQdrantPath).contains("fetchSize: 1000"));
         assertTrue(read(postgresToQdrantPath).contains("timeoutMs: 30000"));
         assertEquals(30000, fileToQdrant.getSink().getTimeoutMs());
