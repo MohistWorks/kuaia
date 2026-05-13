@@ -176,15 +176,31 @@ transforms:
 ```
 
 `filter` drops rows that do not match the configured predicate while preserving
-the row schema. The current MVP supports one predicate: `op: not-empty` keeps
-rows whose configured string field contains at least one non-whitespace
-character.
+the row schema.
+
+Supported predicates:
+
+- `op: not-empty` keeps rows whose configured string field contains at least one
+  non-whitespace character.
+- `op: min-length` keeps rows whose configured string field has at least
+  `minLength` non-whitespace characters after trimming for predicate evaluation.
+
+Example:
+
+```yaml
+transforms:
+  - type: filter
+    field: content
+    op: min-length
+    minLength: 20
+```
 
 Rules:
 
 - `field` must exist and be `STRING`,
 - `op` is required,
-- supported `op` values: `not-empty`,
+- supported `op` values: `not-empty`, `min-length`,
+- `minLength` is required for `op: min-length` and must be a positive integer,
 - dropped rows are counted as source rows read, not as rows written,
 - checkpointed runs still advance the checkpoint after a filtered source batch
   is processed.
@@ -669,6 +685,7 @@ Common examples:
 - `Invalid transform.dimensions: <value>`
 - `Invalid transform.timeoutMs: <value>`
 - `Invalid transform.batchSize: <value>`
+- `Invalid transform.minLength: <value>`
 - `Invalid transform.chunkSize: <value>`
 - `Invalid transform.overlap: <value>`
 - `Invalid transform.dropInput: <value>`
@@ -709,7 +726,7 @@ The current YAML contract does not support:
 - nested JSONL objects, arrays, or null values,
 - token-based or semantic text chunking,
 - transform DAGs,
-- comparison filters, joins, casts, or aggregations,
+- general comparison filters, joins, casts, or aggregations,
 - CDC offsets,
 - CDC or streaming external connectors,
 - additional production-certified external connectors beyond batch PostgreSQL,

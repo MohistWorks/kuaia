@@ -65,6 +65,8 @@ class KuaiaExamplesTest {
         assertTrue(read(fileToQdrantPath).contains("timeoutMs: 30000"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-vector.yaml")).contains("type: trim"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-vector.yaml")).contains("op: not-empty"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("op: min-length"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("minLength: 4"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-chunk-to-vector.yaml")).contains("type: trim"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-chunk-to-vector.yaml")).contains("op: not-empty"));
         assertTrue(read(chunkToQdrantPath).contains("type: trim"));

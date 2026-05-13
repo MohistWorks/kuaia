@@ -246,7 +246,10 @@ public class PipelineConfigLoader {
     private PipelineConfig.TransformConfig loadFilterTransform(Map<String, String> transform, String fieldPrefix)
             throws PipelineConfigException {
         String op = require(transform, fieldPrefix + ".op");
-        requireSupported(fieldPrefix + ".op", op, "not-empty");
+        requireSupported(fieldPrefix + ".op", op, "not-empty", "min-length");
+        int minLength = "min-length".equals(op)
+                ? parseMinLength(require(transform, fieldPrefix + ".minLength"))
+                : 0;
         return new PipelineConfig.TransformConfig(
                 "filter",
                 new ArrayList<>(),
@@ -265,7 +268,8 @@ public class PipelineConfigLoader {
                 0,
                 false,
                 false,
-                op);
+                op,
+                minLength);
     }
 
     private PipelineConfig.TransformConfig loadTrimTransform(Map<String, String> transform, String fieldPrefix)
@@ -489,6 +493,18 @@ public class PipelineConfigLoader {
             return chunkSize;
         } catch (NumberFormatException e) {
             throw new PipelineConfigException("Invalid transform.chunkSize: " + value, e);
+        }
+    }
+
+    private int parseMinLength(String value) throws PipelineConfigException {
+        try {
+            int minLength = Integer.parseInt(value.trim());
+            if (minLength <= 0) {
+                throw new PipelineConfigException("Invalid transform.minLength: " + value);
+            }
+            return minLength;
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid transform.minLength: " + value, e);
         }
     }
 

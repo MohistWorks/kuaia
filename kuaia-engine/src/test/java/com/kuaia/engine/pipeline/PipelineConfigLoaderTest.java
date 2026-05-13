@@ -382,6 +382,32 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsMinLengthFilterTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("min-length-filter-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: min-length-filter-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: min-length",
+                "    minLength: 12",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig filter = config.getTransforms().get(0);
+        assertEquals("filter", filter.getType());
+        assertEquals("content", filter.getInput());
+        assertEquals("min-length", filter.getOp());
+        assertEquals(12, filter.getMinLength());
+    }
+
+    @Test
     void rejectsMissingFilterTransformOp() throws Exception {
         Path configPath = tempDir.resolve("missing-filter-op.yaml");
         Files.write(configPath, String.join("\n",
@@ -424,6 +450,53 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("Unsupported transforms[0].op: equals", error.getMessage());
+    }
+
+    @Test
+    void rejectsMissingMinLengthFilterTransformMinLength() throws Exception {
+        Path configPath = tempDir.resolve("missing-min-length-filter-min-length.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-min-length-filter-min-length",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: min-length",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].minLength", error.getMessage());
+    }
+
+    @Test
+    void rejectsInvalidMinLengthFilterTransformMinLength() throws Exception {
+        Path configPath = tempDir.resolve("invalid-min-length-filter-min-length.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-min-length-filter-min-length",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: min-length",
+                "    minLength: 0",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid transform.minLength: 0", error.getMessage());
     }
 
     @Test

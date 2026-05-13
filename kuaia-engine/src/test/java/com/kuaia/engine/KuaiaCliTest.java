@@ -236,7 +236,8 @@ class KuaiaCliTest {
         Path data = tempDir.resolve("documents-file-sink.jsonl");
         Files.write(data, String.join("\n",
                 "{\"id\":1,\"content\":\"  Alpha  \"}",
-                "{\"id\":2,\"content\":\"   \"}").getBytes(StandardCharsets.UTF_8));
+                "{\"id\":2,\"content\":\"   \"}",
+                "{\"id\":3,\"content\":\"Hi\"}").getBytes(StandardCharsets.UTF_8));
         Path output = tempDir.resolve("out/documents.jsonl");
         Path config = tempDir.resolve("local-jsonl-to-file.yaml");
         Files.write(config, String.join("\n",
@@ -251,6 +252,10 @@ class KuaiaCliTest {
                 "  - type: filter",
                 "    field: content",
                 "    op: not-empty",
+                "  - type: filter",
+                "    field: content",
+                "    op: min-length",
+                "    minLength: 5",
                 "sink:",
                 "  type: file",
                 "  path: " + output,
