@@ -143,6 +143,25 @@ The example reads `examples/data/documents.csv`, creates deterministic mock
 embeddings, and upserts points into Qdrant collection `kuaia_docs`. It is not
 part of default automated tests because it requires a running Qdrant service.
 
+For chunked JSONL documents, create the chunk collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_article_chunks \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Then run:
+
+```bash
+bin/kuaia run -f examples/local-jsonl-chunk-to-qdrant.yaml
+```
+
+This example reads `examples/data/articles.jsonl`, splits each document into
+chunks, generates deterministic mock embeddings, and writes Qdrant point ids as
+`id * 1000000 + chunk_index` so chunks from the same document do not overwrite
+each other.
+
 ## Postgres To Qdrant
 
 Start Postgres and Qdrant:

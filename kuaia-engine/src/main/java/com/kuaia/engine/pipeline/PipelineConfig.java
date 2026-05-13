@@ -357,13 +357,15 @@ public class PipelineConfig {
         private final String vectorField;
         private final boolean wait;
         private final int timeoutMs;
+        private final String chunkIndexField;
+        private final long chunkIdMultiplier;
 
         public SinkConfig(String type) {
             this(type, null, null, null);
         }
 
         public SinkConfig(String type, String path, String format, String mode) {
-            this(type, path, format, mode, null, null, null, null, null, true, 0);
+            this(type, path, format, mode, null, null, null, null, null, true, 0, null, 0L);
         }
 
         public SinkConfig(
@@ -392,8 +394,28 @@ public class PipelineConfig {
                 String vectorField,
                 boolean wait,
                 int timeoutMs) {
+            this(type, path, format, mode, url, collection, apiKeyEnv, idField, vectorField, wait, timeoutMs, null, 0L);
+        }
+
+        public SinkConfig(
+                String type,
+                String path,
+                String format,
+                String mode,
+                String url,
+                String collection,
+                String apiKeyEnv,
+                String idField,
+                String vectorField,
+                boolean wait,
+                int timeoutMs,
+                String chunkIndexField,
+                long chunkIdMultiplier) {
             if (timeoutMs < 0) {
                 throw new IllegalArgumentException("timeoutMs must not be negative");
+            }
+            if (chunkIdMultiplier < 0) {
+                throw new IllegalArgumentException("chunkIdMultiplier must not be negative");
             }
             this.type = type;
             this.path = path;
@@ -406,6 +428,8 @@ public class PipelineConfig {
             this.vectorField = vectorField;
             this.wait = wait;
             this.timeoutMs = timeoutMs;
+            this.chunkIndexField = chunkIndexField;
+            this.chunkIdMultiplier = chunkIdMultiplier;
         }
 
         public String getType() {
@@ -450,6 +474,14 @@ public class PipelineConfig {
 
         public int getTimeoutMs() {
             return timeoutMs;
+        }
+
+        public String getChunkIndexField() {
+            return chunkIndexField;
+        }
+
+        public long getChunkIdMultiplier() {
+            return chunkIdMultiplier;
         }
     }
 

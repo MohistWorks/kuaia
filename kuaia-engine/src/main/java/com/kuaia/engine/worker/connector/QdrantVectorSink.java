@@ -25,6 +25,8 @@ public class QdrantVectorSink implements SinkWriter {
     private final KuaiaRowType rowType;
     private final int idOrdinal;
     private final int vectorOrdinal;
+    private final int chunkIndexOrdinal;
+    private final long chunkIdMultiplier;
     private final String upsertUrl;
     private final String apiKey;
     private final int timeoutMillis;
@@ -49,6 +51,10 @@ public class QdrantVectorSink implements SinkWriter {
         this.rowType = rowType;
         this.idOrdinal = requireField(rowType, config.getIdField(), DataType.LONG);
         this.vectorOrdinal = requireField(rowType, config.getVectorField(), DataType.VECTOR);
+        this.chunkIndexOrdinal = config.getChunkIndexField() == null
+                ? -1
+                : requireField(rowType, config.getChunkIndexField(), DataType.LONG);
+        this.chunkIdMultiplier = config.getChunkIdMultiplier();
         this.upsertUrl = buildUpsertUrl(config);
         this.apiKey = loadApiKey(config.getApiKeyEnv(), environment);
         this.timeoutMillis = config.getTimeoutMs() > 0 ? config.getTimeoutMs() : DEFAULT_TIMEOUT_MILLIS;
@@ -136,13 +142,31 @@ public class QdrantVectorSink implements SinkWriter {
             }
             BinaryRow row = rows.get(i);
             json.append("{");
-            json.append("\"id\":").append(row.getLong(idOrdinal));
+            json.append("\"id\":").append(pointId(row));
             json.append(",\"vector\":").append(vectorJson(row.getVector(vectorOrdinal)));
             json.append(",\"payload\":").append(payloadJson(row));
             json.append("}");
         }
         json.append("]}");
         return json.toString();
+    }
+
+    private long pointId(BinaryRow row) throws PipelineExecutionException {
+        long id = row.getLong(idOrdinal);
+        if (chunkIndexOrdinal < 0) {
+            return id;
+        }
+        long chunkIndex = row.getLong(chunkIndexOrdinal);
+        if (chunkIndex < 0L) {
+            throw new PipelineExecutionException("Qdrant chunk index must not be negative: " + chunkIndex);
+        }
+        try {
+            return Math.addExact(Math.multiplyExact(id, chunkIdMultiplier), chunkIndex);
+        } catch (ArithmeticException e) {
+            throw new PipelineExecutionException(
+                    "Qdrant generated point id overflow for id " + id + " and chunk index " + chunkIndex,
+                    e);
+        }
     }
 
     private String vectorJson(float[] vector) {

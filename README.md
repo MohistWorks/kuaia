@@ -194,7 +194,11 @@ docker compose -f docker-compose.qdrant.yml up -d
 curl -X PUT http://localhost:6333/collections/kuaia_docs \
   -H 'Content-Type: application/json' \
   --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+curl -X PUT http://localhost:6333/collections/kuaia_article_chunks \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
 bin/kuaia run -f examples/local-file-to-qdrant.yaml
+bin/kuaia run -f examples/local-jsonl-chunk-to-qdrant.yaml
 ```
 
 Postgres-to-Qdrant example:

@@ -227,6 +227,7 @@ public class KuaiaCli {
         out.println("External service examples:");
         out.println("  kuaia run -f examples/local-file-to-openai-compatible-vector.yaml");
         out.println("  kuaia run -f examples/local-file-to-qdrant.yaml");
+        out.println("  kuaia run -f examples/local-jsonl-chunk-to-qdrant.yaml");
         out.println("  kuaia run -f examples/postgres-to-qdrant.yaml");
         out.println();
         out.println("Docs:");

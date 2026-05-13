@@ -696,6 +696,128 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsQdrantChunkPointIdDefaults() throws Exception {
+        Path configPath = tempDir.resolve("qdrant-sink-chunk-id-defaults.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: qdrant-sink-chunk-id-defaults",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: chunk",
+                "    chunkSize: 500",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_chunks",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  chunkIndexField: chunk_index").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("chunk_index", config.getSink().getChunkIndexField());
+        assertEquals(1_000_000L, config.getSink().getChunkIdMultiplier());
+    }
+
+    @Test
+    void loadsQdrantChunkPointIdMultiplier() throws Exception {
+        Path configPath = tempDir.resolve("qdrant-sink-chunk-id-multiplier.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: qdrant-sink-chunk-id-multiplier",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_chunks",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  chunkIndexField: chunk_index",
+                "  chunkIdMultiplier: 10000").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals(10_000L, config.getSink().getChunkIdMultiplier());
+    }
+
+    @Test
+    void rejectsInvalidQdrantChunkIdMultiplier() throws Exception {
+        Path configPath = tempDir.resolve("invalid-qdrant-chunk-id-multiplier.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-qdrant-chunk-id-multiplier",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_chunks",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  chunkIndexField: chunk_index",
+                "  chunkIdMultiplier: 0").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid sink.chunkIdMultiplier: 0", error.getMessage());
+    }
+
+    @Test
+    void rejectsQdrantChunkIdMultiplierWithoutChunkIndexField() throws Exception {
+        Path configPath = tempDir.resolve("qdrant-chunk-id-multiplier-without-field.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: qdrant-chunk-id-multiplier-without-field",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_chunks",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  chunkIdMultiplier: 10000").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("sink.chunkIdMultiplier requires sink.chunkIndexField", error.getMessage());
+    }
+
+    @Test
+    void rejectsQdrantChunkPointIdFieldsForFileSink() throws Exception {
+        Path configPath = tempDir.resolve("file-sink-chunk-id.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: file-sink-chunk-id",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: out/users.csv",
+                "  format: csv",
+                "  chunkIndexField: chunk_index").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("sink.chunkIndexField is only supported for sink.type: qdrant", error.getMessage());
+    }
+
+    @Test
     void rejectsInvalidQdrantSinkTimeout() throws Exception {
         Path configPath = tempDir.resolve("invalid-qdrant-sink-timeout.yaml");
         Files.write(configPath, String.join("\n",

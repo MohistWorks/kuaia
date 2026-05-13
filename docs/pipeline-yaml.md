@@ -336,6 +336,8 @@ sink:
   collection: kuaia_docs
   idField: id
   vectorField: embedding
+  chunkIndexField: chunk_index
+  chunkIdMultiplier: 1000000
   wait: true
   timeoutMs: 30000
 ```
@@ -351,10 +353,20 @@ Fields:
 - `collection`: target collection name
 - `idField`: `LONG` field used as the Qdrant point id
 - `vectorField`: `VECTOR` field used as the Qdrant vector
+- `chunkIndexField`: optional `LONG` field used to generate unique point ids
+  for chunked rows
+- `chunkIdMultiplier`: optional positive multiplier used with
+  `chunkIndexField`; defaults to `1000000`
 - `apiKeyEnv`: optional environment variable containing the Qdrant API key
 - `wait`: optional, defaults to `true`; controls Qdrant's `wait` query parameter
 - `timeoutMs`: optional HTTP connect/read timeout in milliseconds. Defaults to
   `30000` and must be a positive integer when configured.
+
+When `chunkIndexField` is set, the Qdrant point id is generated as
+`idField * chunkIdMultiplier + chunkIndexField`. The payload still includes the
+original document id and `chunk_index`, so source documents can be traced while
+each chunk gets a stable point id. This is intended for pipelines that run
+`chunk` before writing to Qdrant.
 
 Qdrant collections are not created automatically. Create the example collection
 before running `examples/local-file-to-qdrant.yaml`:
@@ -625,7 +637,6 @@ The current YAML contract does not support:
 - quoted CSV parsing,
 - nested JSONL objects, arrays, or null values,
 - token-based or semantic text chunking,
-- generated unique vector ids for chunked Qdrant writes,
 - transform DAGs,
 - filters, joins, casts, or aggregations,
 - CDC offsets,
