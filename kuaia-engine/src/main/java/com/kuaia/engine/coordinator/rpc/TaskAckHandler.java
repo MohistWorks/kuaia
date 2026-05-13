@@ -52,6 +52,11 @@ public class TaskAckHandler {
             return record.complete(result.getAttemptId());
         }
         if (status == AttemptStatus.ATTEMPT_FAILED) {
+            if ("TRANSIENT".equals(result.getErrorCode())) {
+                return record.retrying(
+                        nullIfEmpty(result.getErrorCode()),
+                        nullIfEmpty(result.getErrorMessage()));
+            }
             return record.fail(
                     result.getAttemptId(),
                     nullIfEmpty(result.getErrorCode()),

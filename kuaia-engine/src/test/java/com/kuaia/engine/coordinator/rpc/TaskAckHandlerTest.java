@@ -119,6 +119,33 @@ class TaskAckHandlerTest {
     }
 
     @Test
+    void currentAttemptTransientFailureRetriesTask() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        store.saveTask(TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "attempt-1", System.currentTimeMillis() + 10_000L)
+                .running()
+                .checkpoint("attempt-1", 25L));
+        TaskAckHandler handler = new TaskAckHandler(store);
+
+        boolean accepted = handler.handleTaskAttemptResult(TaskAttemptResult.newBuilder()
+                .setTaskId("task-1")
+                .setAttemptId("attempt-1")
+                .setWorkerId("worker-1")
+                .setStatus(AttemptStatus.ATTEMPT_FAILED)
+                .setErrorCode("TRANSIENT")
+                .setErrorMessage("temporary worker failure")
+                .build());
+
+        TaskRecord record = store.getTask("task-1");
+        assertTrue(accepted);
+        assertEquals(TaskState.RETRYING, record.getState());
+        assertEquals(25L, record.getLastCheckpointSeq());
+        assertEquals("TRANSIENT", record.getLastErrorCode());
+        assertEquals("temporary worker failure", record.getLastErrorMessage());
+        assertEquals(0L, record.getLeaseUntilMillis());
+    }
+
+    @Test
     void currentAttemptCancellationCancelsTask() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")
