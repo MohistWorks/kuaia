@@ -104,10 +104,12 @@ public class WorkerNode {
                                 .setTaskId(assignment.getTaskId())
                                 .setAttemptId(assignment.getAttemptId())
                                 .setWorkerId(id);
-                if (assignment.getTaskId().isEmpty() || assignment.getAttemptId().isEmpty()) {
+                if (assignment.getTaskId().isEmpty()
+                        || assignment.getAttemptId().isEmpty()
+                        || assignment.getDefinition().isEmpty()) {
                     result.setStatus(AttemptStatus.ATTEMPT_FAILED)
                             .setErrorCode("INVALID_ASSIGNMENT")
-                            .setErrorMessage("Task assignment requires taskId and attemptId");
+                            .setErrorMessage("Task assignment requires taskId, attemptId, and definition");
                 } else {
                     result.setStatus(AttemptStatus.ATTEMPT_SUCCESS);
                 }

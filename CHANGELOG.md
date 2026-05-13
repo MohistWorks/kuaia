@@ -54,6 +54,8 @@ All notable public changes to Kuaia are tracked here.
   payloads.
 - Worker nodes now reject malformed typed assignments missing task or attempt
   ids with `INVALID_ASSIGNMENT` instead of reporting success.
+- Worker nodes now also require typed assignments to include definition bytes
+  before reporting success.
 - RETRYING tasks now clear stale worker assignments and are no longer replayed
   as active worker assignments after coordinator recovery.
 - `kuaia benchmark` can now write CSV benchmark output with `--format csv`.
