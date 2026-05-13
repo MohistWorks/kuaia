@@ -111,7 +111,7 @@ public class WorkerNode {
                 if (isInvalidAssignment(assignment)) {
                     result.setStatus(AttemptStatus.ATTEMPT_FAILED)
                             .setErrorCode("INVALID_ASSIGNMENT")
-                            .setErrorMessage("Task assignment requires taskId, attemptId, and definition");
+                            .setErrorMessage("Task assignment requires taskId, attemptId, definition, and active lease");
                 } else {
                     result.setStatus(AttemptStatus.ATTEMPT_SUCCESS);
                 }
@@ -125,6 +125,7 @@ public class WorkerNode {
             private boolean isInvalidAssignment(TaskAssignment assignment) {
                 return assignment.getTaskId().isEmpty()
                         || assignment.getAttemptId().isEmpty()
+                        || assignment.getLeaseUntilMillis() <= System.currentTimeMillis()
                         || !hasMatchingDefinition(assignment);
             }
 
