@@ -188,6 +188,7 @@ public class PipelineConfig {
         private final int overlap;
         private final boolean dropInput;
         private final boolean includeOffsets;
+        private final String op;
 
         public TransformConfig(String type, List<String> fields, String from, String to) {
             this(type, fields, from, to, null, null, 4);
@@ -291,6 +292,29 @@ public class PipelineConfig {
                 int overlap,
                 boolean dropInput,
                 boolean includeOffsets) {
+            this(type, fields, from, to, input, output, dimensions, provider, baseUrl, model, apiKeyEnv,
+                    timeoutMs, batchSize, chunkSize, overlap, dropInput, includeOffsets, null);
+        }
+
+        public TransformConfig(
+                String type,
+                List<String> fields,
+                String from,
+                String to,
+                String input,
+                String output,
+                int dimensions,
+                String provider,
+                String baseUrl,
+                String model,
+                String apiKeyEnv,
+                int timeoutMs,
+                int batchSize,
+                int chunkSize,
+                int overlap,
+                boolean dropInput,
+                boolean includeOffsets,
+                String op) {
             this.type = type;
             this.fields = Collections.unmodifiableList(new ArrayList<>(fields));
             this.from = from;
@@ -308,6 +332,7 @@ public class PipelineConfig {
             this.overlap = overlap;
             this.dropInput = dropInput;
             this.includeOffsets = includeOffsets;
+            this.op = op;
         }
 
         public String getType() {
@@ -376,6 +401,10 @@ public class PipelineConfig {
 
         public boolean isIncludeOffsets() {
             return includeOffsets;
+        }
+
+        public String getOp() {
+            return op;
         }
     }
 

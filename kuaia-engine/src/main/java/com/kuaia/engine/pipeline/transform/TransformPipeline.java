@@ -93,6 +93,9 @@ public class TransformPipeline {
                     embeddingProviders.create(config),
                     config.getBatchSize());
         }
+        if ("filter".equals(config.getType())) {
+            return new FilterTransform(config.getInput(), config.getOp());
+        }
         if ("chunk".equals(config.getType())) {
             return new TextChunkTransform(
                     config.getInput(),

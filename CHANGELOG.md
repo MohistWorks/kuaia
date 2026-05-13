@@ -15,6 +15,8 @@ All notable public changes to Kuaia are tracked here.
   chunk-to-Qdrant example.
 - Chunk transforms now support `dropInput` and `includeOffsets` so chunked
   vector payloads can omit repeated source text while keeping character offsets.
+- Added a minimal `filter` transform with `op: not-empty` for dropping empty
+  text rows before embedding or chunking.
 
 ### Changed
 

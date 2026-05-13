@@ -315,6 +315,75 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsFilterTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("filter-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: filter-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: not-empty",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig filter = config.getTransforms().get(0);
+        assertEquals("filter", filter.getType());
+        assertEquals("content", filter.getInput());
+        assertEquals("not-empty", filter.getOp());
+    }
+
+    @Test
+    void rejectsMissingFilterTransformOp() throws Exception {
+        Path configPath = tempDir.resolve("missing-filter-op.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-filter-op",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].op", error.getMessage());
+    }
+
+    @Test
+    void rejectsUnsupportedFilterTransformOp() throws Exception {
+        Path configPath = tempDir.resolve("unsupported-filter-op.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: unsupported-filter-op",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: equals",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Unsupported transforms[0].op: equals", error.getMessage());
+    }
+
+    @Test
     void rejectsMissingChunkTransformChunkSize() throws Exception {
         Path configPath = tempDir.resolve("missing-chunk-size.yaml");
         Files.write(configPath, String.join("\n",

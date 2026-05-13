@@ -6,6 +6,9 @@ source:
 transforms:
   - type: select
     fields: [id, content]
+  - type: filter
+    field: content
+    op: not-empty
   - type: chunk
     input: content
     output: chunk

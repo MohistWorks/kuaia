@@ -50,6 +50,9 @@ source:
 transforms:
   - type: select
     fields: [id, content]
+  - type: filter
+    field: content
+    op: not-empty
   - type: mock-embedding
     input: content
     output: embedding
@@ -90,6 +93,9 @@ source:
 transforms:
   - type: select
     fields: [id, content]
+  - type: filter
+    field: content
+    op: not-empty
   - type: chunk
     input: content
     output: chunk

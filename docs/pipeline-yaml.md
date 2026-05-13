@@ -148,6 +148,29 @@ Rules:
 - `from` must exist,
 - `to` must not duplicate another field name unless it is the same field.
 
+### filter
+
+```yaml
+transforms:
+  - type: filter
+    field: content
+    op: not-empty
+```
+
+`filter` drops rows that do not match the configured predicate while preserving
+the row schema. The current MVP supports one predicate: `op: not-empty` keeps
+rows whose configured string field contains at least one non-whitespace
+character.
+
+Rules:
+
+- `field` must exist and be `STRING`,
+- `op` is required,
+- supported `op` values: `not-empty`,
+- dropped rows are counted as source rows read, not as rows written,
+- checkpointed runs still advance the checkpoint after a filtered source batch
+  is processed.
+
 ### chunk
 
 ```yaml
@@ -618,6 +641,7 @@ Common examples:
 - `Invalid transform.dropInput: <value>`
 - `Invalid transform.includeOffsets: <value>`
 - `transform.overlap must be smaller than transform.chunkSize`
+- `Unsupported transforms[<n>].op: <value>`
 - `Local path escapes allowed directories: <field>`
 - `Missing API key environment variable: <name>`
 - `Missing Postgres environment variable: <name>`
@@ -652,7 +676,7 @@ The current YAML contract does not support:
 - nested JSONL objects, arrays, or null values,
 - token-based or semantic text chunking,
 - transform DAGs,
-- filters, joins, casts, or aggregations,
+- comparison filters, joins, casts, or aggregations,
 - CDC offsets,
 - CDC or streaming external connectors,
 - additional production-certified external connectors beyond batch PostgreSQL,
