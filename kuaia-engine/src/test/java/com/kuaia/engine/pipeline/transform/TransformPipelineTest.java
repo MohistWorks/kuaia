@@ -67,6 +67,36 @@ class TransformPipelineTest {
     }
 
     @Test
+    void chunkTransformCanDropInputAndIncludeOffsets() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(chunkConfig("chunk", 5, 1, true, true)));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Collections.singletonList(row(7L, "abcdefghij")));
+
+        assertArrayEquals(
+                new String[]{"id", "chunk", "chunk_index", "chunk_start", "chunk_end"},
+                pipeline.getOutputType().getFieldNames());
+        assertArrayEquals(
+                new DataType[]{DataType.LONG, DataType.STRING, DataType.LONG, DataType.LONG, DataType.LONG},
+                pipeline.getOutputType().getFieldTypes());
+        assertEquals(3, outputs.size());
+        assertEquals(7L, outputs.get(0).getLong(0));
+        assertEquals("abcde", outputs.get(0).getString(1));
+        assertEquals(0L, outputs.get(0).getLong(2));
+        assertEquals(0L, outputs.get(0).getLong(3));
+        assertEquals(5L, outputs.get(0).getLong(4));
+        assertEquals("efghi", outputs.get(1).getString(1));
+        assertEquals(1L, outputs.get(1).getLong(2));
+        assertEquals(4L, outputs.get(1).getLong(3));
+        assertEquals(9L, outputs.get(1).getLong(4));
+        assertEquals("ij", outputs.get(2).getString(1));
+        assertEquals(2L, outputs.get(2).getLong(2));
+        assertEquals(8L, outputs.get(2).getLong(3));
+        assertEquals(10L, outputs.get(2).getLong(4));
+    }
+
+    @Test
     void chunkTransformEmitsNoRowsForEmptyText() throws Exception {
         TransformPipeline pipeline = TransformPipeline.from(
                 rowType(),
@@ -171,6 +201,15 @@ class TransformPipelineTest {
     }
 
     private PipelineConfig.TransformConfig chunkConfig(String output, int chunkSize, int overlap) {
+        return chunkConfig(output, chunkSize, overlap, false, false);
+    }
+
+    private PipelineConfig.TransformConfig chunkConfig(
+            String output,
+            int chunkSize,
+            int overlap,
+            boolean dropInput,
+            boolean includeOffsets) {
         return new PipelineConfig.TransformConfig(
                 "chunk",
                 Collections.emptyList(),
@@ -186,7 +225,9 @@ class TransformPipelineTest {
                 30000,
                 32,
                 chunkSize,
-                overlap);
+                overlap,
+                dropInput,
+                includeOffsets);
     }
 
     private KuaiaRowType rowType() {

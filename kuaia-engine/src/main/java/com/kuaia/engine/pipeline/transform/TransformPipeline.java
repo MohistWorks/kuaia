@@ -98,7 +98,9 @@ public class TransformPipeline {
                     config.getInput(),
                     config.getOutput(),
                     config.getChunkSize(),
-                    config.getOverlap());
+                    config.getOverlap(),
+                    config.isDropInput(),
+                    config.isIncludeOffsets());
         }
         throw new PipelineExecutionException("Unsupported transform.type: " + config.getType());
     }

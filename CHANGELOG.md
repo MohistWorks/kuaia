@@ -13,6 +13,8 @@ All notable public changes to Kuaia are tracked here.
 - Qdrant sinks can now generate stable chunk point ids with
   `chunkIndexField` and `chunkIdMultiplier`, with a public JSONL
   chunk-to-Qdrant example.
+- Chunk transforms now support `dropInput` and `includeOffsets` so chunked
+  vector payloads can omit repeated source text while keeping character offsets.
 
 ### Changed
 

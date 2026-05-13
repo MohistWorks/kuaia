@@ -246,6 +246,8 @@ public class PipelineConfigLoader {
         if (overlap >= chunkSize) {
             throw new PipelineConfigException("transform.overlap must be smaller than transform.chunkSize");
         }
+        boolean dropInput = parseBoolean(transform.get("dropInput"), "transform.dropInput", false);
+        boolean includeOffsets = parseBoolean(transform.get("includeOffsets"), "transform.includeOffsets", false);
         return new PipelineConfig.TransformConfig(
                 "chunk",
                 new ArrayList<>(),
@@ -261,7 +263,9 @@ public class PipelineConfigLoader {
                 DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_MS,
                 DEFAULT_EMBEDDING_BATCH_SIZE,
                 chunkSize,
-                overlap);
+                overlap,
+                dropInput,
+                includeOffsets);
     }
 
     private PipelineConfig.SinkConfig loadSink(Path configPath, String sinkType, Map<String, String> sink)
@@ -460,6 +464,20 @@ public class PipelineConfigLoader {
         } catch (NumberFormatException e) {
             throw new PipelineConfigException("Invalid transform.overlap: " + value, e);
         }
+    }
+
+    private boolean parseBoolean(String value, String field, boolean defaultValue) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return defaultValue;
+        }
+        String normalized = value.trim();
+        if ("true".equals(normalized)) {
+            return true;
+        }
+        if ("false".equals(normalized)) {
+            return false;
+        }
+        throw new PipelineConfigException("Invalid " + field + ": " + value);
     }
 
     private int parseSinkTimeoutMs(String value, int defaultTimeoutMs) throws PipelineConfigException {

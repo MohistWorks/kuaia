@@ -10,18 +10,30 @@ import java.util.List;
 
 public class TextChunkTransform implements PipelineTransform {
     private static final String CHUNK_INDEX_FIELD = "chunk_index";
+    private static final String CHUNK_START_FIELD = "chunk_start";
+    private static final String CHUNK_END_FIELD = "chunk_end";
 
     private final String inputField;
     private final String outputField;
     private final int chunkSize;
     private final int overlap;
+    private final boolean dropInput;
+    private final boolean includeOffsets;
     private KuaiaRowType inputType;
     private KuaiaRowType outputType;
     private int inputOrdinal;
     private int outputOrdinal;
     private int chunkIndexOrdinal;
+    private int chunkStartOrdinal;
+    private int chunkEndOrdinal;
 
-    public TextChunkTransform(String inputField, String outputField, int chunkSize, int overlap) {
+    public TextChunkTransform(
+            String inputField,
+            String outputField,
+            int chunkSize,
+            int overlap,
+            boolean dropInput,
+            boolean includeOffsets) {
         if (chunkSize <= 0) {
             throw new IllegalArgumentException("chunkSize must be positive");
         }
@@ -35,6 +47,10 @@ public class TextChunkTransform implements PipelineTransform {
         this.outputField = outputField;
         this.chunkSize = chunkSize;
         this.overlap = overlap;
+        this.dropInput = dropInput;
+        this.includeOffsets = includeOffsets;
+        this.chunkStartOrdinal = -1;
+        this.chunkEndOrdinal = -1;
     }
 
     @Override
@@ -52,17 +68,40 @@ public class TextChunkTransform implements PipelineTransform {
         if (CHUNK_INDEX_FIELD.equals(outputField) || inputType.getIndex(CHUNK_INDEX_FIELD) >= 0) {
             throw new PipelineExecutionException("Duplicate transform field: " + CHUNK_INDEX_FIELD);
         }
+        if (includeOffsets) {
+            rejectDuplicateOffsetField(inputType, outputField, CHUNK_START_FIELD);
+            rejectDuplicateOffsetField(inputType, outputField, CHUNK_END_FIELD);
+        }
 
-        String[] outputNames = new String[inputType.getFieldNames().length + 2];
-        DataType[] outputTypes = new DataType[inputType.getFieldTypes().length + 2];
-        System.arraycopy(inputType.getFieldNames(), 0, outputNames, 0, inputType.getFieldNames().length);
-        System.arraycopy(inputType.getFieldTypes(), 0, outputTypes, 0, inputType.getFieldTypes().length);
-        outputOrdinal = inputType.getFieldNames().length;
-        chunkIndexOrdinal = inputType.getFieldNames().length + 1;
+        int inputFieldCount = inputType.getFieldNames().length;
+        int retainedInputFields = dropInput ? inputFieldCount - 1 : inputFieldCount;
+        int extraFields = includeOffsets ? 4 : 2;
+        String[] outputNames = new String[retainedInputFields + extraFields];
+        DataType[] outputTypes = new DataType[retainedInputFields + extraFields];
+
+        int cursor = 0;
+        for (int i = 0; i < inputFieldCount; i++) {
+            if (dropInput && i == candidateInputOrdinal) {
+                continue;
+            }
+            outputNames[cursor] = inputType.getFieldNames()[i];
+            outputTypes[cursor] = inputType.getFieldTypes()[i];
+            cursor++;
+        }
+        outputOrdinal = cursor++;
+        chunkIndexOrdinal = cursor++;
         outputNames[outputOrdinal] = outputField;
         outputTypes[outputOrdinal] = DataType.STRING;
         outputNames[chunkIndexOrdinal] = CHUNK_INDEX_FIELD;
         outputTypes[chunkIndexOrdinal] = DataType.LONG;
+        if (includeOffsets) {
+            chunkStartOrdinal = cursor++;
+            chunkEndOrdinal = cursor;
+            outputNames[chunkStartOrdinal] = CHUNK_START_FIELD;
+            outputTypes[chunkStartOrdinal] = DataType.LONG;
+            outputNames[chunkEndOrdinal] = CHUNK_END_FIELD;
+            outputTypes[chunkEndOrdinal] = DataType.LONG;
+        }
 
         this.inputType = inputType;
         this.outputType = new KuaiaRowType(outputNames, outputTypes);
@@ -88,7 +127,7 @@ public class TextChunkTransform implements PipelineTransform {
             int start = 0;
             while (start < text.length()) {
                 int end = Math.min(text.length(), start + chunkSize);
-                outputs.add(copyInputWithChunk(input, text.substring(start, end), chunkIndex));
+                outputs.add(copyInputWithChunk(input, text.substring(start, end), chunkIndex, start, end));
                 if (end == text.length()) {
                     break;
                 }
@@ -99,14 +138,30 @@ public class TextChunkTransform implements PipelineTransform {
         return outputs;
     }
 
-    private BinaryRow copyInputWithChunk(BinaryRow input, String chunk, long chunkIndex)
+    private void rejectDuplicateOffsetField(KuaiaRowType inputType, String outputField, String offsetField)
+            throws PipelineExecutionException {
+        if (offsetField.equals(outputField) || inputType.getIndex(offsetField) >= 0) {
+            throw new PipelineExecutionException("Duplicate transform field: " + offsetField);
+        }
+    }
+
+    private BinaryRow copyInputWithChunk(BinaryRow input, String chunk, long chunkIndex, long chunkStart, long chunkEnd)
             throws PipelineExecutionException {
         BinaryRow output = new BinaryRow(outputType.getFieldNames().length);
+        int cursor = 0;
         for (int i = 0; i < inputType.getFieldNames().length; i++) {
-            copyValue(input, i, output, i, inputType.getFieldTypes()[i]);
+            if (dropInput && i == inputOrdinal) {
+                continue;
+            }
+            copyValue(input, i, output, cursor, inputType.getFieldTypes()[i]);
+            cursor++;
         }
         output.setString(outputOrdinal, chunk);
         output.setLong(chunkIndexOrdinal, chunkIndex);
+        if (includeOffsets) {
+            output.setLong(chunkStartOrdinal, chunkStart);
+            output.setLong(chunkEndOrdinal, chunkEnd);
+        }
         return output;
     }
 
