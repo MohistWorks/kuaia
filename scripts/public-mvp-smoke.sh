@@ -9,12 +9,14 @@ WORK_DIR="$ROOT_DIR/.kuaia/public-mvp-smoke/$RUN_ID"
 
 mkdir -p "$WORK_DIR/data" "$WORK_DIR/output" "$WORK_DIR/state"
 cp "$ROOT_DIR/examples/data/users.csv" "$WORK_DIR/data/users.csv"
+cp "$ROOT_DIR/examples/data/quoted-documents.csv" "$WORK_DIR/data/quoted-documents.csv"
 cp "$ROOT_DIR/examples/data/documents.csv" "$WORK_DIR/data/documents.csv"
 cp "$ROOT_DIR/examples/data/documents.jsonl" "$WORK_DIR/data/documents.jsonl"
 cp "$ROOT_DIR/examples/data/articles.jsonl" "$WORK_DIR/data/articles.jsonl"
 cp "$ROOT_DIR/examples/data/users-with-bad-row.csv" "$WORK_DIR/data/users-with-bad-row.csv"
 
 CSV_TO_FILE="$WORK_DIR/csv-to-file.yaml"
+QUOTED_CSV_TO_FILE="$WORK_DIR/quoted-csv-to-file.yaml"
 CSV_TO_VECTOR="$WORK_DIR/csv-to-vector.yaml"
 JSONL_TO_FILE="$WORK_DIR/jsonl-to-file.yaml"
 JSONL_TO_VECTOR="$WORK_DIR/jsonl-to-vector.yaml"
@@ -90,6 +92,21 @@ sink:
   mode: overwrite
 checkpoint:
   stateDir: $WORK_DIR/state/jsonl-to-file
+EOF
+
+cat > "$QUOTED_CSV_TO_FILE" <<EOF
+name: public-mvp-quoted-csv-to-file
+source:
+  type: file
+  path: data/quoted-documents.csv
+  format: csv
+sink:
+  type: file
+  path: $WORK_DIR/output/quoted-documents.csv
+  format: csv
+  mode: overwrite
+checkpoint:
+  stateDir: $WORK_DIR/state/quoted-csv-to-file
 EOF
 
 cat > "$JSONL_TO_VECTOR" <<EOF
@@ -198,6 +215,21 @@ EXPECTED_USERS="$WORK_DIR/expected-users.csv"
 
 if ! diff -u "$EXPECTED_USERS" "$WORK_DIR/output/users.csv"; then
   printf '%s\n' "CSV file output did not match expected rows" >&2
+  exit 1
+fi
+
+run_pipeline "Quoted CSV to file" "$QUOTED_CSV_TO_FILE"
+
+EXPECTED_QUOTED_DOCUMENTS="$WORK_DIR/expected-quoted-documents.csv"
+{
+  printf '%s\n' "id,content"
+  printf '%s\n' '1,"Alpha, ""Beta"""'
+  printf '%s\n' '2,"Line one'
+  printf '%s\n' 'Line two"'
+} > "$EXPECTED_QUOTED_DOCUMENTS"
+
+if ! diff -u "$EXPECTED_QUOTED_DOCUMENTS" "$WORK_DIR/output/quoted-documents.csv"; then
+  printf '%s\n' "Quoted CSV file output did not match expected rows" >&2
   exit 1
 fi
 

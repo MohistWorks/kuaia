@@ -5,13 +5,17 @@ import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,12 +30,27 @@ class KuaiaExamplesTest {
                 "examples/local-jsonl-to-vector.yaml",
                 "examples/local-jsonl-chunk-to-vector.yaml",
                 "examples/local-file-to-file.yaml",
+                "examples/local-quoted-csv-to-file.yaml",
                 "examples/local-jsonl-to-file.yaml",
                 "examples/local-file-skip-bad-records.yaml");
 
         Path fileSinkOutput = repoRoot().resolve(".kuaia/output/local-file-to-file.csv");
+        Path quotedCsvSinkOutput = repoRoot().resolve(".kuaia/output/local-quoted-csv-to-file.csv");
         Path jsonlSinkOutput = repoRoot().resolve(".kuaia/output/local-jsonl-to-file.jsonl");
+        for (String stateDir : Arrays.asList(
+                "local-file-to-console",
+                "local-file-transform-to-console",
+                "local-file-to-vector",
+                "local-jsonl-to-vector",
+                "local-jsonl-chunk-to-vector",
+                "local-file-to-file",
+                "local-quoted-csv-to-file",
+                "local-jsonl-to-file",
+                "local-file-skip-bad-records")) {
+            deleteExampleState(stateDir);
+        }
         Files.deleteIfExists(fileSinkOutput);
+        Files.deleteIfExists(quotedCsvSinkOutput);
         Files.deleteIfExists(jsonlSinkOutput);
 
         for (String example : examples) {
@@ -46,6 +65,12 @@ class KuaiaExamplesTest {
         assertEquals(
                 Arrays.asList("id,name", "1,Alice", "2,Bob"),
                 Files.readAllLines(fileSinkOutput, StandardCharsets.UTF_8));
+        String nl = System.lineSeparator();
+        assertEquals(
+                "id,content" + nl
+                        + "1,\"Alpha, \"\"Beta\"\"\"" + nl
+                        + "2,\"Line one\nLine two\"" + nl,
+                new String(Files.readAllBytes(quotedCsvSinkOutput), StandardCharsets.UTF_8));
         assertEquals(
                 Arrays.asList(
                         "{\"id\":1,\"content\":\"Alpha\"}",
@@ -98,6 +123,28 @@ class KuaiaExamplesTest {
             return cwd;
         }
         return cwd.getParent();
+    }
+
+    private void deleteRecursively(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(path)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(file -> {
+                try {
+                    Files.deleteIfExists(file);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
+        }
+    }
+
+    private void deleteExampleState(String stateDir) throws IOException {
+        deleteRecursively(Paths.get(".kuaia/state").resolve(stateDir).toAbsolutePath().normalize());
+        deleteRecursively(repoRoot().resolve(".kuaia/state").resolve(stateDir));
     }
 
     private String read(Path path) throws Exception {

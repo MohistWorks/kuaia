@@ -47,6 +47,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("make public-mvp-smoke"));
         assertTrue(result.output.contains("No external services:"));
         assertTrue(result.output.contains("examples/local-file-to-file.yaml"));
+        assertTrue(result.output.contains("examples/local-quoted-csv-to-file.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-to-file.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-to-vector.yaml"));
