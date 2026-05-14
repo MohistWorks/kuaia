@@ -737,6 +737,12 @@ Run JSONL through `chunk` and mock embedding:
 bin/kuaia run -f examples/local-jsonl-chunk-to-vector.yaml
 ```
 
+Run FAQ JSONL through cleanup and mock embedding:
+
+```bash
+bin/kuaia run -f examples/local-faq-jsonl-to-vector.yaml
+```
+
 Run CSV through an OpenAI-compatible embedding provider:
 
 ```bash

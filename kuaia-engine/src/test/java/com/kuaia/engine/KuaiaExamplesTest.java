@@ -29,6 +29,7 @@ class KuaiaExamplesTest {
                 "examples/local-file-to-vector.yaml",
                 "examples/local-jsonl-to-vector.yaml",
                 "examples/local-jsonl-chunk-to-vector.yaml",
+                "examples/local-faq-jsonl-to-vector.yaml",
                 "examples/local-file-to-file.yaml",
                 "examples/local-quoted-csv-to-file.yaml",
                 "examples/local-jsonl-to-file.yaml",
@@ -43,6 +44,7 @@ class KuaiaExamplesTest {
                 "local-file-to-vector",
                 "local-jsonl-to-vector",
                 "local-jsonl-chunk-to-vector",
+                "local-faq-jsonl-to-vector",
                 "local-file-to-file",
                 "local-quoted-csv-to-file",
                 "local-jsonl-to-file",
@@ -105,6 +107,9 @@ class KuaiaExamplesTest {
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("value: 2"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-chunk-to-vector.yaml")).contains("type: trim"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-chunk-to-vector.yaml")).contains("op: not-empty"));
+        assertTrue(read(repoRoot().resolve("examples/local-faq-jsonl-to-vector.yaml")).contains("fields: [id, question, answer]"));
+        assertTrue(read(repoRoot().resolve("examples/local-faq-jsonl-to-vector.yaml")).contains("input: answer"));
+        assertTrue(read(repoRoot().resolve("examples/local-faq-jsonl-to-vector.yaml")).contains("batchSize: 32"));
         assertTrue(read(chunkToQdrantPath).contains("type: trim"));
         assertTrue(read(chunkToQdrantPath).contains("op: not-empty"));
         assertTrue(read(chunkToQdrantPath).contains("chunkIndexField: chunk_index"));

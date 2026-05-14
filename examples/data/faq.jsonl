@@ -1,0 +1,3 @@
+{"id":1,"question":" What is Kuaia? ","answer":"Kuaia runs local AI-ready data pipelines from YAML."}
+{"id":2,"question":"How do I test a pipeline before running it?","answer":"Use kuaia validate -f with the pipeline YAML path."}
+{"id":3,"question":"   ","answer":"This row is filtered because the question is empty."}

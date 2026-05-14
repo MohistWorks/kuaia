@@ -28,6 +28,8 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
   vector sink,
 - JSONL source through `trim`, `filter`, `chunk`, and `mock-embedding` into the
   mock vector sink,
+- FAQ JSONL source through question and answer cleanup into the mock vector
+  sink,
 - malformed CSV handling with `errorPolicy.mode: skip-bad-records`,
 - JSON run summary output through `kuaia run --summary-json <path>`,
 - fatal malformed CSV diagnostics with a stable `Source stage failed:` prefix.
@@ -35,6 +37,28 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 After that, run individual examples below when you want to inspect one pipeline
 at a time. Qdrant, Postgres, and OpenAI-compatible examples require external
 services or credentials and are not part of the default smoke.
+
+## Common RAG Flows
+
+For a local document import path, start with:
+
+```bash
+bin/kuaia run -f examples/local-jsonl-chunk-to-vector.yaml
+```
+
+For an FAQ import path that keeps question and answer metadata together, start
+with:
+
+```bash
+bin/kuaia run -f examples/local-faq-jsonl-to-vector.yaml
+```
+
+For a production-like batch source into Qdrant, start Postgres and Qdrant and
+then run:
+
+```bash
+bin/kuaia run -f examples/postgres-to-qdrant.yaml
+```
 
 ## Local File To Console
 
@@ -156,6 +180,18 @@ splits each remaining `content` field into character-based chunks, creates
 deterministic local embeddings for each chunk, and prints mock vector sink
 summaries. It is the recommended no-service path for checking document chunking
 before using a real embedding provider or vector database.
+
+## FAQ JSONL Mock Vector Pipeline
+
+```bash
+bin/kuaia run -f examples/local-faq-jsonl-to-vector.yaml
+```
+
+Reads `examples/data/faq.jsonl`, selects `id`, `question`, and `answer`, trims
+question and answer text, filters empty values, creates deterministic local
+embeddings from `answer`, and prints mock vector sink summaries. It is the
+recommended no-service path for checking a simple FAQ import while preserving
+FAQ metadata before switching to Qdrant.
 
 ## OpenAI-Compatible Embedding Pipeline
 

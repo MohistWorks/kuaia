@@ -16,6 +16,8 @@ All notable public changes to Kuaia are tracked here.
   index, and out-of-range index errors explicitly.
 - Declarative pipeline failures now include stable source, transform, sink, or
   checkpoint stage prefixes before the underlying error message.
+- Added a no-service FAQ JSONL-to-vector example and surfaced common RAG flows
+  in `kuaia examples`.
 
 ### Changed
 
