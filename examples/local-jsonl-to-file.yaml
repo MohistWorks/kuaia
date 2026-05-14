@@ -8,6 +8,8 @@ transforms:
     fields: [id, content]
   - type: trim
     field: content
+  - type: lowercase
+    field: content
   - type: filter
     field: content
     op: not-empty

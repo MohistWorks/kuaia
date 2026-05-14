@@ -434,6 +434,28 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsLowercaseTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("lowercase-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: lowercase-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: lowercase",
+                "    field: content",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig lowercase = config.getTransforms().get(0);
+        assertEquals("lowercase", lowercase.getType());
+        assertEquals("content", lowercase.getInput());
+    }
+
+    @Test
     void rejectsMissingFilterTransformOp() throws Exception {
         Path configPath = tempDir.resolve("missing-filter-op.yaml");
         Files.write(configPath, String.join("\n",

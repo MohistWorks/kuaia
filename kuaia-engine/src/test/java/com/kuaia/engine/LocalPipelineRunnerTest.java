@@ -252,6 +252,43 @@ class LocalPipelineRunnerTest {
     }
 
     @Test
+    void lowercaseJsonlPipelineWritesNormalizedRows() throws Exception {
+        Path data = tempDir.resolve("mixed-case-documents.jsonl");
+        Files.write(data, String.join("\n",
+                "{\"id\":1,\"content\":\"Alpha BETA\"}",
+                "{\"id\":2,\"content\":\"KUAIA\"}").getBytes(StandardCharsets.UTF_8));
+        Path output = tempDir.resolve("out/lowercase-documents.jsonl");
+        Path configPath = tempDir.resolve("lowercase-jsonl-file.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: lowercase-jsonl-file",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: jsonl",
+                "transforms:",
+                "  - type: lowercase",
+                "    field: content",
+                "sink:",
+                "  type: file",
+                "  path: " + output,
+                "  format: jsonl",
+                "  mode: overwrite").getBytes(StandardCharsets.UTF_8));
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PipelineRunSummary summary = new LocalPipelineRunner()
+                .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(2L, summary.getRowsRead());
+        assertEquals(2L, summary.getRowsWritten());
+        assertEquals(2L, summary.getCheckpointSeq());
+        assertEquals(java.util.Arrays.asList(
+                "{\"id\":1,\"content\":\"alpha beta\"}",
+                "{\"id\":2,\"content\":\"kuaia\"}"),
+                Files.readAllLines(output, StandardCharsets.UTF_8));
+    }
+
+    @Test
     void trimAndFilterJsonlPipelineCountsSourceRowsAndWrittenRowsSeparately() throws Exception {
         Path data = tempDir.resolve("trimmed-documents.jsonl");
         Files.write(data, String.join("\n",
