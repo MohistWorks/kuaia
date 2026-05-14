@@ -7,8 +7,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class PipelineConfigLoader {
     private static final String DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
@@ -380,6 +382,9 @@ public class PipelineConfigLoader {
         if (hasText(sink.get("chunkIdMultiplier"))) {
             throw new PipelineConfigException("sink.chunkIdMultiplier is only supported for sink.type: qdrant");
         }
+        if (hasText(sink.get("payloadFields"))) {
+            throw new PipelineConfigException("sink.payloadFields is only supported for sink.type: qdrant");
+        }
         if (!"file".equals(sinkType)) {
             return new PipelineConfig.SinkConfig(sinkType);
         }
@@ -411,6 +416,9 @@ public class PipelineConfigLoader {
         long chunkIdMultiplier = hasText(chunkIndexField)
                 ? parseQdrantChunkIdMultiplier(sink.get("chunkIdMultiplier"), DEFAULT_QDRANT_CHUNK_ID_MULTIPLIER)
                 : 0L;
+        String idField = require(sink, "sink.idField");
+        String vectorField = require(sink, "sink.vectorField");
+        List<String> payloadFields = parseQdrantPayloadFields(sink.get("payloadFields"), vectorField);
         return new PipelineConfig.SinkConfig(
                 "qdrant",
                 null,
@@ -419,12 +427,13 @@ public class PipelineConfigLoader {
                 require(sink, "sink.url"),
                 require(sink, "sink.collection"),
                 sink.get("apiKeyEnv"),
-                require(sink, "sink.idField"),
-                require(sink, "sink.vectorField"),
+                idField,
+                vectorField,
                 waitForCommit,
                 parseSinkTimeoutMs(sink.get("timeoutMs"), DEFAULT_QDRANT_TIMEOUT_MS),
                 hasText(chunkIndexField) ? chunkIndexField : null,
-                chunkIdMultiplier);
+                chunkIdMultiplier,
+                payloadFields);
     }
 
     private PipelineConfig.ErrorPolicyConfig loadErrorPolicy(Map<String, String> errorPolicy)
@@ -458,6 +467,23 @@ public class PipelineConfigLoader {
             values.add(item);
         }
         return values;
+    }
+
+    private List<String> parseQdrantPayloadFields(String value, String vectorField) throws PipelineConfigException {
+        if (value == null || value.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<String> fields = parseInlineList(value, "sink.payloadFields");
+        Set<String> seen = new HashSet<>();
+        for (String field : fields) {
+            if (!seen.add(field)) {
+                throw new PipelineConfigException("Duplicate value in sink.payloadFields: " + field);
+            }
+            if (field.equals(vectorField)) {
+                throw new PipelineConfigException("sink.payloadFields must not include sink.vectorField: " + field);
+            }
+        }
+        return fields;
     }
 
     private String[] splitKeyValue(String line) {

@@ -16,8 +16,10 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class QdrantVectorSink implements SinkWriter {
     private static final int DEFAULT_TIMEOUT_MILLIS = 30_000;
@@ -25,6 +27,7 @@ public class QdrantVectorSink implements SinkWriter {
     private final KuaiaRowType rowType;
     private final int idOrdinal;
     private final int vectorOrdinal;
+    private final int[] payloadOrdinals;
     private final int chunkIndexOrdinal;
     private final long chunkIdMultiplier;
     private final String upsertUrl;
@@ -51,6 +54,7 @@ public class QdrantVectorSink implements SinkWriter {
         this.rowType = rowType;
         this.idOrdinal = requireField(rowType, config.getIdField(), DataType.LONG);
         this.vectorOrdinal = requireField(rowType, config.getVectorField(), DataType.VECTOR);
+        this.payloadOrdinals = resolvePayloadOrdinals(rowType, config.getPayloadFields(), vectorOrdinal);
         this.chunkIndexOrdinal = config.getChunkIndexField() == null
                 ? -1
                 : requireField(rowType, config.getChunkIndexField(), DataType.LONG);
@@ -188,15 +192,12 @@ public class QdrantVectorSink implements SinkWriter {
         String[] names = rowType.getFieldNames();
         DataType[] types = rowType.getFieldTypes();
         boolean first = true;
-        for (int i = 0; i < names.length; i++) {
-            if (i == vectorOrdinal) {
-                continue;
-            }
+        for (int ordinal : payloadOrdinals) {
             if (!first) {
                 json.append(",");
             }
-            json.append("\"").append(escape(names[i])).append("\":");
-            appendPayloadValue(json, row, i, types[i]);
+            json.append("\"").append(escape(names[ordinal])).append("\":");
+            appendPayloadValue(json, row, ordinal, types[ordinal]);
             first = false;
         }
         json.append("}");
@@ -222,6 +223,44 @@ public class QdrantVectorSink implements SinkWriter {
             throw new PipelineExecutionException("Qdrant sink requires " + type.name() + " field: " + field);
         }
         return ordinal;
+    }
+
+    private int[] resolvePayloadOrdinals(KuaiaRowType rowType, List<String> payloadFields, int vectorOrdinal)
+            throws PipelineExecutionException {
+        String[] names = rowType.getFieldNames();
+        DataType[] types = rowType.getFieldTypes();
+        if (payloadFields == null || payloadFields.isEmpty()) {
+            int[] ordinals = new int[names.length - 1];
+            int count = 0;
+            for (int i = 0; i < names.length; i++) {
+                if (i != vectorOrdinal) {
+                    ordinals[count++] = i;
+                }
+            }
+            return ordinals;
+        }
+
+        int[] ordinals = new int[payloadFields.size()];
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < payloadFields.size(); i++) {
+            String field = payloadFields.get(i);
+            if (!seen.add(field)) {
+                throw new PipelineExecutionException("Duplicate Qdrant payload field: " + field);
+            }
+            int ordinal = rowType.getIndex(field);
+            if (ordinal < 0) {
+                throw new PipelineExecutionException("Qdrant sink requires payload field: " + field);
+            }
+            if (ordinal == vectorOrdinal) {
+                throw new PipelineExecutionException("Qdrant payload field must not be the vector field: " + field);
+            }
+            if (types[ordinal] != DataType.LONG && types[ordinal] != DataType.STRING) {
+                throw new PipelineExecutionException(
+                        "Qdrant sink does not support payload field type: " + types[ordinal].name());
+            }
+            ordinals[i] = ordinal;
+        }
+        return ordinals;
     }
 
     private String readResponse(HttpURLConnection connection) throws IOException {

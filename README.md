@@ -218,8 +218,9 @@ bin/kuaia run -f examples/local-file-to-qdrant.yaml
 bin/kuaia run -f examples/local-jsonl-chunk-to-qdrant.yaml
 ```
 
-The chunked Qdrant example uses stable chunk point ids and omits repeated source
-text from vector payloads while keeping chunk character offsets.
+The Qdrant examples use `payloadFields` to keep vector payloads predictable. The
+chunked example combines stable chunk point ids with selected payload metadata,
+so it omits repeated source text while keeping chunk character offsets.
 
 Postgres-to-Qdrant example:
 

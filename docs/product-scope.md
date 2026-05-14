@@ -79,6 +79,7 @@ Supported runtime behavior:
   character offsets,
 - batch-aware embedding and vector sink execution,
 - Qdrant point id generation for chunked document pipelines,
+- Qdrant payload field selection for predictable vector metadata,
 - run summaries with row, checkpoint, split, and sink batch counters.
 
 ## Current Contract

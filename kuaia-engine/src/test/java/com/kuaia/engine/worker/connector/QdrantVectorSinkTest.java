@@ -104,6 +104,58 @@ class QdrantVectorSinkTest {
     }
 
     @Test
+    void writesOnlyConfiguredPayloadFieldsToQdrant() throws Exception {
+        CapturedRequest captured = startServer(200, "{\"status\":\"ok\"}");
+        PipelineConfig.SinkConfig config = configWithPayloadFields(
+                baseUrl(),
+                "docs",
+                "id",
+                "embedding",
+                Arrays.asList("id", "source"));
+        QdrantVectorSink sink = new QdrantVectorSink(rowTypeWithSource(), config, Collections.emptyMap());
+
+        sink.open();
+        sink.write(rowWithSource());
+        sink.close();
+
+        assertEquals(
+                "{\"points\":[{\"id\":7,\"vector\":[1.0,2.0],\"payload\":{\"id\":7,\"source\":\"kb\"}}]}",
+                captured.body);
+    }
+
+    @Test
+    void rejectsMissingConfiguredPayloadField() {
+        PipelineConfig.SinkConfig config = configWithPayloadFields(
+                "http://localhost:6333",
+                "docs",
+                "id",
+                "embedding",
+                Collections.singletonList("missing"));
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> new QdrantVectorSink(rowType(), config, Collections.emptyMap()));
+
+        assertEquals("Qdrant sink requires payload field: missing", error.getMessage());
+    }
+
+    @Test
+    void rejectsVectorConfiguredPayloadField() {
+        PipelineConfig.SinkConfig config = configWithPayloadFields(
+                "http://localhost:6333",
+                "docs",
+                "id",
+                "embedding",
+                Collections.singletonList("embedding"));
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> new QdrantVectorSink(rowType(), config, Collections.emptyMap()));
+
+        assertEquals("Qdrant payload field must not be the vector field: embedding", error.getMessage());
+    }
+
+    @Test
     void requiresLongChunkIndexField() {
         KuaiaRowType rowType = new KuaiaRowType(
                 new String[]{"id", "chunk_index", "embedding"},
@@ -295,6 +347,12 @@ class QdrantVectorSinkTest {
                 new DataType[]{DataType.LONG, DataType.STRING, DataType.LONG, DataType.VECTOR});
     }
 
+    private KuaiaRowType rowTypeWithSource() {
+        return new KuaiaRowType(
+                new String[]{"id", "content", "source", "embedding"},
+                new DataType[]{DataType.LONG, DataType.STRING, DataType.STRING, DataType.VECTOR});
+    }
+
     private BinaryRow row() {
         return row(7L, "Alpha", new float[]{1.0f, 2.0f});
     }
@@ -304,6 +362,15 @@ class QdrantVectorSinkTest {
         row.setLong(0, id);
         row.setString(1, content);
         row.setVector(2, vector);
+        return row;
+    }
+
+    private BinaryRow rowWithSource() {
+        BinaryRow row = new BinaryRow(4);
+        row.setLong(0, 7L);
+        row.setString(1, "Alpha");
+        row.setString(2, "kb");
+        row.setVector(3, new float[]{1.0f, 2.0f});
         return row;
     }
 
@@ -369,6 +436,29 @@ class QdrantVectorSinkTest {
                 0,
                 chunkIndexField,
                 chunkIdMultiplier);
+    }
+
+    private PipelineConfig.SinkConfig configWithPayloadFields(
+            String url,
+            String collection,
+            String idField,
+            String vectorField,
+            java.util.List<String> payloadFields) {
+        return new PipelineConfig.SinkConfig(
+                "qdrant",
+                null,
+                null,
+                null,
+                url,
+                collection,
+                null,
+                idField,
+                vectorField,
+                true,
+                0,
+                null,
+                0L,
+                payloadFields);
     }
 
     private Map<String, String> env(String key, String value) {

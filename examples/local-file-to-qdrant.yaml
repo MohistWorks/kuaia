@@ -16,6 +16,7 @@ sink:
   collection: kuaia_docs
   idField: id
   vectorField: embedding
+  payloadFields: [id, content]
   wait: true
   timeoutMs: 30000
 checkpoint:
