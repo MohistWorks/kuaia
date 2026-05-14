@@ -85,6 +85,10 @@ transforms:
     field: content
     op: min-length
     minLength: 4
+  - type: filter
+    field: content
+    op: contains
+    value: a
 sink:
   type: file
   path: $WORK_DIR/output/documents.jsonl

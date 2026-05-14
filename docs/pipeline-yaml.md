@@ -185,6 +185,8 @@ Supported predicates:
   non-whitespace character.
 - `op: min-length` keeps rows whose configured string field has at least
   `minLength` non-whitespace characters after trimming for predicate evaluation.
+- `op: contains` keeps rows whose configured string field contains the
+  configured `value` substring. Matching is case-sensitive.
 
 Example:
 
@@ -194,14 +196,19 @@ transforms:
     field: content
     op: min-length
     minLength: 20
+  - type: filter
+    field: content
+    op: contains
+    value: invoice
 ```
 
 Rules:
 
 - `field` must exist and be `STRING`,
 - `op` is required,
-- supported `op` values: `not-empty`, `min-length`,
+- supported `op` values: `not-empty`, `min-length`, `contains`,
 - `minLength` is required for `op: min-length` and must be a positive integer,
+- `value` is required for `op: contains` and must not be empty,
 - dropped rows are counted as source rows read, not as rows written,
 - checkpointed runs still advance the checkpoint after a filtered source batch
   is processed.

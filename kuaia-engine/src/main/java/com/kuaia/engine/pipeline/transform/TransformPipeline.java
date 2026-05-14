@@ -97,7 +97,7 @@ public class TransformPipeline {
             return new TrimTransform(config.getInput());
         }
         if ("filter".equals(config.getType())) {
-            return new FilterTransform(config.getInput(), config.getOp(), config.getMinLength());
+            return new FilterTransform(config.getInput(), config.getOp(), config.getMinLength(), config.getValue());
         }
         if ("chunk".equals(config.getType())) {
             return new TextChunkTransform(

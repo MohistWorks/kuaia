@@ -15,6 +15,10 @@ transforms:
     field: content
     op: min-length
     minLength: 4
+  - type: filter
+    field: content
+    op: contains
+    value: a
 sink:
   type: file
   path: ../.kuaia/output/local-jsonl-to-file.jsonl

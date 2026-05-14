@@ -190,6 +190,7 @@ public class PipelineConfig {
         private final boolean includeOffsets;
         private final String op;
         private final int minLength;
+        private final String value;
 
         public TransformConfig(String type, List<String> fields, String from, String to) {
             this(type, fields, from, to, null, null, 4);
@@ -340,6 +341,31 @@ public class PipelineConfig {
                 boolean includeOffsets,
                 String op,
                 int minLength) {
+            this(type, fields, from, to, input, output, dimensions, provider, baseUrl, model, apiKeyEnv,
+                    timeoutMs, batchSize, chunkSize, overlap, dropInput, includeOffsets, op, minLength, null);
+        }
+
+        public TransformConfig(
+                String type,
+                List<String> fields,
+                String from,
+                String to,
+                String input,
+                String output,
+                int dimensions,
+                String provider,
+                String baseUrl,
+                String model,
+                String apiKeyEnv,
+                int timeoutMs,
+                int batchSize,
+                int chunkSize,
+                int overlap,
+                boolean dropInput,
+                boolean includeOffsets,
+                String op,
+                int minLength,
+                String value) {
             this.type = type;
             this.fields = Collections.unmodifiableList(new ArrayList<>(fields));
             this.from = from;
@@ -359,6 +385,7 @@ public class PipelineConfig {
             this.includeOffsets = includeOffsets;
             this.op = op;
             this.minLength = minLength;
+            this.value = value;
         }
 
         public String getType() {
@@ -435,6 +462,10 @@ public class PipelineConfig {
 
         public int getMinLength() {
             return minLength;
+        }
+
+        public String getValue() {
+            return value;
         }
     }
 
