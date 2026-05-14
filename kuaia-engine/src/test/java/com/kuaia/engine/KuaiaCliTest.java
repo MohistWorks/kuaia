@@ -28,6 +28,7 @@ class KuaiaCliTest {
         assertEquals(0, result.exitCode);
         assertTrue(result.output.contains("Usage: kuaia <command>"));
         assertTrue(result.output.contains("run -f PIPELINE"));
+        assertTrue(result.output.contains("validate -f PIPELINE"));
         assertTrue(result.output.contains("local-demo"));
         assertTrue(result.output.contains("ai-demo"));
         assertTrue(result.output.contains("recover-demo"));
@@ -39,12 +40,95 @@ class KuaiaCliTest {
     }
 
     @Test
+    void validateChecksFilePipelineWithoutRunningIt() throws Exception {
+        Path data = tempDir.resolve("validate-users.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2,Bob").getBytes(StandardCharsets.UTF_8));
+        Path output = tempDir.resolve("out/validate-users.csv");
+        Path stateDir = tempDir.resolve("validate-state");
+        Path config = writeFileSinkPipelineConfig("validate-users", data, output, "overwrite", stateDir);
+
+        CliResult result = run("validate", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Pipeline valid: validate-users"));
+        assertTrue(result.output.contains("Source: file fields=2"));
+        assertTrue(result.output.contains("Transforms: 0"));
+        assertTrue(result.output.contains("Sink: file"));
+        assertFalse(Files.exists(output));
+        assertFalse(Files.exists(stateDir));
+        assertFalse(result.output.contains("Starting pipeline:"));
+        assertFalse(result.output.contains("Run Summary:"));
+    }
+
+    @Test
+    void validateReportsTransformFieldErrorsWithoutRunningPipeline() throws Exception {
+        Path data = tempDir.resolve("validate-unknown-transform-field.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice").getBytes(StandardCharsets.UTF_8));
+        Path config = tempDir.resolve("validate-unknown-transform-field.yaml");
+        Files.write(config, String.join("\n",
+                "name: validate-unknown-transform-field",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: csv",
+                "transforms:",
+                "  - type: select",
+                "    fields: [id, missing]",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("validate", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Transform stage failed: Unknown transform field: missing"));
+        assertFalse(result.output.contains("Starting pipeline:"));
+        assertFalse(result.output.contains("Run Summary:"));
+    }
+
+    @Test
+    void validateDoesNotConnectToPostgres() throws Exception {
+        Path config = tempDir.resolve("validate-postgres.yaml");
+        Files.write(config, String.join("\n",
+                "name: validate-postgres",
+                "source:",
+                "  type: postgres",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: PGUSER",
+                "  passwordEnv: PGPASSWORD",
+                "  query: SELECT id, content FROM documents",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("validate", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Pipeline valid: validate-postgres"));
+        assertTrue(result.output.contains("Source: postgres fields=deferred"));
+        assertTrue(result.output.contains("Transform and sink row-type checks deferred for source.type: postgres"));
+    }
+
+    @Test
+    void validateRequiresConfigPath() throws Exception {
+        CliResult result = run("validate");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("validate requires -f <pipeline.yaml>"));
+    }
+
+    @Test
     void examplesPrintsRecommendedPublicMvpPaths() throws Exception {
         CliResult result = run("examples");
 
         assertEquals(0, result.exitCode);
         assertTrue(result.output.contains("Recommended no-service smoke:"));
         assertTrue(result.output.contains("make public-mvp-smoke"));
+        assertTrue(result.output.contains("Recommended preflight:"));
+        assertTrue(result.output.contains("kuaia validate -f examples/local-file-to-file.yaml"));
         assertTrue(result.output.contains("No external services:"));
         assertTrue(result.output.contains("examples/local-file-to-file.yaml"));
         assertTrue(result.output.contains("examples/local-quoted-csv-to-file.yaml"));

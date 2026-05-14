@@ -67,6 +67,7 @@ Supported sinks:
 Supported runtime behavior:
 
 - declarative YAML pipelines,
+- preflight validation for local file pipelines,
 - linear transform chains,
 - RocksDB-backed local checkpoints,
 - bad-record skipping for malformed CSV or JSONL rows,

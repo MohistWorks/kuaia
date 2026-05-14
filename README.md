@@ -46,6 +46,7 @@ Run the CLI and the default local example:
 ```bash
 bin/kuaia help
 bin/kuaia examples
+bin/kuaia validate -f examples/local-file-to-file.yaml
 bin/kuaia run -f examples/local-file-to-file.yaml
 bin/kuaia run -f examples/local-file-to-file.yaml --summary-json .kuaia/output/local-file-to-file-summary.json
 bin/kuaia run -f examples/local-quoted-csv-to-file.yaml
@@ -62,6 +63,12 @@ under `.kuaia/output/local-file-to-file.csv`. The quoted CSV example reads
 line breaks through `.kuaia/output/local-quoted-csv-to-file.csv`. The JSONL file
 example reads `examples/data/documents.jsonl`, trims, lowercases, and filters
 `content`, and writes `.kuaia/output/local-jsonl-to-file.jsonl`.
+
+Use `kuaia validate -f <pipeline.yaml>` to check a pipeline before running it.
+For file sources, validation checks the source row type, transform field
+compatibility, and sink field compatibility without writing output or checkpoint
+state. For Postgres sources, validation parses connector configuration without
+connecting to the database, so row-type checks are deferred until run time.
 
 Validate the public MVP paths without external services:
 
@@ -244,7 +251,7 @@ service requirements.
 | Sources | `file` CSV and JSONL, batch `postgres` queries |
 | Transforms | `select`, `rename`, `trim`, `lowercase`, `replace`, `filter` (`not-empty`, `min-length`, `contains`, `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`, `greater-than-or-equal`, `less-than`, `less-than-or-equal`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
 | Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant` |
-| Runtime | Linear batch pipeline, checkpoint resume, bad-record skip mode |
+| Runtime | Linear batch pipeline, preflight validation, checkpoint resume, bad-record skip mode |
 | State | Local checkpoint state, in-memory and RocksDB state stores |
 | Extension points | Source, transform, sink, split reader, and batch writer boundaries |
 

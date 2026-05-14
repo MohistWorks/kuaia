@@ -38,4 +38,5 @@ jobs:
           VERSION=$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml | head -n 1)
           java -jar "kuaia-engine/target/kuaia-engine-${VERSION}-cli.jar" help
           bin/kuaia help
+          bin/kuaia validate -f examples/local-file-to-file.yaml
           docker compose config

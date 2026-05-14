@@ -8,6 +8,10 @@ All notable public changes to Kuaia are tracked here.
 
 - `kuaia run` now supports `--summary-json <path>` to write successful pipeline
   run counters as machine-readable JSON.
+- `kuaia validate -f <pipeline.yaml>` now checks pipeline configuration without
+  executing the pipeline.
+- Qdrant sinks now support `payloadFields` for explicit vector payload
+  metadata selection.
 - Declarative pipeline failures now include stable source, transform, sink, or
   checkpoint stage prefixes before the underlying error message.
 
