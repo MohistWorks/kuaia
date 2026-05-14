@@ -186,6 +186,40 @@ class TransformPipelineTest {
     }
 
     @Test
+    void filterTransformKeepsStringsEqualToValue() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(filterConfig("content", "equals", "alfa")));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Arrays.asList(
+                row(1L, "alfa"),
+                row(2L, "alpha"),
+                row(3L, "alfa beta")));
+
+        assertEquals(1, outputs.size());
+        assertEquals(1L, outputs.get(0).getLong(0));
+        assertEquals("alfa", outputs.get(0).getString(1));
+    }
+
+    @Test
+    void filterTransformDropsStringsEqualToValue() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(filterConfig("content", "not-equals", "beta")));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Arrays.asList(
+                row(1L, "alfa"),
+                row(2L, "beta"),
+                row(3L, "gamma")));
+
+        assertEquals(2, outputs.size());
+        assertEquals(1L, outputs.get(0).getLong(0));
+        assertEquals("alfa", outputs.get(0).getString(1));
+        assertEquals(3L, outputs.get(1).getLong(0));
+        assertEquals("gamma", outputs.get(1).getString(1));
+    }
+
+    @Test
     void filterTransformRejectsUnknownField() {
         PipelineExecutionException error = assertThrows(
                 PipelineExecutionException.class,

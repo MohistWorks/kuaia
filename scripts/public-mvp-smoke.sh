@@ -99,6 +99,10 @@ transforms:
     field: content
     op: starts-with
     value: a
+  - type: filter
+    field: content
+    op: equals
+    value: alfa
 sink:
   type: file
   path: $WORK_DIR/output/documents.jsonl
