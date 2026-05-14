@@ -47,9 +47,11 @@ Run the CLI and the default local example:
 bin/kuaia help
 bin/kuaia examples
 bin/kuaia run -f examples/local-file-to-file.yaml
+bin/kuaia run -f examples/local-file-to-file.yaml --summary-json .kuaia/output/local-file-to-file-summary.json
 bin/kuaia run -f examples/local-quoted-csv-to-file.yaml
 bin/kuaia run -f examples/local-jsonl-to-file.yaml
 cat .kuaia/output/local-file-to-file.csv
+cat .kuaia/output/local-file-to-file-summary.json
 cat .kuaia/output/local-quoted-csv-to-file.csv
 cat .kuaia/output/local-jsonl-to-file.jsonl
 ```
@@ -135,6 +137,8 @@ bin/kuaia run -f examples/local-file-to-vector.yaml
 
 Declarative runs print a summary with rows read, rows written, failed records,
 checkpoint sequence, task state, source splits, sink batches, and duration.
+Add `--summary-json <path>` to write the same counters as machine-readable JSON
+for scripts and CI checks.
 
 The full YAML contract is documented in
 [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md).

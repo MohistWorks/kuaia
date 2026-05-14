@@ -25,7 +25,8 @@ work directory:
   vector sink,
 - JSONL source through `trim`, `filter`, `chunk`, and `mock-embedding` into the
   mock vector sink,
-- malformed CSV handling with `errorPolicy.mode: skip-bad-records`.
+- malformed CSV handling with `errorPolicy.mode: skip-bad-records`,
+- JSON run summary output through `kuaia run --summary-json <path>`.
 
 After that, run individual examples below when you want to inspect one pipeline
 at a time. Qdrant, Postgres, and OpenAI-compatible examples require external

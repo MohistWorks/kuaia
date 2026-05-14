@@ -233,6 +233,38 @@ class KuaiaCliTest {
     }
 
     @Test
+    void runWritesJsonSummaryWhenConfigured() throws Exception {
+        Path data = tempDir.resolve("users-summary.csv");
+        Files.write(data, String.join("\n",
+                "id,name",
+                "1,Alice",
+                "2,Bob").getBytes(StandardCharsets.UTF_8));
+        Path output = tempDir.resolve("out/summary-users.csv");
+        Path summaryJson = tempDir.resolve("summaries/local-file-to-file.json");
+        Path config = writeFileSinkPipelineConfig("local-file-to-file", data, output, "overwrite");
+
+        CliResult result = run(
+                "run",
+                "-f", config.toString(),
+                "--summary-json", summaryJson.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Run Summary JSON: " + summaryJson));
+        assertTrue(Files.exists(summaryJson));
+        String json = new String(Files.readAllBytes(summaryJson), StandardCharsets.UTF_8);
+        assertTrue(json.contains("\"pipelineName\":\"local-file-to-file\""));
+        assertTrue(json.contains("\"rowsRead\":2"));
+        assertTrue(json.contains("\"rowsWritten\":2"));
+        assertTrue(json.contains("\"rowsFailed\":0"));
+        assertTrue(json.contains("\"rowsSkipped\":0"));
+        assertTrue(json.contains("\"checkpointSeq\":2"));
+        assertTrue(json.contains("\"taskState\":\"COMPLETED\""));
+        assertTrue(json.contains("\"sourceSplits\":1"));
+        assertTrue(json.contains("\"sinkBatches\":2"));
+        assertTrue(json.contains("\"durationMs\":"));
+    }
+
+    @Test
     void runWritesDeclarativePipelineToJsonlFile() throws Exception {
         Path data = tempDir.resolve("documents-file-sink.jsonl");
         Files.write(data, String.join("\n",

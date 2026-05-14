@@ -628,8 +628,22 @@ Successful declarative runs print a stable summary line:
 Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED sourceSplits=1 sinkBatches=2 durationMs=12
 ```
 
+Use `--summary-json <path>` when scripts need a machine-readable summary:
+
+```bash
+bin/kuaia run -f examples/local-file-to-file.yaml --summary-json .kuaia/output/local-file-to-file-summary.json
+```
+
+The JSON file uses stable field names:
+
+```json
+{"pipelineName":"local-file-to-file","rowsRead":2,"rowsWritten":2,"rowsFailed":0,"rowsSkipped":0,"checkpointSeq":2,"taskState":"COMPLETED","sourceSplits":1,"sinkBatches":2,"durationMs":12}
+```
+
 Fields:
 
+- `pipelineName`: pipeline name from the YAML config, present only in JSON
+  summary output,
 - `rowsRead`: source rows read after checkpoint skips,
 - `rowsWritten`: output rows successfully written to the sink,
 - `rowsFailed`: malformed source rows skipped under `skip-bad-records`,
