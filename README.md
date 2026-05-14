@@ -209,7 +209,8 @@ bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
 ```
 
 The OpenAI-compatible embedding transform supports `batchSize` for batched
-array input requests and `timeoutMs` for HTTP connect/read timeout control.
+array input requests, `timeoutMs` for HTTP connect/read timeout control, and
+stable validation of batch response counts and embedding indexes.
 
 Qdrant example:
 
