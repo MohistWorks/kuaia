@@ -95,17 +95,18 @@ bin/kuaia run -f examples/local-jsonl-to-file.yaml
 cat .kuaia/output/local-jsonl-to-file.jsonl
 ```
 
-Reads `examples/data/documents.jsonl`, selects `id` and `content`, trims and
-lowercases text, filters empty or too-short `content` values, keeps rows that
-contain `a` and start with `a`, and writes deterministic JSON Lines output:
+Reads `examples/data/documents.jsonl`, selects `id` and `content`, trims,
+lowercases, and applies a literal replacement to text, filters empty or
+too-short `content` values, keeps rows that contain `a` and start with `a`, and
+writes deterministic JSON Lines output:
 
 ```json
-{"id":1,"content":"alpha"}
+{"id":1,"content":"alfa"}
 ```
 
 This is the no-service path for checking JSONL cleanup, text normalization,
-length filtering, and literal string filtering before embedding, chunking, or
-writing to a vector sink.
+literal replacement, length filtering, and literal string filtering before
+embedding, chunking, or writing to a vector sink.
 
 ## Skip Bad Records
 

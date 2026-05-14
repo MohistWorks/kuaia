@@ -80,6 +80,10 @@ transforms:
     field: content
   - type: lowercase
     field: content
+  - type: replace
+    field: content
+    target: ph
+    replacement: f
   - type: filter
     field: content
     op: not-empty
@@ -247,7 +251,7 @@ run_pipeline "JSONL to file" "$JSONL_TO_FILE"
 
 EXPECTED_DOCUMENTS="$WORK_DIR/expected-documents.jsonl"
 {
-  printf '%s\n' '{"id":1,"content":"alpha"}'
+  printf '%s\n' '{"id":1,"content":"alfa"}'
 } > "$EXPECTED_DOCUMENTS"
 
 if ! diff -u "$EXPECTED_DOCUMENTS" "$WORK_DIR/output/documents.jsonl"; then

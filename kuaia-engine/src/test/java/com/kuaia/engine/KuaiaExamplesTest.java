@@ -73,7 +73,7 @@ class KuaiaExamplesTest {
                 new String(Files.readAllBytes(quotedCsvSinkOutput), StandardCharsets.UTF_8));
         assertEquals(
                 Arrays.asList(
-                        "{\"id\":1,\"content\":\"alpha\"}"),
+                        "{\"id\":1,\"content\":\"alfa\"}"),
                 Files.readAllLines(jsonlSinkOutput, StandardCharsets.UTF_8));
     }
 
@@ -90,6 +90,9 @@ class KuaiaExamplesTest {
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-vector.yaml")).contains("type: trim"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-vector.yaml")).contains("op: not-empty"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("type: lowercase"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("type: replace"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("target: ph"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("replacement: f"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("op: min-length"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("minLength: 4"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("op: contains"));

@@ -99,6 +99,9 @@ public class TransformPipeline {
         if ("lowercase".equals(config.getType())) {
             return new LowercaseTransform(config.getInput());
         }
+        if ("replace".equals(config.getType())) {
+            return new ReplaceTransform(config.getInput(), config.getFrom(), config.getTo());
+        }
         if ("filter".equals(config.getType())) {
             return new FilterTransform(config.getInput(), config.getOp(), config.getMinLength(), config.getValue());
         }
