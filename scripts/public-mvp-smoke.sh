@@ -226,7 +226,34 @@ run_pipeline() {
   require_contains "$output" "taskState=COMPLETED"
 }
 
-run_pipeline "CSV to transformed file" "$CSV_TO_FILE"
+run_pipeline_with_summary_json() {
+  name=$1
+  file=$2
+  summary_json=$3
+  printf '\n== %s ==\n' "$name"
+  if ! output=$("$KUAIA_CMD" run -f "$file" --summary-json "$summary_json" 2>&1); then
+    printf '%s\n' "$output"
+    exit 1
+  fi
+  printf '%s\n' "$output"
+  require_contains "$output" "Pipeline Finished."
+  require_contains "$output" "Run Summary:"
+  require_contains "$output" "taskState=COMPLETED"
+  require_contains "$output" "Run Summary JSON: $summary_json"
+  if [ ! -f "$summary_json" ]; then
+    printf '%s\n' "Expected summary JSON to exist: $summary_json" >&2
+    exit 1
+  fi
+}
+
+CSV_SUMMARY_JSON="$WORK_DIR/output/csv-to-file-summary.json"
+run_pipeline_with_summary_json "CSV to transformed file" "$CSV_TO_FILE" "$CSV_SUMMARY_JSON"
+
+SUMMARY_JSON_CONTENT=$(cat "$CSV_SUMMARY_JSON")
+require_contains "$SUMMARY_JSON_CONTENT" '"pipelineName":"public-mvp-csv-to-file"'
+require_contains "$SUMMARY_JSON_CONTENT" '"rowsRead":2'
+require_contains "$SUMMARY_JSON_CONTENT" '"rowsWritten":2'
+require_contains "$SUMMARY_JSON_CONTENT" '"taskState":"COMPLETED"'
 
 EXPECTED_USERS="$WORK_DIR/expected-users.csv"
 {

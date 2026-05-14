@@ -4,6 +4,11 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+### Added
+
+- `kuaia run` now supports `--summary-json <path>` to write successful pipeline
+  run counters as machine-readable JSON.
+
 ### Changed
 
 - Main branch development version is now `0.1.3-SNAPSHOT` after the `v0.1.2`

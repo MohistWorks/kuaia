@@ -1,5 +1,7 @@
 package com.kuaia.engine;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kuaia.engine.benchmark.LocalPipelineBenchmarkRunner;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigException;
@@ -7,11 +9,15 @@ import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.pipeline.PipelineRunSummary;
 
+import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class KuaiaCli {
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+
     public static void main(String[] args) throws Exception {
         System.exit(run(args, System.out));
     }
@@ -54,14 +60,18 @@ public class KuaiaCli {
             return 0;
         }
         if ("run".equals(command)) {
-            Path configPath = parseRunConfigPath(args, out);
-            if (configPath == null) {
+            RunOptions options = parseRunOptions(args, out);
+            if (options == null) {
                 return 1;
             }
             try {
-                PipelineConfig config = new PipelineConfigLoader().load(configPath);
+                PipelineConfig config = new PipelineConfigLoader().load(options.configPath);
                 PipelineRunSummary summary = new LocalPipelineRunner().run(config, out);
                 out.println(summary.toCliLine());
+                if (options.summaryJsonPath != null) {
+                    writeRunSummaryJson(options.summaryJsonPath, config.getName(), summary);
+                    out.println("Run Summary JSON: " + options.summaryJsonPath);
+                }
                 return 0;
             } catch (PipelineConfigException | PipelineExecutionException e) {
                 out.println(e.getMessage());
@@ -182,15 +192,62 @@ public class KuaiaCli {
         return args[valueIndex];
     }
 
-    private static Path parseRunConfigPath(String[] args, PrintStream out) {
-        for (int i = 1; i < args.length - 1; i++) {
-            if ("-f".equals(args[i]) || "--file".equals(args[i])) {
-                return Paths.get(args[i + 1]);
+    private static RunOptions parseRunOptions(String[] args, PrintStream out) {
+        Path configPath = null;
+        Path summaryJsonPath = null;
+        for (int i = 1; i < args.length; i++) {
+            String option = args[i];
+            if ("-f".equals(option) || "--file".equals(option)) {
+                if (i + 1 >= args.length) {
+                    out.println("run requires -f <pipeline.yaml>");
+                    printUsage(out);
+                    return null;
+                }
+                configPath = Paths.get(args[++i]);
+            } else if ("--summary-json".equals(option)) {
+                if (i + 1 >= args.length) {
+                    out.println("run --summary-json requires <path>");
+                    printUsage(out);
+                    return null;
+                }
+                summaryJsonPath = Paths.get(args[++i]);
+            } else {
+                out.println("Unknown run option: " + option);
+                printUsage(out);
+                return null;
             }
         }
-        out.println("run requires -f <pipeline.yaml>");
-        printUsage(out);
-        return null;
+        if (configPath == null) {
+            out.println("run requires -f <pipeline.yaml>");
+            printUsage(out);
+            return null;
+        }
+        return new RunOptions(configPath, summaryJsonPath);
+    }
+
+    private static void writeRunSummaryJson(Path outputPath, String pipelineName, PipelineRunSummary summary)
+            throws PipelineExecutionException {
+        ObjectNode json = JSON_MAPPER.createObjectNode();
+        json.put("pipelineName", pipelineName);
+        json.put("rowsRead", summary.getRowsRead());
+        json.put("rowsWritten", summary.getRowsWritten());
+        json.put("rowsFailed", summary.getRowsFailed());
+        json.put("rowsSkipped", summary.getRowsSkipped());
+        json.put("checkpointSeq", summary.getCheckpointSeq());
+        json.put("taskState", summary.getTaskState().name());
+        json.put("sourceSplits", summary.getSourceSplits());
+        json.put("sinkBatches", summary.getSinkBatches());
+        json.put("durationMs", summary.getDurationMillis());
+        try {
+            Path absolutePath = outputPath.toAbsolutePath().normalize();
+            Path parent = absolutePath.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.write(absolutePath, JSON_MAPPER.writeValueAsBytes(json));
+        } catch (IOException e) {
+            throw new PipelineExecutionException("Failed to write run summary JSON: " + outputPath, e);
+        }
     }
 
     private static void printUsage(PrintStream out) {
@@ -198,7 +255,8 @@ public class KuaiaCli {
         out.println();
         out.println("Commands:");
         out.println("  help                         Show this help message");
-        out.println("  run -f PIPELINE              Run a declarative local pipeline");
+        out.println("  run -f PIPELINE [--summary-json PATH]");
+        out.println("                               Run a declarative local pipeline");
         out.println("  local-demo                   Run FakeSource -> BinaryRow -> ConsoleSink");
         out.println("  ai-demo                      Run mock embedding -> mock vector sink");
         out.println("  examples                     Show runnable public example pipelines");
@@ -235,5 +293,15 @@ public class KuaiaCli {
         out.println("Docs:");
         out.println("  docs/examples.md");
         out.println("  docs/pipeline-yaml.md");
+    }
+
+    private static class RunOptions {
+        private final Path configPath;
+        private final Path summaryJsonPath;
+
+        private RunOptions(Path configPath, Path summaryJsonPath) {
+            this.configPath = configPath;
+            this.summaryJsonPath = summaryJsonPath;
+        }
     }
 }
