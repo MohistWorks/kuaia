@@ -548,7 +548,8 @@ curl -X PUT http://localhost:6333/collections/kuaia_docs \
 
 When `apiKeyEnv` is configured, Kuaia reads that environment variable at runtime
 and sends it as Qdrant's `api-key` header. Missing API keys, missing id/vector
-fields, and non-2xx Qdrant responses are fatal sink errors.
+fields, non-2xx Qdrant responses, and 2xx responses whose JSON `status` is not
+`ok` are fatal sink errors.
 
 ## Error Policy
 

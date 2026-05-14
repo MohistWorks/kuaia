@@ -1,5 +1,7 @@
 package com.kuaia.engine.worker.connector;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.data.BinaryRow;
 import com.kuaia.common.type.DataType;
@@ -23,6 +25,8 @@ import java.util.Set;
 
 public class QdrantVectorSink implements SinkWriter {
     private static final int DEFAULT_TIMEOUT_MILLIS = 30_000;
+    private static final int MAX_RESPONSE_CHARS = 500;
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
     private final KuaiaRowType rowType;
     private final int idOrdinal;
@@ -101,11 +105,34 @@ public class QdrantVectorSink implements SinkWriter {
                 throw new PipelineExecutionException(
                         "Qdrant upsert failed with status " + status + ": " + readResponse(connection));
             }
-            readResponse(connection);
+            validateSuccessResponse(readResponse(connection));
         } catch (PipelineExecutionException e) {
             throw e;
         } catch (IOException e) {
             throw new PipelineExecutionException("Qdrant upsert failed: " + e.getMessage(), e);
+        }
+    }
+
+    private void validateSuccessResponse(String response) throws PipelineExecutionException {
+        String body = response == null ? "" : response.trim();
+        if (body.isEmpty()) {
+            throw new PipelineExecutionException("Qdrant upsert returned empty response");
+        }
+
+        JsonNode root;
+        try {
+            root = JSON_MAPPER.readTree(body);
+        } catch (IOException e) {
+            throw new PipelineExecutionException("Qdrant upsert returned invalid response: " + truncate(body), e);
+        }
+
+        JsonNode status = root.get("status");
+        if (status == null || !status.isTextual()) {
+            throw new PipelineExecutionException("Qdrant upsert returned invalid response: " + truncate(body));
+        }
+        if (!"ok".equals(status.asText())) {
+            throw new PipelineExecutionException(
+                    "Qdrant upsert returned status " + status.asText() + ": " + truncate(body));
         }
     }
 
@@ -307,6 +334,13 @@ public class QdrantVectorSink implements SinkWriter {
             }
         }
         return escaped.toString();
+    }
+
+    private String truncate(String value) {
+        if (value.length() <= MAX_RESPONSE_CHARS) {
+            return value;
+        }
+        return value.substring(0, MAX_RESPONSE_CHARS) + "...";
     }
 
     private static HttpURLConnection openHttpConnection(URL url) throws IOException {
