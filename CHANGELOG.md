@@ -4,6 +4,8 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+## 0.1.2 - 2026-05-14
+
 ### Added
 
 - File sources now support `source.format: jsonl` for local JSON Lines
@@ -36,8 +38,6 @@ All notable public changes to Kuaia are tracked here.
 
 ### Changed
 
-- Main branch development version is now `0.1.2-SNAPSHOT` after the `v0.1.1`
-  release.
 - CSV file sinks now quote string values containing commas, quotes, or line
   breaks instead of rejecting them.
 - CSV file sources now parse quoted fields with commas, escaped quotes, and
