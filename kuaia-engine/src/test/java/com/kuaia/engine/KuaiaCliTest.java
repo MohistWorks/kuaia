@@ -136,7 +136,11 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/local-file-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-chunk-to-vector.yaml"));
+        assertTrue(result.output.contains("examples/local-faq-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-skip-bad-records.yaml"));
+        assertTrue(result.output.contains("Common RAG flows:"));
+        assertTrue(result.output.contains("FAQ import: kuaia run -f examples/local-faq-jsonl-to-vector.yaml"));
+        assertTrue(result.output.contains("Postgres to Qdrant: kuaia run -f examples/postgres-to-qdrant.yaml"));
         assertTrue(result.output.contains("External service examples:"));
         assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-qdrant.yaml"));

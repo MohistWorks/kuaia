@@ -17,6 +17,7 @@ Kuaia is useful when you want to:
 - transform records through a typed `BinaryRow` model,
 - trim and filter empty text before embedding or chunking,
 - split JSONL document text into embed-ready chunks,
+- import small FAQ JSONL datasets while preserving question and answer fields,
 - generate mock or OpenAI-compatible embeddings,
 - write to console, local CSV or JSONL files, mock vector output, or Qdrant,
 - resume local runs from checkpoint state,
@@ -51,6 +52,7 @@ bin/kuaia run -f examples/local-file-to-file.yaml
 bin/kuaia run -f examples/local-file-to-file.yaml --summary-json .kuaia/output/local-file-to-file-summary.json
 bin/kuaia run -f examples/local-quoted-csv-to-file.yaml
 bin/kuaia run -f examples/local-jsonl-to-file.yaml
+bin/kuaia run -f examples/local-faq-jsonl-to-vector.yaml
 cat .kuaia/output/local-file-to-file.csv
 cat .kuaia/output/local-file-to-file-summary.json
 cat .kuaia/output/local-quoted-csv-to-file.csv
@@ -63,6 +65,8 @@ under `.kuaia/output/local-file-to-file.csv`. The quoted CSV example reads
 line breaks through `.kuaia/output/local-quoted-csv-to-file.csv`. The JSONL file
 example reads `examples/data/documents.jsonl`, trims, lowercases, and filters
 `content`, and writes `.kuaia/output/local-jsonl-to-file.jsonl`.
+The FAQ vector example reads `examples/data/faq.jsonl`, trims question and
+answer fields, filters empty values, and emits deterministic mock vectors.
 
 Use `kuaia validate -f <pipeline.yaml>` to check a pipeline before running it.
 For file sources, validation checks the source row type, transform field
@@ -76,8 +80,9 @@ Validate the public MVP paths without external services:
 make public-mvp-smoke
 ```
 
-This smoke test runs file-to-file, quoted CSV, mock-vector, and bad-record
-handling examples in an isolated local state directory.
+This smoke test runs file-to-file, quoted CSV, JSONL cleanup, mock-vector,
+FAQ import, and bad-record handling examples in an isolated local state
+directory.
 
 ## Build A Packaged Runtime
 
@@ -199,6 +204,7 @@ bin/kuaia run -f examples/local-quoted-csv-to-file.yaml
 bin/kuaia run -f examples/local-file-to-vector.yaml
 bin/kuaia run -f examples/local-jsonl-to-vector.yaml
 bin/kuaia run -f examples/local-jsonl-chunk-to-vector.yaml
+bin/kuaia run -f examples/local-faq-jsonl-to-vector.yaml
 ```
 
 OpenAI-compatible embedding example:

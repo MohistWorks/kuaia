@@ -1,0 +1,27 @@
+name: local-faq-jsonl-to-vector
+source:
+  type: file
+  path: data/faq.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, question, answer]
+  - type: trim
+    field: question
+  - type: trim
+    field: answer
+  - type: filter
+    field: question
+    op: not-empty
+  - type: filter
+    field: answer
+    op: not-empty
+  - type: mock-embedding
+    input: answer
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: mock-vector
+checkpoint:
+  stateDir: .kuaia/state/local-faq-jsonl-to-vector

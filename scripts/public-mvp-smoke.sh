@@ -13,6 +13,7 @@ cp "$ROOT_DIR/examples/data/quoted-documents.csv" "$WORK_DIR/data/quoted-documen
 cp "$ROOT_DIR/examples/data/documents.csv" "$WORK_DIR/data/documents.csv"
 cp "$ROOT_DIR/examples/data/documents.jsonl" "$WORK_DIR/data/documents.jsonl"
 cp "$ROOT_DIR/examples/data/articles.jsonl" "$WORK_DIR/data/articles.jsonl"
+cp "$ROOT_DIR/examples/data/faq.jsonl" "$WORK_DIR/data/faq.jsonl"
 cp "$ROOT_DIR/examples/data/users-with-bad-row.csv" "$WORK_DIR/data/users-with-bad-row.csv"
 
 CSV_TO_FILE="$WORK_DIR/csv-to-file.yaml"
@@ -21,6 +22,7 @@ CSV_TO_VECTOR="$WORK_DIR/csv-to-vector.yaml"
 JSONL_TO_FILE="$WORK_DIR/jsonl-to-file.yaml"
 JSONL_TO_VECTOR="$WORK_DIR/jsonl-to-vector.yaml"
 JSONL_CHUNK_TO_VECTOR="$WORK_DIR/jsonl-chunk-to-vector.yaml"
+FAQ_JSONL_TO_VECTOR="$WORK_DIR/faq-jsonl-to-vector.yaml"
 SKIP_BAD_RECORDS="$WORK_DIR/skip-bad-records.yaml"
 FATAL_BAD_RECORDS="$WORK_DIR/fatal-bad-records.yaml"
 
@@ -187,6 +189,36 @@ checkpoint:
   stateDir: $WORK_DIR/state/jsonl-chunk-to-vector
 EOF
 
+cat > "$FAQ_JSONL_TO_VECTOR" <<EOF
+name: public-mvp-faq-jsonl-to-vector
+source:
+  type: file
+  path: data/faq.jsonl
+  format: jsonl
+transforms:
+  - type: select
+    fields: [id, question, answer]
+  - type: trim
+    field: question
+  - type: trim
+    field: answer
+  - type: filter
+    field: question
+    op: not-empty
+  - type: filter
+    field: answer
+    op: not-empty
+  - type: mock-embedding
+    input: answer
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: mock-vector
+checkpoint:
+  stateDir: $WORK_DIR/state/faq-jsonl-to-vector
+EOF
+
 cat > "$SKIP_BAD_RECORDS" <<EOF
 name: public-mvp-skip-bad-records
 source:
@@ -338,6 +370,7 @@ fi
 run_pipeline "CSV to mock vector" "$CSV_TO_VECTOR"
 run_pipeline "JSONL to mock vector" "$JSONL_TO_VECTOR"
 run_pipeline "JSONL chunk to mock vector" "$JSONL_CHUNK_TO_VECTOR"
+run_pipeline "FAQ JSONL to mock vector" "$FAQ_JSONL_TO_VECTOR"
 run_pipeline "Skip malformed CSV records" "$SKIP_BAD_RECORDS"
 run_expected_failure "Fatal malformed CSV records" "$FATAL_BAD_RECORDS" "Source stage failed:"
 
