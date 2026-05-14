@@ -211,6 +211,47 @@ class LocalPipelineRunnerTest {
     }
 
     @Test
+    void containsFilterJsonlPipelineWritesOnlyMatchingRows() throws Exception {
+        Path data = tempDir.resolve("contains-documents.jsonl");
+        Files.write(data, String.join("\n",
+                "{\"id\":1,\"content\":\"Alpha\"}",
+                "{\"id\":2,\"content\":\"Beta\"}",
+                "{\"id\":3,\"content\":\"Alpha Beta\"}").getBytes(StandardCharsets.UTF_8));
+        Path output = tempDir.resolve("out/contains-documents.jsonl");
+        Path configPath = tempDir.resolve("contains-jsonl-file.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: contains-jsonl-file",
+                "source:",
+                "  type: file",
+                "  path: " + data,
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: contains",
+                "    value: Alpha",
+                "sink:",
+                "  type: file",
+                "  path: " + output,
+                "  format: jsonl",
+                "  mode: overwrite").getBytes(StandardCharsets.UTF_8));
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PipelineRunSummary summary = new LocalPipelineRunner()
+                .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name()));
+
+        assertEquals(3L, summary.getRowsRead());
+        assertEquals(2L, summary.getRowsWritten());
+        assertEquals(3L, summary.getCheckpointSeq());
+        assertEquals(2L, summary.getSinkBatches());
+        assertEquals(java.util.Arrays.asList(
+                "{\"id\":1,\"content\":\"Alpha\"}",
+                "{\"id\":3,\"content\":\"Alpha Beta\"}"),
+                Files.readAllLines(output, StandardCharsets.UTF_8));
+    }
+
+    @Test
     void trimAndFilterJsonlPipelineCountsSourceRowsAndWrittenRowsSeparately() throws Exception {
         Path data = tempDir.resolve("trimmed-documents.jsonl");
         Files.write(data, String.join("\n",

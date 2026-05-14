@@ -408,6 +408,32 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsContainsFilterTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("contains-filter-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: contains-filter-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: contains",
+                "    value: Alpha",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig filter = config.getTransforms().get(0);
+        assertEquals("filter", filter.getType());
+        assertEquals("content", filter.getInput());
+        assertEquals("contains", filter.getOp());
+        assertEquals("Alpha", filter.getValue());
+    }
+
+    @Test
     void rejectsMissingFilterTransformOp() throws Exception {
         Path configPath = tempDir.resolve("missing-filter-op.yaml");
         Files.write(configPath, String.join("\n",
@@ -497,6 +523,29 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("Invalid transform.minLength: 0", error.getMessage());
+    }
+
+    @Test
+    void rejectsMissingContainsFilterTransformValue() throws Exception {
+        Path configPath = tempDir.resolve("missing-contains-filter-value.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-contains-filter-value",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: contains",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].value", error.getMessage());
     }
 
     @Test
