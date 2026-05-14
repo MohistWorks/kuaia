@@ -248,11 +248,11 @@ public class PipelineConfigLoader {
     private PipelineConfig.TransformConfig loadFilterTransform(Map<String, String> transform, String fieldPrefix)
             throws PipelineConfigException {
         String op = require(transform, fieldPrefix + ".op");
-        requireSupported(fieldPrefix + ".op", op, "not-empty", "min-length", "contains");
+        requireSupported(fieldPrefix + ".op", op, "not-empty", "min-length", "contains", "starts-with", "ends-with");
         int minLength = "min-length".equals(op)
                 ? parseMinLength(require(transform, fieldPrefix + ".minLength"))
                 : 0;
-        String value = "contains".equals(op)
+        String value = requiresFilterValue(op)
                 ? require(transform, fieldPrefix + ".value")
                 : null;
         return new PipelineConfig.TransformConfig(
@@ -276,6 +276,10 @@ public class PipelineConfigLoader {
                 op,
                 minLength,
                 value);
+    }
+
+    private boolean requiresFilterValue(String op) {
+        return "contains".equals(op) || "starts-with".equals(op) || "ends-with".equals(op);
     }
 
     private PipelineConfig.TransformConfig loadTrimTransform(Map<String, String> transform, String fieldPrefix)

@@ -21,6 +21,8 @@ All notable public changes to Kuaia are tracked here.
   before filtering, chunking, or embedding.
 - Added a `lowercase` transform for deterministic string normalization before
   filtering, chunking, or embedding.
+- `filter` now supports `op: starts-with` and `op: ends-with` for
+  case-sensitive literal prefix and suffix filtering.
 - File sinks now support `format: jsonl`, including a public JSONL clean-to-file
   example and smoke coverage.
 - `filter` now supports `op: min-length` for dropping too-short text before

@@ -96,17 +96,16 @@ cat .kuaia/output/local-jsonl-to-file.jsonl
 ```
 
 Reads `examples/data/documents.jsonl`, selects `id` and `content`, trims and
-lowercases text, filters empty or too-short `content` values, keeps rows
-containing `a`, and writes deterministic JSON Lines output:
+lowercases text, filters empty or too-short `content` values, keeps rows that
+contain `a` and start with `a`, and writes deterministic JSON Lines output:
 
 ```json
 {"id":1,"content":"alpha"}
-{"id":2,"content":"beta"}
 ```
 
 This is the no-service path for checking JSONL cleanup, text normalization,
-length filtering, and substring filtering before embedding, chunking, or writing
-to a vector sink.
+length filtering, and literal string filtering before embedding, chunking, or
+writing to a vector sink.
 
 ## Skip Bad Records
 

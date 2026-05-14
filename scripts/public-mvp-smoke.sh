@@ -91,6 +91,10 @@ transforms:
     field: content
     op: contains
     value: a
+  - type: filter
+    field: content
+    op: starts-with
+    value: a
 sink:
   type: file
   path: $WORK_DIR/output/documents.jsonl
@@ -244,7 +248,6 @@ run_pipeline "JSONL to file" "$JSONL_TO_FILE"
 EXPECTED_DOCUMENTS="$WORK_DIR/expected-documents.jsonl"
 {
   printf '%s\n' '{"id":1,"content":"alpha"}'
-  printf '%s\n' '{"id":2,"content":"beta"}'
 } > "$EXPECTED_DOCUMENTS"
 
 if ! diff -u "$EXPECTED_DOCUMENTS" "$WORK_DIR/output/documents.jsonl"; then

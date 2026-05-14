@@ -12,11 +12,13 @@ public class FilterTransform implements PipelineTransform {
     private static final String OP_NOT_EMPTY = "not-empty";
     private static final String OP_MIN_LENGTH = "min-length";
     private static final String OP_CONTAINS = "contains";
+    private static final String OP_STARTS_WITH = "starts-with";
+    private static final String OP_ENDS_WITH = "ends-with";
 
     private final String field;
     private final String op;
     private final int minLength;
-    private final String expectedSubstring;
+    private final String expectedValue;
     private KuaiaRowType outputType;
     private int fieldOrdinal;
 
@@ -28,20 +30,24 @@ public class FilterTransform implements PipelineTransform {
         this(field, op, minLength, null);
     }
 
-    public FilterTransform(String field, String op, int minLength, String expectedSubstring) {
+    public FilterTransform(String field, String op, int minLength, String expectedValue) {
         this.field = field;
         this.op = op;
         this.minLength = minLength;
-        this.expectedSubstring = expectedSubstring;
+        this.expectedValue = expectedValue;
     }
 
     @Override
     public KuaiaRowType outputType(KuaiaRowType inputType) throws PipelineExecutionException {
-        if (!OP_NOT_EMPTY.equals(op) && !OP_MIN_LENGTH.equals(op) && !OP_CONTAINS.equals(op)) {
+        if (!OP_NOT_EMPTY.equals(op)
+                && !OP_MIN_LENGTH.equals(op)
+                && !OP_CONTAINS.equals(op)
+                && !OP_STARTS_WITH.equals(op)
+                && !OP_ENDS_WITH.equals(op)) {
             throw new PipelineExecutionException("Unsupported filter op: " + op);
         }
-        if (OP_CONTAINS.equals(op) && (expectedSubstring == null || expectedSubstring.isEmpty())) {
-            throw new PipelineExecutionException("Filter value is required for contains");
+        if (requiresValue() && (expectedValue == null || expectedValue.isEmpty())) {
+            throw new PipelineExecutionException("Filter value is required for " + op);
         }
         int ordinal = inputType.getIndex(field);
         if (ordinal < 0) {
@@ -83,6 +89,16 @@ public class FilterTransform implements PipelineTransform {
         if (OP_MIN_LENGTH.equals(op)) {
             return trimmed.length() >= minLength;
         }
-        return fieldValue.contains(expectedSubstring);
+        if (OP_CONTAINS.equals(op)) {
+            return fieldValue.contains(expectedValue);
+        }
+        if (OP_STARTS_WITH.equals(op)) {
+            return fieldValue.startsWith(expectedValue);
+        }
+        return fieldValue.endsWith(expectedValue);
+    }
+
+    private boolean requiresValue() {
+        return OP_CONTAINS.equals(op) || OP_STARTS_WITH.equals(op) || OP_ENDS_WITH.equals(op);
     }
 }
