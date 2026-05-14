@@ -26,7 +26,8 @@ work directory:
 - JSONL source through `trim`, `filter`, `chunk`, and `mock-embedding` into the
   mock vector sink,
 - malformed CSV handling with `errorPolicy.mode: skip-bad-records`,
-- JSON run summary output through `kuaia run --summary-json <path>`.
+- JSON run summary output through `kuaia run --summary-json <path>`,
+- fatal malformed CSV diagnostics with a stable `Source stage failed:` prefix.
 
 After that, run individual examples below when you want to inspect one pipeline
 at a time. Qdrant, Postgres, and OpenAI-compatible examples require external

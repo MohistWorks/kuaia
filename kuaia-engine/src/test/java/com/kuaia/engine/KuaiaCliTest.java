@@ -488,7 +488,7 @@ class KuaiaCliTest {
         CliResult result = run("run", "-f", config.toString());
 
         assertEquals(1, result.exitCode);
-        assertTrue(result.output.contains("Unknown transform field: missing"));
+        assertTrue(result.output.contains("Transform stage failed: Unknown transform field: missing"));
         assertFalse(result.output.contains("Run Summary:"));
     }
 
@@ -539,7 +539,7 @@ class KuaiaCliTest {
         CliResult result = run("run", "-f", config.toString());
 
         assertEquals(1, result.exitCode);
-        assertTrue(result.output.contains("Mock vector sink requires VECTOR field: embedding"));
+        assertTrue(result.output.contains("Sink stage failed: Mock vector sink requires VECTOR field: embedding"));
     }
 
     @Test
@@ -798,7 +798,8 @@ class KuaiaCliTest {
         CliResult result = run("run", "-f", config.toString());
 
         assertEquals(1, result.exitCode);
-        assertTrue(result.output.contains("Invalid CSV row at line 3: expected 2 columns but found 1"));
+        assertTrue(result.output.contains(
+                "Source stage failed: Invalid CSV row at line 3: expected 2 columns but found 1"));
     }
 
     @Test
@@ -827,6 +828,7 @@ class KuaiaCliTest {
         CliResult result = run("run", "-f", config.toString());
 
         assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Sink stage failed:"));
         assertFalse(result.output.contains("Run Summary:"));
     }
 

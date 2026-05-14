@@ -655,6 +655,23 @@ Fields:
 - `sinkBatches`: sink batches successfully committed by the local runner,
 - `durationMs`: wall-clock runtime in milliseconds.
 
+## Failure Messages
+
+Failed declarative runs include a stable stage prefix before the underlying
+error:
+
+```text
+Source stage failed: Invalid CSV row at line 3: expected 2 columns but found 1
+Transform stage failed: Unknown transform field: missing
+Sink stage failed: Mock vector sink requires VECTOR field: embedding
+Checkpoint stage failed: Pipeline task local-pipeline-example is FAILED
+```
+
+Stage prefixes identify whether the failure happened while reading source data,
+building or applying transforms, creating and writing the sink, or updating
+checkpoint state. Failed runs do not print `Run Summary:` or write
+`--summary-json` output.
+
 ## Examples
 
 For the full list of public examples, expected output, Docker quickstart, and

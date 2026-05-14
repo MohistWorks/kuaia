@@ -138,7 +138,10 @@ bin/kuaia run -f examples/local-file-to-vector.yaml
 Declarative runs print a summary with rows read, rows written, failed records,
 checkpoint sequence, task state, source splits, sink batches, and duration.
 Add `--summary-json <path>` to write the same counters as machine-readable JSON
-for scripts and CI checks.
+for scripts and CI checks. Failed declarative runs include a stable stage
+prefix such as `Source stage failed:`, `Transform stage failed:`, or
+`Sink stage failed:` before the underlying error. Checkpoint failures are
+reported with `Checkpoint stage failed:`.
 
 The full YAML contract is documented in
 [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md).

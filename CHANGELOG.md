@@ -8,6 +8,8 @@ All notable public changes to Kuaia are tracked here.
 
 - `kuaia run` now supports `--summary-json <path>` to write successful pipeline
   run counters as machine-readable JSON.
+- Declarative pipeline failures now include stable source, transform, sink, or
+  checkpoint stage prefixes before the underlying error message.
 
 ### Changed
 
