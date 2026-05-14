@@ -109,15 +109,21 @@ class KuaiaExamplesTest {
         assertTrue(read(chunkToQdrantPath).contains("op: not-empty"));
         assertTrue(read(chunkToQdrantPath).contains("chunkIndexField: chunk_index"));
         assertTrue(read(chunkToQdrantPath).contains("chunkIdMultiplier: 1000000"));
+        assertTrue(read(chunkToQdrantPath).contains("payloadFields: [id, chunk, chunk_index, chunk_start, chunk_end]"));
         assertTrue(read(chunkToQdrantPath).contains("dropInput: true"));
         assertTrue(read(chunkToQdrantPath).contains("includeOffsets: true"));
         assertTrue(read(postgresToQdrantPath).contains("fetchSize: 1000"));
         assertTrue(read(postgresToQdrantPath).contains("timeoutMs: 30000"));
         assertEquals(30000, fileToQdrant.getSink().getTimeoutMs());
+        assertEquals(Arrays.asList("id", "content"), fileToQdrant.getSink().getPayloadFields());
         assertEquals("chunk_index", chunkToQdrant.getSink().getChunkIndexField());
         assertEquals(1_000_000L, chunkToQdrant.getSink().getChunkIdMultiplier());
+        assertEquals(
+                Arrays.asList("id", "chunk", "chunk_index", "chunk_start", "chunk_end"),
+                chunkToQdrant.getSink().getPayloadFields());
         assertEquals(1000, postgresToQdrant.getSource().getFetchSize());
         assertEquals(30000, postgresToQdrant.getSink().getTimeoutMs());
+        assertEquals(Arrays.asList("id", "content"), postgresToQdrant.getSink().getPayloadFields());
     }
 
     private CliResult run(String... args) throws Exception {

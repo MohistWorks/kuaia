@@ -497,6 +497,7 @@ sink:
   vectorField: embedding
   chunkIndexField: chunk_index
   chunkIdMultiplier: 1000000
+  payloadFields: [id, chunk, chunk_index, chunk_start, chunk_end]
   wait: true
   timeoutMs: 30000
 ```
@@ -512,6 +513,8 @@ Fields:
 - `collection`: target collection name
 - `idField`: `LONG` field used as the Qdrant point id
 - `vectorField`: `VECTOR` field used as the Qdrant vector
+- `payloadFields`: optional list of `LONG` or `STRING` fields to include in the
+  Qdrant payload; when omitted, all non-vector fields are included
 - `chunkIndexField`: optional `LONG` field used to generate unique point ids
   for chunked rows
 - `chunkIdMultiplier`: optional positive multiplier used with
@@ -521,11 +524,16 @@ Fields:
 - `timeoutMs`: optional HTTP connect/read timeout in milliseconds. Defaults to
   `30000` and must be a positive integer when configured.
 
+When `payloadFields` is set, Kuaia sends only those fields as Qdrant payload.
+The vector field cannot be included. This keeps large source text or temporary
+transform fields out of vector payloads while preserving the metadata needed for
+retrieval.
+
 When `chunkIndexField` is set, the Qdrant point id is generated as
-`idField * chunkIdMultiplier + chunkIndexField`. The payload still includes the
-original document id and `chunk_index`, so source documents can be traced while
-each chunk gets a stable point id. This is intended for pipelines that run
-`chunk` before writing to Qdrant.
+`idField * chunkIdMultiplier + chunkIndexField`. The chunked example combines
+that with `payloadFields` to keep the original document id, chunk text, chunk
+index, and character offsets while each chunk gets a stable point id. This is
+intended for pipelines that run `chunk` before writing to Qdrant.
 
 Qdrant collections are not created automatically. Create the example collection
 before running `examples/local-file-to-qdrant.yaml`:
@@ -794,6 +802,9 @@ Common examples:
 - `source.fetchSize is only supported for source.type: postgres`
 - `Invalid source.fetchSize: <value>`
 - `sink.timeoutMs is only supported for sink.type: qdrant`
+- `sink.payloadFields is only supported for sink.type: qdrant`
+- `sink.payloadFields must not include sink.vectorField: <field>`
+- `Duplicate value in sink.payloadFields: <field>`
 - `Invalid sink.timeoutMs: <value>`
 - `Invalid transform.dimensions: <value>`
 - `Invalid transform.timeoutMs: <value>`
@@ -819,6 +830,9 @@ Common examples:
 - `Mock vector sink requires VECTOR field: embedding`
 - `Qdrant sink requires LONG field: <field>`
 - `Qdrant sink requires VECTOR field: <field>`
+- `Qdrant sink requires payload field: <field>`
+- `Qdrant payload field must not be the vector field: <field>`
+- `Duplicate Qdrant payload field: <field>`
 - `Missing Qdrant API key environment variable: <name>`
 - `Qdrant upsert failed with status <code>: <response>`
 - `Qdrant upsert failed: <message>`

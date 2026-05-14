@@ -31,6 +31,7 @@ sink:
   vectorField: embedding
   chunkIndexField: chunk_index
   chunkIdMultiplier: 1000000
+  payloadFields: [id, chunk, chunk_index, chunk_start, chunk_end]
   wait: true
   timeoutMs: 30000
 checkpoint:

@@ -483,13 +483,15 @@ public class PipelineConfig {
         private final int timeoutMs;
         private final String chunkIndexField;
         private final long chunkIdMultiplier;
+        private final List<String> payloadFields;
 
         public SinkConfig(String type) {
             this(type, null, null, null);
         }
 
         public SinkConfig(String type, String path, String format, String mode) {
-            this(type, path, format, mode, null, null, null, null, null, true, 0, null, 0L);
+            this(type, path, format, mode, null, null, null, null, null, true, 0, null, 0L,
+                    Collections.emptyList());
         }
 
         public SinkConfig(
@@ -518,7 +520,8 @@ public class PipelineConfig {
                 String vectorField,
                 boolean wait,
                 int timeoutMs) {
-            this(type, path, format, mode, url, collection, apiKeyEnv, idField, vectorField, wait, timeoutMs, null, 0L);
+            this(type, path, format, mode, url, collection, apiKeyEnv, idField, vectorField, wait, timeoutMs, null, 0L,
+                    Collections.emptyList());
         }
 
         public SinkConfig(
@@ -535,6 +538,25 @@ public class PipelineConfig {
                 int timeoutMs,
                 String chunkIndexField,
                 long chunkIdMultiplier) {
+            this(type, path, format, mode, url, collection, apiKeyEnv, idField, vectorField, wait, timeoutMs,
+                    chunkIndexField, chunkIdMultiplier, Collections.emptyList());
+        }
+
+        public SinkConfig(
+                String type,
+                String path,
+                String format,
+                String mode,
+                String url,
+                String collection,
+                String apiKeyEnv,
+                String idField,
+                String vectorField,
+                boolean wait,
+                int timeoutMs,
+                String chunkIndexField,
+                long chunkIdMultiplier,
+                List<String> payloadFields) {
             if (timeoutMs < 0) {
                 throw new IllegalArgumentException("timeoutMs must not be negative");
             }
@@ -554,6 +576,8 @@ public class PipelineConfig {
             this.timeoutMs = timeoutMs;
             this.chunkIndexField = chunkIndexField;
             this.chunkIdMultiplier = chunkIdMultiplier;
+            this.payloadFields = Collections.unmodifiableList(new ArrayList<>(
+                    payloadFields == null ? Collections.emptyList() : payloadFields));
         }
 
         public String getType() {
@@ -606,6 +630,10 @@ public class PipelineConfig {
 
         public long getChunkIdMultiplier() {
             return chunkIdMultiplier;
+        }
+
+        public List<String> getPayloadFields() {
+            return payloadFields;
         }
     }
 

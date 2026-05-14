@@ -1285,6 +1285,32 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsQdrantPayloadFields() throws Exception {
+        Path configPath = tempDir.resolve("qdrant-sink-payload-fields.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: qdrant-sink-payload-fields",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "sink:",
+                "  type: qdrant",
+                "  url: http://localhost:6333",
+                "  collection: kuaia_docs",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  payloadFields: [id, source]").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals(java.util.Arrays.asList("id", "source"), config.getSink().getPayloadFields());
+    }
+
+    @Test
     void loadsQdrantChunkPointIdDefaults() throws Exception {
         Path configPath = tempDir.resolve("qdrant-sink-chunk-id-defaults.yaml");
         Files.write(configPath, String.join("\n",
@@ -1404,6 +1430,28 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("sink.chunkIndexField is only supported for sink.type: qdrant", error.getMessage());
+    }
+
+    @Test
+    void rejectsQdrantPayloadFieldsForFileSink() throws Exception {
+        Path configPath = tempDir.resolve("file-sink-payload-fields.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: file-sink-payload-fields",
+                "source:",
+                "  type: file",
+                "  path: data/users.csv",
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: out/users.csv",
+                "  format: csv",
+                "  payloadFields: [id]").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("sink.payloadFields is only supported for sink.type: qdrant", error.getMessage());
     }
 
     @Test

@@ -189,8 +189,9 @@ bin/kuaia run -f examples/local-file-to-qdrant.yaml
 ```
 
 The example reads `examples/data/documents.csv`, creates deterministic mock
-embeddings, and upserts points into Qdrant collection `kuaia_docs`. It is not
-part of default automated tests because it requires a running Qdrant service.
+embeddings, and upserts points into Qdrant collection `kuaia_docs`. It uses
+`payloadFields: [id, content]` so the Qdrant payload is explicit. It is not part
+of default automated tests because it requires a running Qdrant service.
 
 For chunked JSONL documents, create the chunk collection:
 
@@ -213,7 +214,7 @@ deterministic mock embeddings, and writes Qdrant point ids as
 each other. It also sets
 `dropInput: true` and `includeOffsets: true` so Qdrant payloads keep `chunk`,
 `chunk_index`, `chunk_start`, and `chunk_end` without repeating the full source
-document text on every point.
+document text on every point, and pins those fields with `payloadFields`.
 
 ## Postgres To Qdrant
 
@@ -241,9 +242,9 @@ bin/kuaia run -f examples/postgres-to-qdrant.yaml
 
 The example reads rows from the `documents` table initialized by
 `examples/postgres/init/01-documents.sql`, creates deterministic mock
-embeddings, and upserts points into Qdrant collection `kuaia_pg_docs`. It is not
-part of default automated tests because it requires running Postgres and Qdrant
-services.
+embeddings, and upserts points into Qdrant collection `kuaia_pg_docs` with
+`payloadFields: [id, content]`. It is not part of default automated tests
+because it requires running Postgres and Qdrant services.
 
 ## Docker Quickstart
 
