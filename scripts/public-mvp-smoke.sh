@@ -22,6 +22,7 @@ JSONL_TO_FILE="$WORK_DIR/jsonl-to-file.yaml"
 JSONL_TO_VECTOR="$WORK_DIR/jsonl-to-vector.yaml"
 JSONL_CHUNK_TO_VECTOR="$WORK_DIR/jsonl-chunk-to-vector.yaml"
 SKIP_BAD_RECORDS="$WORK_DIR/skip-bad-records.yaml"
+FATAL_BAD_RECORDS="$WORK_DIR/fatal-bad-records.yaml"
 
 cat > "$CSV_TO_FILE" <<EOF
 name: public-mvp-csv-to-file
@@ -200,6 +201,16 @@ checkpoint:
   stateDir: $WORK_DIR/state/skip-bad-records
 EOF
 
+cat > "$FATAL_BAD_RECORDS" <<EOF
+name: public-mvp-fatal-bad-records
+source:
+  type: file
+  path: data/users-with-bad-row.csv
+  format: csv
+sink:
+  type: console
+EOF
+
 require_contains() {
   text=$1
   needle=$2
@@ -209,6 +220,18 @@ require_contains() {
       printf '%s\n' "Expected output to contain: $needle" >&2
       exit 1
       ;;
+  esac
+}
+
+require_not_contains() {
+  text=$1
+  needle=$2
+  case "$text" in
+    *"$needle"*)
+      printf '%s\n' "Expected output not to contain: $needle" >&2
+      exit 1
+      ;;
+    *) ;;
   esac
 }
 
@@ -244,6 +267,24 @@ run_pipeline_with_summary_json() {
     printf '%s\n' "Expected summary JSON to exist: $summary_json" >&2
     exit 1
   fi
+}
+
+run_expected_failure() {
+  name=$1
+  file=$2
+  expected=$3
+  printf '\n== %s ==\n' "$name"
+  set +e
+  output=$("$KUAIA_CMD" run -f "$file" 2>&1)
+  status=$?
+  set -e
+  printf '%s\n' "$output"
+  if [ "$status" -eq 0 ]; then
+    printf '%s\n' "Expected pipeline to fail: $file" >&2
+    exit 1
+  fi
+  require_contains "$output" "$expected"
+  require_not_contains "$output" "Run Summary:"
 }
 
 CSV_SUMMARY_JSON="$WORK_DIR/output/csv-to-file-summary.json"
@@ -298,5 +339,6 @@ run_pipeline "CSV to mock vector" "$CSV_TO_VECTOR"
 run_pipeline "JSONL to mock vector" "$JSONL_TO_VECTOR"
 run_pipeline "JSONL chunk to mock vector" "$JSONL_CHUNK_TO_VECTOR"
 run_pipeline "Skip malformed CSV records" "$SKIP_BAD_RECORDS"
+run_expected_failure "Fatal malformed CSV records" "$FATAL_BAD_RECORDS" "Source stage failed:"
 
 printf '\nPublic MVP smoke passed. Work dir: %s\n' "$WORK_DIR"

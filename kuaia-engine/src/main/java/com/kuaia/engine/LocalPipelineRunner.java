@@ -34,6 +34,10 @@ import java.util.List;
 
 public class LocalPipelineRunner {
     private static final int DEFAULT_FILE_ROWS_PER_SPLIT = 10_000;
+    private static final String SOURCE_STAGE = "Source";
+    private static final String TRANSFORM_STAGE = "Transform";
+    private static final String SINK_STAGE = "Sink";
+    private static final String CHECKPOINT_STAGE = "Checkpoint";
 
     private final SinkFactoryRegistry sinkFactories;
     private final EmbeddingProviderRegistry embeddingProviders;
@@ -97,35 +101,44 @@ public class LocalPipelineRunner {
     }
 
     private PipelineRunSummary runWithoutCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
-        SourceEnumerator source = createSource(config);
-        source.open();
+        SourceEnumerator source = runStage(SOURCE_STAGE, () -> createSource(config));
         BatchSinkWriter sink = null;
         try {
-            TransformPipeline transforms = TransformPipeline.from(
+            runStage(SOURCE_STAGE, () -> {
+                source.open();
+                return null;
+            });
+            TransformPipeline transforms = runStage(TRANSFORM_STAGE, () -> TransformPipeline.from(
                     source.getRowType(),
                     config.getTransforms(),
-                    embeddingProviders);
-            sink = createSink(config, transforms.getOutputType(), out);
-            sink.open();
-            out.println("Starting pipeline: " + config.getName());
+                    embeddingProviders));
+            sink = runStage(SINK_STAGE, () -> createSink(config, transforms.getOutputType(), out));
             BatchSinkWriter openedSink = sink;
+            runStage(SINK_STAGE, () -> {
+                openedSink.open();
+                return null;
+            });
+            out.println("Starting pipeline: " + config.getName());
             PipelineCounters counters = new PipelineCounters();
             BatchBuffer batch = new BatchBuffer(transforms.getBatchSize());
-            for (SourceSplit split : source.enumerateSplits()) {
+            for (SourceSplit split : runStage(SOURCE_STAGE, source::enumerateSplits)) {
                 counters.recordSourceSplit();
-                BatchSourceReader reader = source.createReader(split);
-                reader.readFrom(
-                        0L,
-                        (seqId, row) -> {
-                            batch.add(seqId, row);
-                            if (batch.isFull()) {
+                BatchSourceReader reader = runStage(SOURCE_STAGE, () -> source.createReader(split));
+                runStage(SOURCE_STAGE, () -> {
+                    reader.readFrom(
+                            0L,
+                            (seqId, row) -> {
+                                batch.add(seqId, row);
+                                if (batch.isFull()) {
+                                    flushBatch(split, batch, transforms, openedSink, counters, null);
+                                }
+                            },
+                            (seqId, error) -> {
                                 flushBatch(split, batch, transforms, openedSink, counters, null);
-                            }
-                        },
-                        (seqId, error) -> {
-                            flushBatch(split, batch, transforms, openedSink, counters, null);
-                            return handleRecordError(config, out, counters, seqId, error);
-                        });
+                                return handleRecordError(config, out, counters, seqId, error);
+                            });
+                    return null;
+                });
                 flushBatch(split, batch, transforms, openedSink, counters, null);
             }
             out.println("Pipeline Finished. rows=" + counters.rowsWritten);
@@ -139,19 +152,24 @@ public class LocalPipelineRunner {
     }
 
     private PipelineRunSummary runWithCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
-        SourceEnumerator source = createSource(config);
-        source.open();
+        SourceEnumerator source = runStage(SOURCE_STAGE, () -> createSource(config));
         BatchSinkWriter sink = null;
         try {
-            TransformPipeline transforms = TransformPipeline.from(
+            runStage(SOURCE_STAGE, () -> {
+                source.open();
+                return null;
+            });
+            TransformPipeline transforms = runStage(TRANSFORM_STAGE, () -> TransformPipeline.from(
                     source.getRowType(),
                     config.getTransforms(),
-                    embeddingProviders);
+                    embeddingProviders));
             out.println("Starting pipeline: " + config.getName());
-            try (LocalPipelineCheckpointStore checkpointStore = new LocalPipelineCheckpointStore(
-                    Paths.get(config.getCheckpoint().getStateDir()),
-                    config.getName())) {
-                TaskRecord task = checkpointStore.startOrResume();
+            try (LocalPipelineCheckpointStore checkpointStore = runStage(
+                    CHECKPOINT_STAGE,
+                    () -> new LocalPipelineCheckpointStore(
+                            Paths.get(config.getCheckpoint().getStateDir()),
+                            config.getName()))) {
+                TaskRecord task = runStage(CHECKPOINT_STAGE, checkpointStore::startOrResume);
                 if (task.getState() == TaskState.COMPLETED) {
                     out.println("Pipeline Finished. rows=0 checkpoint="
                             + task.getLastCheckpointSeq()
@@ -167,22 +185,38 @@ public class LocalPipelineRunner {
                             0L);
                 }
 
-                sink = createSink(config, transforms.getOutputType(), out);
-                sink.open();
+                sink = runStage(SINK_STAGE, () -> createSink(config, transforms.getOutputType(), out));
                 BatchSinkWriter openedSink = sink;
+                runStage(SINK_STAGE, () -> {
+                    openedSink.open();
+                    return null;
+                });
                 final TaskRecord[] taskRef = new TaskRecord[]{task};
                 PipelineCounters counters = new PipelineCounters();
                 BatchBuffer batch = new BatchBuffer(transforms.getBatchSize());
                 counters.rowsSkipped = task.getLastCheckpointSeq();
                 counters.checkpointSeq = task.getLastCheckpointSeq();
-                for (SourceSplit split : source.enumerateSplits()) {
+                for (SourceSplit split : runStage(SOURCE_STAGE, source::enumerateSplits)) {
                     counters.recordSourceSplit();
-                    BatchSourceReader reader = source.createReader(split);
-                    reader.readFrom(
-                            task.getLastCheckpointSeq(),
-                            (seqId, row) -> {
-                                batch.add(seqId, row);
-                                if (batch.isFull()) {
+                    BatchSourceReader reader = runStage(SOURCE_STAGE, () -> source.createReader(split));
+                    runStage(SOURCE_STAGE, () -> {
+                        reader.readFrom(
+                                task.getLastCheckpointSeq(),
+                                (seqId, row) -> {
+                                    batch.add(seqId, row);
+                                    if (batch.isFull()) {
+                                        flushBatch(
+                                                split,
+                                                batch,
+                                                transforms,
+                                                openedSink,
+                                                counters,
+                                                maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
+                                                        taskRef[0],
+                                                        maxCommittedSeqId));
+                                    }
+                                },
+                                (seqId, error) -> {
                                     flushBatch(
                                             split,
                                             batch,
@@ -192,24 +226,14 @@ public class LocalPipelineRunner {
                                             maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
                                                     taskRef[0],
                                                     maxCommittedSeqId));
-                                }
-                            },
-                            (seqId, error) -> {
-                                flushBatch(
-                                        split,
-                                        batch,
-                                        transforms,
-                                        openedSink,
-                                        counters,
-                                        maxCommittedSeqId -> taskRef[0] = checkpointStore.checkpointBatch(
-                                                taskRef[0],
-                                                maxCommittedSeqId));
-                                boolean skipped = handleRecordError(config, out, counters, seqId, error);
-                                if (skipped) {
-                                    taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
-                                }
-                                return skipped;
-                            });
+                                    boolean skipped = handleRecordError(config, out, counters, seqId, error);
+                                    if (skipped) {
+                                        taskRef[0] = checkpointStore.checkpoint(taskRef[0], seqId);
+                                    }
+                                    return skipped;
+                                });
+                        return null;
+                    });
                     flushBatch(
                             split,
                             batch,
@@ -220,7 +244,7 @@ public class LocalPipelineRunner {
                                     taskRef[0],
                                     maxCommittedSeqId));
                 }
-                TaskRecord completed = checkpointStore.complete(taskRef[0]);
+                TaskRecord completed = runStage(CHECKPOINT_STAGE, () -> checkpointStore.complete(taskRef[0]));
                 out.println("Pipeline Finished. rows="
                         + counters.rowsWritten
                         + " checkpoint="
@@ -307,15 +331,21 @@ public class LocalPipelineRunner {
             return;
         }
         List<Long> seqIds = batch.seqIds();
-        List<BinaryRow> outputs = transforms.applyBatch(batch.rows());
+        List<BinaryRow> outputs = runStage(TRANSFORM_STAGE, () -> transforms.applyBatch(batch.rows()));
         long maxSeqId = maxSeqId(seqIds);
         if (!outputs.isEmpty()) {
-            sink.writeBatch(outputs);
-            sink.committer().commit(new BatchCommit(split.getSplitId(), maxSeqId, outputs.size()));
+            runStage(SINK_STAGE, () -> {
+                sink.writeBatch(outputs);
+                sink.committer().commit(new BatchCommit(split.getSplitId(), maxSeqId, outputs.size()));
+                return null;
+            });
             counters.recordSinkBatch();
         }
         if (committer != null) {
-            committer.commit(maxSeqId);
+            runStage(CHECKPOINT_STAGE, () -> {
+                committer.commit(maxSeqId);
+                return null;
+            });
         }
         counters.recordWrittenBatch(seqIds.size(), outputs.size(), maxSeqId);
         batch.clear();
@@ -329,6 +359,43 @@ public class LocalPipelineRunner {
             }
         }
         return max;
+    }
+
+    private <T> T runStage(String stage, StageOperation<T> operation) throws Exception {
+        try {
+            return operation.run();
+        } catch (PipelineExecutionException e) {
+            if (isStageFailure(e)) {
+                throw e;
+            }
+            throw new PipelineExecutionException(stage + " stage failed: " + e.getMessage(), e);
+        } catch (Exception e) {
+            if (isStageFailure(e)) {
+                throw e;
+            }
+            throw new PipelineExecutionException(stage + " stage failed: " + errorMessage(e), e);
+        }
+    }
+
+    private boolean isStageFailure(Exception error) {
+        String message = error.getMessage();
+        return message != null
+                && (message.startsWith(SOURCE_STAGE + " stage failed:")
+                || message.startsWith(TRANSFORM_STAGE + " stage failed:")
+                || message.startsWith(SINK_STAGE + " stage failed:")
+                || message.startsWith(CHECKPOINT_STAGE + " stage failed:"));
+    }
+
+    private String errorMessage(Exception error) {
+        String message = error.getMessage();
+        if (message == null || message.trim().isEmpty()) {
+            return error.getClass().getSimpleName();
+        }
+        return message;
+    }
+
+    private interface StageOperation<T> {
+        T run() throws Exception;
     }
 
     private interface BatchSeqIdCommitter {

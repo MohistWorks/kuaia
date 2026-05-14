@@ -8,6 +8,7 @@ import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.coordinator.state.RocksDbStateStore;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
+import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.pipeline.PipelineRunSummary;
 import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
@@ -515,15 +516,17 @@ class LocalPipelineRunnerTest {
                 "mock-vector",
                 (VectorSinkFactory) (rowType, out, sinkConfig) -> firstSink));
         ByteArrayOutputStream firstBytes = new ByteArrayOutputStream();
-        IllegalStateException error = assertThrows(
-                IllegalStateException.class,
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
                 () -> new LocalPipelineRunner(
                         firstRegistry,
                         EmbeddingProviderRegistry.defaultRegistry(),
                         2)
                         .run(config, new PrintStream(firstBytes, true, StandardCharsets.UTF_8.name())));
 
-        assertEquals("sink batch failed", error.getMessage());
+        assertEquals("Sink stage failed: sink batch failed", error.getMessage());
+        assertEquals(IllegalStateException.class, error.getCause().getClass());
+        assertEquals("sink batch failed", error.getCause().getMessage());
         assertEquals(java.util.Arrays.asList(2, 2), firstSink.batchSizes());
         try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
             TaskRecord record = store.getTask("local-pipeline-resume-split-vector");
@@ -588,12 +591,14 @@ class LocalPipelineRunnerTest {
                 (VectorSinkFactory) (rowType, out, sinkConfig) -> sink));
 
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        IllegalStateException error = assertThrows(
-                IllegalStateException.class,
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
                 () -> new LocalPipelineRunner(registry)
                         .run(config, new PrintStream(bytes, true, StandardCharsets.UTF_8.name())));
 
-        assertEquals("sink batch failed", error.getMessage());
+        assertEquals("Sink stage failed: sink batch failed", error.getMessage());
+        assertEquals(IllegalStateException.class, error.getCause().getClass());
+        assertEquals("sink batch failed", error.getCause().getMessage());
         assertEquals(1, sink.batchWrites());
         try (RocksDbStateStore store = new RocksDbStateStore(stateDir)) {
             TaskRecord record = store.getTask("local-pipeline-failed-batch-vector");
