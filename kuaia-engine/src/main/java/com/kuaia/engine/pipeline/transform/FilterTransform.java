@@ -16,6 +16,10 @@ public class FilterTransform implements PipelineTransform {
     private static final String OP_ENDS_WITH = "ends-with";
     private static final String OP_EQUALS = "equals";
     private static final String OP_NOT_EQUALS = "not-equals";
+    private static final String OP_GREATER_THAN = "greater-than";
+    private static final String OP_GREATER_THAN_OR_EQUAL = "greater-than-or-equal";
+    private static final String OP_LESS_THAN = "less-than";
+    private static final String OP_LESS_THAN_OR_EQUAL = "less-than-or-equal";
 
     private final String field;
     private final String op;
@@ -23,6 +27,7 @@ public class FilterTransform implements PipelineTransform {
     private final String expectedValue;
     private KuaiaRowType outputType;
     private int fieldOrdinal;
+    private long expectedLongValue;
 
     public FilterTransform(String field, String op) {
         this(field, op, 0, null);
@@ -47,7 +52,8 @@ public class FilterTransform implements PipelineTransform {
                 && !OP_STARTS_WITH.equals(op)
                 && !OP_ENDS_WITH.equals(op)
                 && !OP_EQUALS.equals(op)
-                && !OP_NOT_EQUALS.equals(op)) {
+                && !OP_NOT_EQUALS.equals(op)
+                && !isLongComparison()) {
             throw new PipelineExecutionException("Unsupported filter op: " + op);
         }
         if (requiresValue() && (expectedValue == null || expectedValue.isEmpty())) {
@@ -57,7 +63,12 @@ public class FilterTransform implements PipelineTransform {
         if (ordinal < 0) {
             throw new PipelineExecutionException("Unknown transform field: " + field);
         }
-        if (inputType.getFieldTypes()[ordinal] != DataType.STRING) {
+        if (isLongComparison()) {
+            if (inputType.getFieldTypes()[ordinal] != DataType.LONG) {
+                throw new PipelineExecutionException("Transform field must be LONG: " + field);
+            }
+            expectedLongValue = parseExpectedLongValue();
+        } else if (inputType.getFieldTypes()[ordinal] != DataType.STRING) {
             throw new PipelineExecutionException("Transform field must be STRING: " + field);
         }
         fieldOrdinal = ordinal;
@@ -74,15 +85,16 @@ public class FilterTransform implements PipelineTransform {
     public List<BinaryRow> applyBatch(List<BinaryRow> inputs) {
         List<BinaryRow> outputs = new ArrayList<>();
         for (BinaryRow input : inputs) {
-            String fieldValue = input.getString(fieldOrdinal);
-            if (passes(fieldValue)) {
+            if (isLongComparison() && passesLong(input.getLong(fieldOrdinal))) {
+                outputs.add(input);
+            } else if (!isLongComparison() && passesString(input.getString(fieldOrdinal))) {
                 outputs.add(input);
             }
         }
         return outputs;
     }
 
-    private boolean passes(String fieldValue) {
+    private boolean passesString(String fieldValue) {
         if (fieldValue == null) {
             return false;
         }
@@ -108,11 +120,40 @@ public class FilterTransform implements PipelineTransform {
         return !fieldValue.equals(expectedValue);
     }
 
+    private boolean passesLong(long fieldValue) {
+        if (OP_GREATER_THAN.equals(op)) {
+            return fieldValue > expectedLongValue;
+        }
+        if (OP_GREATER_THAN_OR_EQUAL.equals(op)) {
+            return fieldValue >= expectedLongValue;
+        }
+        if (OP_LESS_THAN.equals(op)) {
+            return fieldValue < expectedLongValue;
+        }
+        return fieldValue <= expectedLongValue;
+    }
+
     private boolean requiresValue() {
         return OP_CONTAINS.equals(op)
                 || OP_STARTS_WITH.equals(op)
                 || OP_ENDS_WITH.equals(op)
                 || OP_EQUALS.equals(op)
-                || OP_NOT_EQUALS.equals(op);
+                || OP_NOT_EQUALS.equals(op)
+                || isLongComparison();
+    }
+
+    private boolean isLongComparison() {
+        return OP_GREATER_THAN.equals(op)
+                || OP_GREATER_THAN_OR_EQUAL.equals(op)
+                || OP_LESS_THAN.equals(op)
+                || OP_LESS_THAN_OR_EQUAL.equals(op);
+    }
+
+    private long parseExpectedLongValue() throws PipelineExecutionException {
+        try {
+            return Long.parseLong(expectedValue.trim());
+        } catch (NumberFormatException e) {
+            throw new PipelineExecutionException("Filter value must be LONG: " + expectedValue, e);
+        }
     }
 }

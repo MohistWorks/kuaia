@@ -33,6 +33,10 @@ transforms:
     field: content
     op: equals
     value: alfa
+  - type: filter
+    field: id
+    op: less-than
+    value: 2
 sink:
   type: file
   path: ../.kuaia/output/local-jsonl-to-file.jsonl
