@@ -18,6 +18,8 @@ All notable public changes to Kuaia are tracked here.
   checkpoint stage prefixes before the underlying error message.
 - Added a no-service FAQ JSONL-to-vector example and surfaced common RAG flows
   in `kuaia examples`.
+- Qdrant upserts now validate successful HTTP response bodies and reject
+  application-level `status` values other than `ok`.
 
 ### Changed
 

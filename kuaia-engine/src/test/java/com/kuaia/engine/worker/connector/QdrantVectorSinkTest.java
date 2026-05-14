@@ -263,6 +263,21 @@ class QdrantVectorSinkTest {
     }
 
     @Test
+    void rejectsQdrantApplicationErrorResponse() throws Exception {
+        startServer(200, "{\"status\":\"error\",\"result\":null}");
+        PipelineConfig.SinkConfig config = config(baseUrl(), "docs", null, "id", "embedding", true);
+        QdrantVectorSink sink = new QdrantVectorSink(rowType(), config, Collections.emptyMap());
+
+        sink.open();
+        PipelineExecutionException error = assertThrows(PipelineExecutionException.class, () -> sink.write(row()));
+        sink.close();
+
+        assertEquals(
+                "Qdrant upsert returned status error: {\"status\":\"error\",\"result\":null}",
+                error.getMessage());
+    }
+
+    @Test
     void wrapsQdrantIoFailures() throws Exception {
         PipelineConfig.SinkConfig config = config(
                 "http://localhost:6333",
