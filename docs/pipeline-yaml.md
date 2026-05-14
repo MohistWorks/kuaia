@@ -167,6 +167,24 @@ Rules:
 - the configured field is updated in place,
 - field names, field order, and field types are preserved.
 
+### lowercase
+
+```yaml
+transforms:
+  - type: lowercase
+    field: content
+```
+
+`lowercase` normalizes a string field with `Locale.ROOT` while preserving the
+row schema. It is useful before case-sensitive `filter`, `chunk`, or
+`embedding` stages.
+
+Rules:
+
+- `field` must exist and be `STRING`,
+- the configured field is updated in place,
+- field names, field order, and field types are preserved.
+
 ### filter
 
 ```yaml

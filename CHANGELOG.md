@@ -19,6 +19,8 @@ All notable public changes to Kuaia are tracked here.
   text rows before embedding or chunking.
 - Added a `trim` transform for cleaning leading and trailing string whitespace
   before filtering, chunking, or embedding.
+- Added a `lowercase` transform for deterministic string normalization before
+  filtering, chunking, or embedding.
 - File sinks now support `format: jsonl`, including a public JSONL clean-to-file
   example and smoke coverage.
 - `filter` now supports `op: min-length` for dropping too-short text before

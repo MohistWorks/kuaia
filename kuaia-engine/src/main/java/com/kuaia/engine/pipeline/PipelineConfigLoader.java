@@ -152,6 +152,8 @@ public class PipelineConfigLoader {
                 configs.add(loadEmbeddingTransform(transform, fieldPrefix));
             } else if ("trim".equals(type)) {
                 configs.add(loadTrimTransform(transform, fieldPrefix));
+            } else if ("lowercase".equals(type)) {
+                configs.add(loadLowercaseTransform(transform, fieldPrefix));
             } else if ("filter".equals(type)) {
                 configs.add(loadFilterTransform(transform, fieldPrefix));
             } else if ("chunk".equals(type)) {
@@ -280,6 +282,18 @@ public class PipelineConfigLoader {
             throws PipelineConfigException {
         return new PipelineConfig.TransformConfig(
                 "trim",
+                new ArrayList<>(),
+                null,
+                null,
+                require(transform, fieldPrefix + ".field"),
+                null,
+                0);
+    }
+
+    private PipelineConfig.TransformConfig loadLowercaseTransform(Map<String, String> transform, String fieldPrefix)
+            throws PipelineConfigException {
+        return new PipelineConfig.TransformConfig(
+                "lowercase",
                 new ArrayList<>(),
                 null,
                 null,
