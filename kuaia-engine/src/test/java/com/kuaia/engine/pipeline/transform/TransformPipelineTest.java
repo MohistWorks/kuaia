@@ -79,6 +79,35 @@ class TransformPipelineTest {
     }
 
     @Test
+    void replaceTransformReplacesLiteralTextInPlaceAndPreservesSchema() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(replaceConfig("content", "ph", "f")));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Arrays.asList(
+                row(1L, "alpha"),
+                row(2L, "alphabet")));
+
+        assertArrayEquals(new String[]{"id", "content"}, pipeline.getOutputType().getFieldNames());
+        assertArrayEquals(new DataType[]{DataType.LONG, DataType.STRING}, pipeline.getOutputType().getFieldTypes());
+        assertEquals(2, outputs.size());
+        assertEquals("alfa", outputs.get(0).getString(1));
+        assertEquals("alfabet", outputs.get(1).getString(1));
+    }
+
+    @Test
+    void replaceTransformCanRemoveLiteralTextWithEmptyReplacement() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(replaceConfig("content", " beta", "")));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Collections.singletonList(row(1L, "alpha beta")));
+
+        assertEquals(1, outputs.size());
+        assertEquals("alpha", outputs.get(0).getString(1));
+    }
+
+    @Test
     void filterTransformDropsEmptyAndWhitespaceStrings() throws Exception {
         TransformPipeline pipeline = TransformPipeline.from(
                 rowType(),
@@ -335,6 +364,17 @@ class TransformPipelineTest {
                 Collections.emptyList(),
                 null,
                 null,
+                field,
+                null,
+                0);
+    }
+
+    private PipelineConfig.TransformConfig replaceConfig(String field, String target, String replacement) {
+        return new PipelineConfig.TransformConfig(
+                "replace",
+                Collections.emptyList(),
+                target,
+                replacement,
                 field,
                 null,
                 0);

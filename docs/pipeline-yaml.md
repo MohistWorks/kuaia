@@ -185,6 +185,27 @@ Rules:
 - the configured field is updated in place,
 - field names, field order, and field types are preserved.
 
+### replace
+
+```yaml
+transforms:
+  - type: replace
+    field: content
+    target: "  "
+    replacement: " "
+```
+
+`replace` normalizes a string field by replacing every literal `target`
+occurrence with `replacement`. It is not a regular-expression transform.
+
+Rules:
+
+- `field` must exist and be `STRING`,
+- `target` is required and must not be empty,
+- `replacement` is optional and defaults to an empty string,
+- the configured field is updated in place,
+- field names, field order, and field types are preserved.
+
 ### filter
 
 ```yaml

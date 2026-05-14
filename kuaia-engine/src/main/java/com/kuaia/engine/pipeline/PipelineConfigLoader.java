@@ -154,6 +154,8 @@ public class PipelineConfigLoader {
                 configs.add(loadTrimTransform(transform, fieldPrefix));
             } else if ("lowercase".equals(type)) {
                 configs.add(loadLowercaseTransform(transform, fieldPrefix));
+            } else if ("replace".equals(type)) {
+                configs.add(loadReplaceTransform(transform, fieldPrefix));
             } else if ("filter".equals(type)) {
                 configs.add(loadFilterTransform(transform, fieldPrefix));
             } else if ("chunk".equals(type)) {
@@ -306,6 +308,18 @@ public class PipelineConfigLoader {
                 0);
     }
 
+    private PipelineConfig.TransformConfig loadReplaceTransform(Map<String, String> transform, String fieldPrefix)
+            throws PipelineConfigException {
+        return new PipelineConfig.TransformConfig(
+                "replace",
+                new ArrayList<>(),
+                requireLiteral(transform, fieldPrefix + ".target"),
+                transform.getOrDefault("replacement", ""),
+                require(transform, fieldPrefix + ".field"),
+                null,
+                0);
+    }
+
     private PipelineConfig.TransformConfig loadChunkTransform(Map<String, String> transform, String fieldPrefix)
             throws PipelineConfigException {
         int chunkSize = parseChunkSize(require(transform, fieldPrefix + ".chunkSize"));
@@ -452,6 +466,15 @@ public class PipelineConfigLoader {
         String key = field.contains(".") ? field.substring(field.indexOf('.') + 1) : field;
         String value = values.get(key);
         if (value == null || value.trim().isEmpty()) {
+            throw new PipelineConfigException("Missing required field: " + field);
+        }
+        return value;
+    }
+
+    private String requireLiteral(Map<String, String> values, String field) throws PipelineConfigException {
+        String key = field.contains(".") ? field.substring(field.indexOf('.') + 1) : field;
+        String value = values.get(key);
+        if (value == null || value.isEmpty()) {
             throw new PipelineConfigException("Missing required field: " + field);
         }
         return value;

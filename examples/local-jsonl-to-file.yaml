@@ -10,6 +10,10 @@ transforms:
     field: content
   - type: lowercase
     field: content
+  - type: replace
+    field: content
+    target: ph
+    replacement: f
   - type: filter
     field: content
     op: not-empty

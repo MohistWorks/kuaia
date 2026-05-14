@@ -492,6 +492,80 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsReplaceTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("replace-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: replace-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: replace",
+                "    field: content",
+                "    target: ph",
+                "    replacement: f",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig replace = config.getTransforms().get(0);
+        assertEquals("replace", replace.getType());
+        assertEquals("content", replace.getInput());
+        assertEquals("ph", replace.getFrom());
+        assertEquals("f", replace.getTo());
+    }
+
+    @Test
+    void loadsReplaceTransformWithDefaultEmptyReplacement() throws Exception {
+        Path configPath = tempDir.resolve("replace-transform-default-empty.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: replace-transform-default-empty",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: replace",
+                "    field: content",
+                "    target: beta",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig replace = config.getTransforms().get(0);
+        assertEquals("replace", replace.getType());
+        assertEquals("content", replace.getInput());
+        assertEquals("beta", replace.getFrom());
+        assertEquals("", replace.getTo());
+    }
+
+    @Test
+    void rejectsMissingReplaceTransformTarget() throws Exception {
+        Path configPath = tempDir.resolve("missing-replace-target.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-replace-target",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: replace",
+                "    field: content",
+                "    replacement: f",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].target", error.getMessage());
+    }
+
+    @Test
     void rejectsMissingFilterTransformOp() throws Exception {
         Path configPath = tempDir.resolve("missing-filter-op.yaml");
         Files.write(configPath, String.join("\n",
