@@ -234,6 +234,14 @@ Supported predicates:
   configured `value`. Matching is case-sensitive.
 - `op: not-equals` keeps rows whose configured string field does not exactly
   equal the configured `value`. Matching is case-sensitive.
+- `op: greater-than` keeps rows whose configured `LONG` field is greater than
+  the configured integer `value`.
+- `op: greater-than-or-equal` keeps rows whose configured `LONG` field is
+  greater than or equal to the configured integer `value`.
+- `op: less-than` keeps rows whose configured `LONG` field is less than the
+  configured integer `value`.
+- `op: less-than-or-equal` keeps rows whose configured `LONG` field is less
+  than or equal to the configured integer `value`.
 
 Example:
 
@@ -255,17 +263,25 @@ transforms:
     field: status
     op: not-equals
     value: archived
+  - type: filter
+    field: id
+    op: greater-than-or-equal
+    value: 1000
 ```
 
 Rules:
 
-- `field` must exist and be `STRING`,
+- `field` must exist and be `STRING` for string predicates, or `LONG` for
+  numeric comparison predicates,
 - `op` is required,
 - supported `op` values: `not-empty`, `min-length`, `contains`,
-  `starts-with`, `ends-with`, `equals`, `not-equals`,
+  `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`,
+  `greater-than-or-equal`, `less-than`, `less-than-or-equal`,
 - `minLength` is required for `op: min-length` and must be a positive integer,
 - `value` is required for `op: contains`, `op: starts-with`, and
   `op: ends-with`, `op: equals`, and `op: not-equals`, and must not be empty,
+- `value` is required for numeric comparison predicates and must parse as a
+  `LONG`,
 - dropped rows are counted as source rows read, not as rows written,
 - checkpointed runs still advance the checkpoint after a filtered source batch
   is processed.
@@ -790,7 +806,7 @@ The current YAML contract does not support:
 - nested JSONL objects, arrays, or null values,
 - token-based or semantic text chunking,
 - transform DAGs,
-- general comparison filters, joins, casts, or aggregations,
+- expression filters, joins, casts, or aggregations,
 - CDC offsets,
 - CDC or streaming external connectors,
 - additional production-certified external connectors beyond batch PostgreSQL,

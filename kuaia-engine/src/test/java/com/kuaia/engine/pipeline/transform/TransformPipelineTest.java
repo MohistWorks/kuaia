@@ -220,6 +220,42 @@ class TransformPipelineTest {
     }
 
     @Test
+    void filterTransformKeepsLongsGreaterThanValue() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(filterConfig("id", "greater-than", "1")));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Arrays.asList(
+                row(1L, "alpha"),
+                row(2L, "beta"),
+                row(3L, "gamma")));
+
+        assertEquals(2, outputs.size());
+        assertEquals(2L, outputs.get(0).getLong(0));
+        assertEquals("beta", outputs.get(0).getString(1));
+        assertEquals(3L, outputs.get(1).getLong(0));
+        assertEquals("gamma", outputs.get(1).getString(1));
+    }
+
+    @Test
+    void filterTransformKeepsLongsLessThanOrEqualToValue() throws Exception {
+        TransformPipeline pipeline = TransformPipeline.from(
+                rowType(),
+                Collections.singletonList(filterConfig("id", "less-than-or-equal", "2")));
+
+        List<BinaryRow> outputs = pipeline.applyBatch(Arrays.asList(
+                row(1L, "alpha"),
+                row(2L, "beta"),
+                row(3L, "gamma")));
+
+        assertEquals(2, outputs.size());
+        assertEquals(1L, outputs.get(0).getLong(0));
+        assertEquals("alpha", outputs.get(0).getString(1));
+        assertEquals(2L, outputs.get(1).getLong(0));
+        assertEquals("beta", outputs.get(1).getString(1));
+    }
+
+    @Test
     void filterTransformRejectsUnknownField() {
         PipelineExecutionException error = assertThrows(
                 PipelineExecutionException.class,
@@ -235,6 +271,16 @@ class TransformPipelineTest {
                 () -> TransformPipeline.from(rowType(), Collections.singletonList(filterConfig("id", "not-empty"))));
 
         assertEquals("Transform field must be STRING: id", error.getMessage());
+    }
+
+    @Test
+    void filterTransformRejectsStringFieldForLongComparison() {
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> TransformPipeline.from(rowType(), Collections.singletonList(
+                        filterConfig("content", "greater-than", "1"))));
+
+        assertEquals("Transform field must be LONG: content", error.getMessage());
     }
 
     @Test

@@ -506,6 +506,47 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsLongComparisonFilterTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("long-comparison-filter-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: long-comparison-filter-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: id",
+                "    op: greater-than",
+                "    value: 10",
+                "  - type: filter",
+                "    field: id",
+                "    op: greater-than-or-equal",
+                "    value: 11",
+                "  - type: filter",
+                "    field: id",
+                "    op: less-than",
+                "    value: 20",
+                "  - type: filter",
+                "    field: id",
+                "    op: less-than-or-equal",
+                "    value: 21",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("greater-than", config.getTransforms().get(0).getOp());
+        assertEquals("10", config.getTransforms().get(0).getValue());
+        assertEquals("greater-than-or-equal", config.getTransforms().get(1).getOp());
+        assertEquals("11", config.getTransforms().get(1).getValue());
+        assertEquals("less-than", config.getTransforms().get(2).getOp());
+        assertEquals("20", config.getTransforms().get(2).getValue());
+        assertEquals("less-than-or-equal", config.getTransforms().get(3).getOp());
+        assertEquals("21", config.getTransforms().get(3).getValue());
+    }
+
+    @Test
     void loadsLowercaseTransformConfig() throws Exception {
         Path configPath = tempDir.resolve("lowercase-transform.yaml");
         Files.write(configPath, String.join("\n",
@@ -760,6 +801,30 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("Missing required field: transforms[0].value", error.getMessage());
+    }
+
+    @Test
+    void rejectsInvalidLongComparisonFilterTransformValue() throws Exception {
+        Path configPath = tempDir.resolve("invalid-long-comparison-filter-value.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: invalid-long-comparison-filter-value",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: id",
+                "    op: greater-than",
+                "    value: abc",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Invalid transform.value: abc", error.getMessage());
     }
 
     @Test

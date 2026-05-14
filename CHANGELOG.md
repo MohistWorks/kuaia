@@ -27,6 +27,8 @@ All notable public changes to Kuaia are tracked here.
   case-sensitive literal prefix and suffix filtering.
 - `filter` now supports `op: equals` and `op: not-equals` for case-sensitive
   exact-match filtering.
+- `filter` now supports `op: greater-than`, `op: greater-than-or-equal`,
+  `op: less-than`, and `op: less-than-or-equal` for `LONG` fields.
 - File sinks now support `format: jsonl`, including a public JSONL clean-to-file
   example and smoke coverage.
 - `filter` now supports `op: min-length` for dropping too-short text before

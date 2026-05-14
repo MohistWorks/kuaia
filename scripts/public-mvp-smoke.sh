@@ -103,6 +103,10 @@ transforms:
     field: content
     op: equals
     value: alfa
+  - type: filter
+    field: id
+    op: less-than
+    value: 2
 sink:
   type: file
   path: $WORK_DIR/output/documents.jsonl

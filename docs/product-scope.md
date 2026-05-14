@@ -50,7 +50,9 @@ Supported transforms:
 - `lowercase`,
 - `replace`,
 - `filter` with `op: not-empty`, `op: min-length`, `op: contains`,
-  `op: starts-with`, `op: ends-with`, `op: equals`, and `op: not-equals`,
+  `op: starts-with`, `op: ends-with`, `op: equals`, `op: not-equals`,
+  `op: greater-than`, `op: greater-than-or-equal`, `op: less-than`, and
+  `op: less-than-or-equal`,
 - `chunk`,
 - deterministic local `mock-embedding`,
 - OpenAI-compatible `embedding` requests.
@@ -71,6 +73,7 @@ Supported runtime behavior:
 - text trimming, lowercasing, literal replacement, empty-text filtering,
   minimum-length filtering, and case-sensitive substring, prefix, suffix, and
   exact-match filtering before embedding or chunking,
+- numeric comparison filtering for `LONG` fields,
 - character-based text chunking for local document pipelines,
 - chunk payload controls for omitting repeated source text and keeping
   character offsets,

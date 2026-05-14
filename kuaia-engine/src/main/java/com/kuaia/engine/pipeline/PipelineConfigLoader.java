@@ -251,13 +251,17 @@ public class PipelineConfigLoader {
             throws PipelineConfigException {
         String op = require(transform, fieldPrefix + ".op");
         requireSupported(fieldPrefix + ".op", op,
-                "not-empty", "min-length", "contains", "starts-with", "ends-with", "equals", "not-equals");
+                "not-empty", "min-length", "contains", "starts-with", "ends-with", "equals", "not-equals",
+                "greater-than", "greater-than-or-equal", "less-than", "less-than-or-equal");
         int minLength = "min-length".equals(op)
                 ? parseMinLength(require(transform, fieldPrefix + ".minLength"))
                 : 0;
         String value = requiresFilterValue(op)
                 ? require(transform, fieldPrefix + ".value")
                 : null;
+        if (isLongComparisonFilterOp(op)) {
+            parseFilterLongValue(value);
+        }
         return new PipelineConfig.TransformConfig(
                 "filter",
                 new ArrayList<>(),
@@ -286,7 +290,15 @@ public class PipelineConfigLoader {
                 || "starts-with".equals(op)
                 || "ends-with".equals(op)
                 || "equals".equals(op)
-                || "not-equals".equals(op);
+                || "not-equals".equals(op)
+                || isLongComparisonFilterOp(op);
+    }
+
+    private boolean isLongComparisonFilterOp(String op) {
+        return "greater-than".equals(op)
+                || "greater-than-or-equal".equals(op)
+                || "less-than".equals(op)
+                || "less-than-or-equal".equals(op);
     }
 
     private PipelineConfig.TransformConfig loadTrimTransform(Map<String, String> transform, String fieldPrefix)
@@ -555,6 +567,14 @@ public class PipelineConfigLoader {
             return minLength;
         } catch (NumberFormatException e) {
             throw new PipelineConfigException("Invalid transform.minLength: " + value, e);
+        }
+    }
+
+    private long parseFilterLongValue(String value) throws PipelineConfigException {
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+            throw new PipelineConfigException("Invalid transform.value: " + value, e);
         }
     }
 
