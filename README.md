@@ -248,6 +248,8 @@ YAML paths outside the YAML directory or repository `.kuaia/`.
 - [`docs/README.md`](docs/README.md): public documentation index
 - [`docs/product-scope.md`](docs/product-scope.md): current product definition
   and non-goals
+- [`docs/roadmap.md`](docs/roadmap.md): planned focus areas for the next public
+  release
 - [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md): YAML pipeline contract
 - [`docs/examples.md`](docs/examples.md): runnable example catalog
 - [`docs/connector-development.md`](docs/connector-development.md): connector
