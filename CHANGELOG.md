@@ -12,6 +12,8 @@ All notable public changes to Kuaia are tracked here.
   executing the pipeline.
 - Qdrant sinks now support `payloadFields` for explicit vector payload
   metadata selection.
+- OpenAI-compatible embedding responses now report batch count, duplicate
+  index, and out-of-range index errors explicitly.
 - Declarative pipeline failures now include stable source, transform, sink, or
   checkpoint stage prefixes before the underlying error message.
 

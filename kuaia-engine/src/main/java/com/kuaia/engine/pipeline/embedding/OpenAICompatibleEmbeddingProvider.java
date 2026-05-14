@@ -1,5 +1,7 @@
 package com.kuaia.engine.pipeline.embedding;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 
 import java.io.ByteArrayOutputStream;
@@ -16,6 +18,7 @@ import java.util.function.Supplier;
 public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
     public static final String DEFAULT_BASE_URL = "https://api.openai.com/v1";
     public static final int DEFAULT_TIMEOUT_MILLIS = 30_000;
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
     private final String baseUrl;
     private final String model;
@@ -146,34 +149,26 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
     }
 
     private List<float[]> parseEmbeddings(String response, int expectedCount) throws PipelineExecutionException {
+        JsonNode data = parseDataArray(response);
+        if (data.size() != expectedCount) {
+            throw new PipelineExecutionException(
+                    "Embedding response returned " + data.size() + " embeddings but expected " + expectedCount);
+        }
         List<float[]> vectors = new ArrayList<>();
         for (int i = 0; i < expectedCount; i++) {
             vectors.add(null);
         }
 
-        int searchFrom = 0;
-        int fallbackIndex = 0;
-        while (searchFrom < response.length()) {
-            int key = findEmbeddingFieldKey(response, searchFrom);
-            if (key < 0) {
-                break;
-            }
-            int arrayStart = response.indexOf('[', key);
-            if (arrayStart < 0) {
-                throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
-            }
-            int arrayEnd = findArrayEnd(response, arrayStart);
-            if (arrayEnd < 0) {
-                throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
-            }
-
-            int index = parseIndex(response, key, fallbackIndex);
+        for (int fallbackIndex = 0; fallbackIndex < data.size(); fallbackIndex++) {
+            JsonNode item = data.get(fallbackIndex);
+            int index = parseIndex(item, fallbackIndex);
             if (index < 0 || index >= expectedCount) {
-                throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
+                throw new PipelineExecutionException("Embedding response index out of range: " + index);
             }
-            vectors.set(index, parseVector(response.substring(arrayStart + 1, arrayEnd).trim()));
-            fallbackIndex++;
-            searchFrom = arrayEnd + 1;
+            if (vectors.get(index) != null) {
+                throw new PipelineExecutionException("Embedding response contained duplicate embedding index: " + index);
+            }
+            vectors.set(index, parseVector(item.get("embedding")));
         }
 
         for (float[] vector : vectors) {
@@ -184,113 +179,45 @@ public class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
         return vectors;
     }
 
-    private int findEmbeddingFieldKey(String response, int searchFrom) {
-        int cursor = searchFrom;
-        while (cursor < response.length()) {
-            int key = response.indexOf("\"embedding\"", cursor);
-            if (key < 0) {
-                return -1;
+    private JsonNode parseDataArray(String response) throws PipelineExecutionException {
+        try {
+            JsonNode root = JSON_MAPPER.readTree(response);
+            JsonNode data = root == null ? null : root.get("data");
+            if (data == null || !data.isArray()) {
+                throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
             }
-            int colon = response.indexOf(':', key);
-            if (colon < 0) {
-                return -1;
-            }
-            int valueStart = colon + 1;
-            while (valueStart < response.length() && Character.isWhitespace(response.charAt(valueStart))) {
-                valueStart++;
-            }
-            if (valueStart < response.length() && response.charAt(valueStart) == '[') {
-                return key;
-            }
-            cursor = key + 1;
-        }
-        return -1;
-    }
-
-    private int parseIndex(String response, int embeddingKey, int fallbackIndex) throws PipelineExecutionException {
-        int objectStart = response.lastIndexOf('{', embeddingKey);
-        if (objectStart < 0) {
-            return fallbackIndex;
-        }
-        int indexKey = response.indexOf("\"index\"", objectStart);
-        if (indexKey < 0 || indexKey > embeddingKey) {
-            return fallbackIndex;
-        }
-        int colon = response.indexOf(':', indexKey);
-        if (colon < 0 || colon > embeddingKey) {
-            return fallbackIndex;
-        }
-        int cursor = colon + 1;
-        while (cursor < response.length() && Character.isWhitespace(response.charAt(cursor))) {
-            cursor++;
-        }
-        int numberStart = cursor;
-        while (cursor < response.length() && Character.isDigit(response.charAt(cursor))) {
-            cursor++;
-        }
-        if (numberStart == cursor) {
+            return data;
+        } catch (PipelineExecutionException e) {
+            throw e;
+        } catch (Exception e) {
             throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
         }
-        return Integer.parseInt(response.substring(numberStart, cursor));
     }
 
-    private float[] parseVector(String body) throws PipelineExecutionException {
-        if (body.isEmpty()) {
+    private int parseIndex(JsonNode item, int fallbackIndex) throws PipelineExecutionException {
+        JsonNode index = item == null ? null : item.get("index");
+        if (index == null) {
+            return fallbackIndex;
+        }
+        if (!index.isIntegralNumber() || !index.canConvertToInt()) {
             throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
         }
+        return index.asInt();
+    }
 
-        String[] parts = body.split(",");
-        List<Float> values = new ArrayList<>();
-        for (String part : parts) {
-            String value = part.trim();
-            if (value.isEmpty()) {
-                throw new PipelineExecutionException("Invalid embedding value: " + part);
-            }
-            try {
-                values.add(Float.parseFloat(value));
-            } catch (NumberFormatException e) {
-                throw new PipelineExecutionException("Invalid embedding value: " + value, e);
-            }
+    private float[] parseVector(JsonNode embedding) throws PipelineExecutionException {
+        if (embedding == null || !embedding.isArray() || embedding.size() == 0) {
+            throw new PipelineExecutionException("Embedding response did not contain an embedding vector");
         }
-
-        float[] vector = new float[values.size()];
-        for (int i = 0; i < values.size(); i++) {
-            vector[i] = values.get(i);
+        float[] vector = new float[embedding.size()];
+        for (int i = 0; i < embedding.size(); i++) {
+            JsonNode value = embedding.get(i);
+            if (!value.isNumber()) {
+                throw new PipelineExecutionException("Invalid embedding value: " + value.asText());
+            }
+            vector[i] = (float) value.asDouble();
         }
         return vector;
-    }
-
-    private int findArrayEnd(String text, int arrayStart) {
-        int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = arrayStart; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (c == '\\') {
-                escaped = true;
-                continue;
-            }
-            if (c == '"') {
-                inString = !inString;
-                continue;
-            }
-            if (inString) {
-                continue;
-            }
-            if (c == '[') {
-                depth++;
-            } else if (c == ']') {
-                depth--;
-                if (depth == 0) {
-                    return i;
-                }
-            }
-        }
-        return -1;
     }
 
     private String read(InputStream input) throws IOException {

@@ -161,6 +161,114 @@ class OpenAICompatibleEmbeddingProviderTest {
         assertEquals("Embedding response did not contain an embedding vector", error.getMessage());
     }
 
+    @Test
+    void reportsBatchResponseWithTooFewEmbeddings() throws Exception {
+        CapturedRequest captured = new CapturedRequest();
+        server = startServer(captured, 200, "{"
+                + "\"data\":[{\"index\":0,\"embedding\":[1.0,1.5]}]"
+                + "}");
+        OpenAICompatibleEmbeddingProvider provider = new OpenAICompatibleEmbeddingProvider(
+                baseUrl(),
+                "text-embedding-3-small",
+                "OPENAI_API_KEY",
+                () -> "test-key");
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> provider.embedBatch(Arrays.asList("Alpha", "Beta"), 2));
+
+        assertEquals("Embedding response returned 1 embeddings but expected 2", error.getMessage());
+    }
+
+    @Test
+    void reportsBatchResponseWithDuplicateIndex() throws Exception {
+        CapturedRequest captured = new CapturedRequest();
+        server = startServer(captured, 200, "{"
+                + "\"data\":["
+                + "{\"index\":0,\"embedding\":[1.0,1.5]},"
+                + "{\"index\":0,\"embedding\":[2.0,2.5]}"
+                + "]"
+                + "}");
+        OpenAICompatibleEmbeddingProvider provider = new OpenAICompatibleEmbeddingProvider(
+                baseUrl(),
+                "text-embedding-3-small",
+                "OPENAI_API_KEY",
+                () -> "test-key");
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> provider.embedBatch(Arrays.asList("Alpha", "Beta"), 2));
+
+        assertEquals("Embedding response contained duplicate embedding index: 0", error.getMessage());
+    }
+
+    @Test
+    void reportsBatchResponseWithOutOfRangeIndex() throws Exception {
+        CapturedRequest captured = new CapturedRequest();
+        server = startServer(captured, 200, "{"
+                + "\"data\":["
+                + "{\"index\":2,\"embedding\":[1.0,1.5]},"
+                + "{\"index\":0,\"embedding\":[2.0,2.5]}"
+                + "]"
+                + "}");
+        OpenAICompatibleEmbeddingProvider provider = new OpenAICompatibleEmbeddingProvider(
+                baseUrl(),
+                "text-embedding-3-small",
+                "OPENAI_API_KEY",
+                () -> "test-key");
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> provider.embedBatch(Arrays.asList("Alpha", "Beta"), 2));
+
+        assertEquals("Embedding response index out of range: 2", error.getMessage());
+    }
+
+    @Test
+    void reportsBatchResponseWithNonIntegerIndex() throws Exception {
+        CapturedRequest captured = new CapturedRequest();
+        server = startServer(captured, 200, "{"
+                + "\"data\":["
+                + "{\"index\":0.5,\"embedding\":[1.0,1.5]},"
+                + "{\"index\":1,\"embedding\":[2.0,2.5]}"
+                + "]"
+                + "}");
+        OpenAICompatibleEmbeddingProvider provider = new OpenAICompatibleEmbeddingProvider(
+                baseUrl(),
+                "text-embedding-3-small",
+                "OPENAI_API_KEY",
+                () -> "test-key");
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> provider.embedBatch(Arrays.asList("Alpha", "Beta"), 2));
+
+        assertEquals("Embedding response did not contain an embedding vector", error.getMessage());
+    }
+
+    @Test
+    void truncatesLongErrorResponses() throws Exception {
+        CapturedRequest captured = new CapturedRequest();
+        StringBuilder response = new StringBuilder();
+        for (int i = 0; i < 1200; i++) {
+            response.append('x');
+        }
+        server = startServer(captured, 500, response.toString());
+        OpenAICompatibleEmbeddingProvider provider = new OpenAICompatibleEmbeddingProvider(
+                baseUrl(),
+                "text-embedding-3-small",
+                "OPENAI_API_KEY",
+                () -> "test-key");
+
+        PipelineExecutionException error = assertThrows(
+                PipelineExecutionException.class,
+                () -> provider.embed("Alpha", 0));
+
+        String prefix = "Embedding request failed with status 500: ";
+        assertTrue(error.getMessage().startsWith(prefix), error.getMessage());
+        assertEquals(prefix.length() + 1000, error.getMessage().length());
+    }
+
     private HttpServer startServer(CapturedRequest captured, int status, String response) throws IOException {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         httpServer.createContext("/v1/embeddings", exchange -> {

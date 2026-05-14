@@ -409,7 +409,9 @@ request body contains `input` as an array of strings, `model`, and
 `encoding_format: float`; when `dimensions` is configured, it is included as a
 positive integer. The API key is read at runtime from `apiKeyEnv` and is never
 stored in YAML. The configured `timeoutMs` is applied to both the HTTP connect
-timeout and read timeout.
+timeout and read timeout. Batch responses are mapped by `index` when present,
+or by response order when `index` is omitted. Kuaia rejects missing embeddings,
+count mismatches, duplicate indexes, and out-of-range indexes.
 
 ## Sink
 
@@ -840,6 +842,10 @@ Common examples:
 - `Invalid Postgres row seq=<seq>: field <field> is null`
 - `Embedding request failed with status <code>: <response>`
 - `Embedding response did not contain an embedding vector`
+- `Embedding response returned <n> embeddings but expected <m>`
+- `Embedding response contained duplicate embedding index: <index>`
+- `Embedding response index out of range: <index>`
+- `Invalid embedding value: <value>`
 - `Unknown transform field: <field>`
 - `Duplicate transform field: <field>`
 - `Transform field must be STRING: <field>`
