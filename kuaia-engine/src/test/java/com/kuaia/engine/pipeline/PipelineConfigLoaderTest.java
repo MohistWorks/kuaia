@@ -434,6 +434,42 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsPrefixAndSuffixFilterTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("prefix-suffix-filter-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: prefix-suffix-filter-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: starts-with",
+                "    value: Alpha",
+                "  - type: filter",
+                "    field: content",
+                "    op: ends-with",
+                "    value: done",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig prefix = config.getTransforms().get(0);
+        assertEquals("filter", prefix.getType());
+        assertEquals("content", prefix.getInput());
+        assertEquals("starts-with", prefix.getOp());
+        assertEquals("Alpha", prefix.getValue());
+
+        PipelineConfig.TransformConfig suffix = config.getTransforms().get(1);
+        assertEquals("filter", suffix.getType());
+        assertEquals("content", suffix.getInput());
+        assertEquals("ends-with", suffix.getOp());
+        assertEquals("done", suffix.getValue());
+    }
+
+    @Test
     void loadsLowercaseTransformConfig() throws Exception {
         Path configPath = tempDir.resolve("lowercase-transform.yaml");
         Files.write(configPath, String.join("\n",
@@ -560,6 +596,29 @@ class PipelineConfigLoaderTest {
                 "  - type: filter",
                 "    field: content",
                 "    op: contains",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].value", error.getMessage());
+    }
+
+    @Test
+    void rejectsMissingStartsWithFilterTransformValue() throws Exception {
+        Path configPath = tempDir.resolve("missing-starts-with-filter-value.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-starts-with-filter-value",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: starts-with",
                 "sink:",
                 "  type: console").getBytes(StandardCharsets.UTF_8));
 

@@ -205,6 +205,10 @@ Supported predicates:
   `minLength` non-whitespace characters after trimming for predicate evaluation.
 - `op: contains` keeps rows whose configured string field contains the
   configured `value` substring. Matching is case-sensitive.
+- `op: starts-with` keeps rows whose configured string field starts with the
+  configured `value` prefix. Matching is case-sensitive.
+- `op: ends-with` keeps rows whose configured string field ends with the
+  configured `value` suffix. Matching is case-sensitive.
 
 Example:
 
@@ -218,6 +222,10 @@ transforms:
     field: content
     op: contains
     value: invoice
+  - type: filter
+    field: content
+    op: ends-with
+    value: paid
 ```
 
 Rules:
@@ -225,8 +233,10 @@ Rules:
 - `field` must exist and be `STRING`,
 - `op` is required,
 - supported `op` values: `not-empty`, `min-length`, `contains`,
+  `starts-with`, `ends-with`,
 - `minLength` is required for `op: min-length` and must be a positive integer,
-- `value` is required for `op: contains` and must not be empty,
+- `value` is required for `op: contains`, `op: starts-with`, and
+  `op: ends-with`, and must not be empty,
 - dropped rows are counted as source rows read, not as rows written,
 - checkpointed runs still advance the checkpoint after a filtered source batch
   is processed.
