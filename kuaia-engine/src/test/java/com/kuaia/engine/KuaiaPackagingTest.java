@@ -31,6 +31,7 @@ class KuaiaPackagingTest {
         assertEquals(0, process.exitValue(), output);
         assertTrue(output.contains("Usage: kuaia <command>"), output);
         assertTrue(output.contains("run -f PIPELINE"), output);
+        assertTrue(output.contains("validate -f PIPELINE"), output);
         assertTrue(output.contains("benchmark"), output);
     }
 
@@ -151,6 +152,7 @@ class KuaiaPackagingTest {
         assertTrue(workflow.contains("VERSION=$(sed -n"), workflow);
         assertTrue(workflow.contains("java -jar \"kuaia-engine/target/kuaia-engine-${VERSION}-cli.jar\" help"), workflow);
         assertTrue(workflow.contains("bin/kuaia help"), workflow);
+        assertTrue(workflow.contains("bin/kuaia validate -f examples/local-file-to-file.yaml"), workflow);
         assertTrue(workflow.contains("docker compose config"), workflow);
     }
 

@@ -10,11 +10,14 @@ Run the no-service smoke check first:
 
 ```bash
 bin/kuaia examples
+bin/kuaia validate -f examples/local-file-to-file.yaml
 make public-mvp-smoke
 ```
 
-It validates these public MVP paths in an isolated `.kuaia/public-mvp-smoke`
-work directory:
+`kuaia validate -f` performs a no-write preflight for a single pipeline. For
+file sources, it checks source row type, transform fields, and sink field
+compatibility before you run the pipeline. The smoke check validates these
+public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 
 - CSV source through `select` and `rename` transforms into a local CSV file,
 - quoted CSV source fields with commas, quotes, and line breaks into a local

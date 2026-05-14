@@ -751,6 +751,22 @@ export KUAIA_POSTGRES_PASSWORD=kuaia
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
+## Validate Before Running
+
+Use `validate` to check a pipeline without executing it:
+
+```bash
+bin/kuaia validate -f examples/local-file-to-file.yaml
+```
+
+For `source.type: file`, validation opens the source enough to infer the row
+type, builds the transform chain, and checks sink field compatibility. It does
+not write sink output or checkpoint state.
+
+For `source.type: postgres`, validation parses the YAML and connector options
+without connecting to the database. Because the row type comes from JDBC result
+metadata, transform and sink row-type checks are deferred until `run`.
+
 ## Benchmark Smoke
 
 Kuaia's benchmark smoke is a developer check for the local batch path. It

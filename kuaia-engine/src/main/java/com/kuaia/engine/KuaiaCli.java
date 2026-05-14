@@ -59,6 +59,23 @@ public class KuaiaCli {
             new RecoveryDemoRunner().run(stateDir, out);
             return 0;
         }
+        if ("validate".equals(command)) {
+            Path configPath = parsePipelineFileOption("validate", args, out);
+            if (configPath == null) {
+                return 1;
+            }
+            try {
+                PipelineConfig config = new PipelineConfigLoader().load(configPath);
+                new LocalPipelineValidator().validate(config, out);
+                return 0;
+            } catch (PipelineConfigException | PipelineExecutionException e) {
+                out.println(e.getMessage());
+                return 1;
+            } catch (Exception e) {
+                out.println(e.getMessage());
+                return 1;
+            }
+        }
         if ("run".equals(command)) {
             RunOptions options = parseRunOptions(args, out);
             if (options == null) {
@@ -96,6 +113,31 @@ public class KuaiaCli {
         out.println("recover-demo requires --state-dir <path>");
         printUsage(out);
         return null;
+    }
+
+    private static Path parsePipelineFileOption(String command, String[] args, PrintStream out) {
+        Path configPath = null;
+        for (int i = 1; i < args.length; i++) {
+            String option = args[i];
+            if ("-f".equals(option) || "--file".equals(option)) {
+                if (i + 1 >= args.length) {
+                    out.println(command + " requires -f <pipeline.yaml>");
+                    printUsage(out);
+                    return null;
+                }
+                configPath = Paths.get(args[++i]);
+            } else {
+                out.println("Unknown " + command + " option: " + option);
+                printUsage(out);
+                return null;
+            }
+        }
+        if (configPath == null) {
+            out.println(command + " requires -f <pipeline.yaml>");
+            printUsage(out);
+            return null;
+        }
+        return configPath;
     }
 
     private static LocalPipelineBenchmarkRunner.BenchmarkOptions parseBenchmarkOptions(String[] args) {
@@ -257,6 +299,7 @@ public class KuaiaCli {
         out.println("  help                         Show this help message");
         out.println("  run -f PIPELINE [--summary-json PATH]");
         out.println("                               Run a declarative local pipeline");
+        out.println("  validate -f PIPELINE         Validate a pipeline without running it");
         out.println("  local-demo                   Run FakeSource -> BinaryRow -> ConsoleSink");
         out.println("  ai-demo                      Run mock embedding -> mock vector sink");
         out.println("  examples                     Show runnable public example pipelines");
@@ -272,6 +315,8 @@ public class KuaiaCli {
     private static void printExamples(PrintStream out) {
         out.println("Recommended no-service smoke:");
         out.println("  make public-mvp-smoke");
+        out.println("Recommended preflight:");
+        out.println("  kuaia validate -f examples/local-file-to-file.yaml");
         out.println();
         out.println("No external services:");
         out.println("  kuaia run -f examples/local-file-to-console.yaml");
