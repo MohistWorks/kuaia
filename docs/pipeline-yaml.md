@@ -230,6 +230,10 @@ Supported predicates:
   configured `value` prefix. Matching is case-sensitive.
 - `op: ends-with` keeps rows whose configured string field ends with the
   configured `value` suffix. Matching is case-sensitive.
+- `op: equals` keeps rows whose configured string field exactly equals the
+  configured `value`. Matching is case-sensitive.
+- `op: not-equals` keeps rows whose configured string field does not exactly
+  equal the configured `value`. Matching is case-sensitive.
 
 Example:
 
@@ -247,6 +251,10 @@ transforms:
     field: content
     op: ends-with
     value: paid
+  - type: filter
+    field: status
+    op: not-equals
+    value: archived
 ```
 
 Rules:
@@ -254,10 +262,10 @@ Rules:
 - `field` must exist and be `STRING`,
 - `op` is required,
 - supported `op` values: `not-empty`, `min-length`, `contains`,
-  `starts-with`, `ends-with`,
+  `starts-with`, `ends-with`, `equals`, `not-equals`,
 - `minLength` is required for `op: min-length` and must be a positive integer,
 - `value` is required for `op: contains`, `op: starts-with`, and
-  `op: ends-with`, and must not be empty,
+  `op: ends-with`, `op: equals`, and `op: not-equals`, and must not be empty,
 - dropped rows are counted as source rows read, not as rows written,
 - checkpointed runs still advance the checkpoint after a filtered source batch
   is processed.

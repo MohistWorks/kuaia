@@ -98,6 +98,8 @@ class KuaiaExamplesTest {
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("op: contains"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("value: a"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("op: starts-with"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("op: equals"));
+        assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-file.yaml")).contains("value: alfa"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-chunk-to-vector.yaml")).contains("type: trim"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-chunk-to-vector.yaml")).contains("op: not-empty"));
         assertTrue(read(chunkToQdrantPath).contains("type: trim"));

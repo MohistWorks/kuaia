@@ -14,6 +14,8 @@ public class FilterTransform implements PipelineTransform {
     private static final String OP_CONTAINS = "contains";
     private static final String OP_STARTS_WITH = "starts-with";
     private static final String OP_ENDS_WITH = "ends-with";
+    private static final String OP_EQUALS = "equals";
+    private static final String OP_NOT_EQUALS = "not-equals";
 
     private final String field;
     private final String op;
@@ -43,7 +45,9 @@ public class FilterTransform implements PipelineTransform {
                 && !OP_MIN_LENGTH.equals(op)
                 && !OP_CONTAINS.equals(op)
                 && !OP_STARTS_WITH.equals(op)
-                && !OP_ENDS_WITH.equals(op)) {
+                && !OP_ENDS_WITH.equals(op)
+                && !OP_EQUALS.equals(op)
+                && !OP_NOT_EQUALS.equals(op)) {
             throw new PipelineExecutionException("Unsupported filter op: " + op);
         }
         if (requiresValue() && (expectedValue == null || expectedValue.isEmpty())) {
@@ -95,10 +99,20 @@ public class FilterTransform implements PipelineTransform {
         if (OP_STARTS_WITH.equals(op)) {
             return fieldValue.startsWith(expectedValue);
         }
-        return fieldValue.endsWith(expectedValue);
+        if (OP_ENDS_WITH.equals(op)) {
+            return fieldValue.endsWith(expectedValue);
+        }
+        if (OP_EQUALS.equals(op)) {
+            return fieldValue.equals(expectedValue);
+        }
+        return !fieldValue.equals(expectedValue);
     }
 
     private boolean requiresValue() {
-        return OP_CONTAINS.equals(op) || OP_STARTS_WITH.equals(op) || OP_ENDS_WITH.equals(op);
+        return OP_CONTAINS.equals(op)
+                || OP_STARTS_WITH.equals(op)
+                || OP_ENDS_WITH.equals(op)
+                || OP_EQUALS.equals(op)
+                || OP_NOT_EQUALS.equals(op);
     }
 }

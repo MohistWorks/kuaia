@@ -470,6 +470,42 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsEqualityFilterTransformConfig() throws Exception {
+        Path configPath = tempDir.resolve("equality-filter-transform.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: equality-filter-transform",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: equals",
+                "    value: alfa",
+                "  - type: filter",
+                "    field: content",
+                "    op: not-equals",
+                "    value: beta",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        PipelineConfig.TransformConfig equals = config.getTransforms().get(0);
+        assertEquals("filter", equals.getType());
+        assertEquals("content", equals.getInput());
+        assertEquals("equals", equals.getOp());
+        assertEquals("alfa", equals.getValue());
+
+        PipelineConfig.TransformConfig notEquals = config.getTransforms().get(1);
+        assertEquals("filter", notEquals.getType());
+        assertEquals("content", notEquals.getInput());
+        assertEquals("not-equals", notEquals.getOp());
+        assertEquals("beta", notEquals.getValue());
+    }
+
+    @Test
     void loadsLowercaseTransformConfig() throws Exception {
         Path configPath = tempDir.resolve("lowercase-transform.yaml");
         Files.write(configPath, String.join("\n",
@@ -599,7 +635,7 @@ class PipelineConfigLoaderTest {
                 "transforms:",
                 "  - type: filter",
                 "    field: content",
-                "    op: equals",
+                "    op: regex",
                 "sink:",
                 "  type: console").getBytes(StandardCharsets.UTF_8));
 
@@ -607,7 +643,7 @@ class PipelineConfigLoaderTest {
                 PipelineConfigException.class,
                 () -> new PipelineConfigLoader().load(configPath));
 
-        assertEquals("Unsupported transforms[0].op: equals", error.getMessage());
+        assertEquals("Unsupported transforms[0].op: regex", error.getMessage());
     }
 
     @Test
@@ -693,6 +729,29 @@ class PipelineConfigLoaderTest {
                 "  - type: filter",
                 "    field: content",
                 "    op: starts-with",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: transforms[0].value", error.getMessage());
+    }
+
+    @Test
+    void rejectsMissingEqualsFilterTransformValue() throws Exception {
+        Path configPath = tempDir.resolve("missing-equals-filter-value.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-equals-filter-value",
+                "source:",
+                "  type: file",
+                "  path: data/articles.jsonl",
+                "  format: jsonl",
+                "transforms:",
+                "  - type: filter",
+                "    field: content",
+                "    op: equals",
                 "sink:",
                 "  type: console").getBytes(StandardCharsets.UTF_8));
 
