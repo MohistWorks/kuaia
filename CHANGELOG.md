@@ -22,6 +22,8 @@ All notable public changes to Kuaia are tracked here.
   application-level `status` values other than `ok`.
 - CI and release gates now run offline `kuaia validate` checks for both the
   local file example and chunked JSONL-to-Qdrant example.
+- CI and release gates now also validate the Postgres-to-Qdrant example config
+  without connecting to external services.
 
 ### Changed
 
