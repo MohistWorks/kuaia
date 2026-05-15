@@ -119,7 +119,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/README.md")).contains("release-checklist.md"));
         assertTrue(read(root.resolve("docs/README.md")).contains("../CHANGELOG.md"));
         assertTrue(Files.exists(root.resolve("CHANGELOG.md")), "CHANGELOG.md should exist");
-        assertTrue(read(root.resolve("CHANGELOG.md")).contains("## Unreleased"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.3 - 2026-05-15"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.0 - 2026-05-11"));
         assertTrue(read(root.resolve("docs/release-checklist.md")).contains("CHANGELOG.md"));
         assertTrue(read(root.resolve("docs/release-checklist.md")).contains("requires GitHub Actions `CI` to pass"));
