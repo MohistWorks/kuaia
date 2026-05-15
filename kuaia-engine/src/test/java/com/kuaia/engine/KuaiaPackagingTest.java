@@ -154,6 +154,7 @@ class KuaiaPackagingTest {
         assertTrue(workflow.contains("bin/kuaia help"), workflow);
         assertTrue(workflow.contains("bin/kuaia validate -f examples/local-file-to-file.yaml"), workflow);
         assertTrue(workflow.contains("bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml"), workflow);
+        assertTrue(workflow.contains("bin/kuaia validate -f examples/postgres-to-qdrant.yaml"), workflow);
         assertTrue(workflow.contains("docker compose config"), workflow);
     }
 
