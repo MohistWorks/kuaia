@@ -2,7 +2,7 @@
 
 All notable public changes to Kuaia are tracked here.
 
-## Unreleased
+## 0.1.3 - 2026-05-15
 
 ### Added
 
