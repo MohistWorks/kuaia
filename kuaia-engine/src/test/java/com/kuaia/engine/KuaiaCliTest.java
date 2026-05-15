@@ -113,6 +113,28 @@ class KuaiaCliTest {
     }
 
     @Test
+    void validateDoesNotConnectToMysql() throws Exception {
+        Path config = tempDir.resolve("validate-mysql.yaml");
+        Files.write(config, String.join("\n",
+                "name: validate-mysql",
+                "source:",
+                "  type: mysql",
+                "  url: jdbc:mysql://localhost:3306/kuaia",
+                "  userEnv: MYSQL_USER",
+                "  passwordEnv: MYSQL_PASSWORD",
+                "  query: SELECT id, content FROM documents",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("validate", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Pipeline valid: validate-mysql"));
+        assertTrue(result.output.contains("Source: mysql fields=deferred"));
+        assertTrue(result.output.contains("Transform and sink row-type checks deferred for source.type: mysql"));
+    }
+
+    @Test
     void validateRequiresConfigPath() throws Exception {
         CliResult result = run("validate");
 
@@ -141,11 +163,13 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("Common RAG flows:"));
         assertTrue(result.output.contains("FAQ import: kuaia run -f examples/local-faq-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("Postgres to Qdrant: kuaia run -f examples/postgres-to-qdrant.yaml"));
+        assertTrue(result.output.contains("MySQL to Qdrant: kuaia run -f examples/mysql-to-qdrant.yaml"));
         assertTrue(result.output.contains("External service examples:"));
         assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-chunk-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/postgres-to-qdrant.yaml"));
+        assertTrue(result.output.contains("examples/mysql-to-qdrant.yaml"));
     }
 
     @Test

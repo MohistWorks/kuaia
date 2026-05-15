@@ -35,8 +35,8 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 - fatal malformed CSV diagnostics with a stable `Source stage failed:` prefix.
 
 After that, run individual examples below when you want to inspect one pipeline
-at a time. Qdrant, Postgres, and OpenAI-compatible examples require external
-services or credentials and are not part of the default smoke.
+at a time. Qdrant, Postgres, MySQL, and OpenAI-compatible examples require
+external services or credentials and are not part of the default smoke.
 
 ## Common RAG Flows
 
@@ -53,11 +53,12 @@ with:
 bin/kuaia run -f examples/local-faq-jsonl-to-vector.yaml
 ```
 
-For a production-like batch source into Qdrant, start Postgres and Qdrant and
-then run:
+For a production-like batch source into Qdrant, start Postgres or MySQL with
+Qdrant and then run:
 
 ```bash
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
+bin/kuaia run -f examples/mysql-to-qdrant.yaml
 ```
 
 ## Local File To Console
@@ -284,6 +285,36 @@ The example reads rows from the `documents` table initialized by
 embeddings, and upserts points into Qdrant collection `kuaia_pg_docs` with
 `payloadFields: [id, content]`. It is not part of default automated tests
 because it requires running Postgres and Qdrant services.
+
+## MySQL To Qdrant
+
+Start MySQL and Qdrant:
+
+```bash
+docker compose -f docker-compose.mysql.yml -f docker-compose.qdrant.yml up -d
+```
+
+Create the example Qdrant collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_mysql_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Run the batch MySQL-to-Qdrant pipeline:
+
+```bash
+export KUAIA_MYSQL_USER=kuaia
+export KUAIA_MYSQL_PASSWORD=kuaia
+bin/kuaia run -f examples/mysql-to-qdrant.yaml
+```
+
+The example reads rows from the `documents` table initialized by
+`examples/mysql/init/01-documents.sql`, creates deterministic mock embeddings,
+and upserts points into Qdrant collection `kuaia_mysql_docs` with
+`payloadFields: [id, content]`. It is not part of default automated tests
+because it requires running MySQL and Qdrant services.
 
 ## Docker Quickstart
 

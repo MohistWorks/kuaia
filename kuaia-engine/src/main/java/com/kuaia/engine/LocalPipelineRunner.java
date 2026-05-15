@@ -16,6 +16,7 @@ import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.FileSource;
 import com.kuaia.engine.worker.connector.FileSink;
 import com.kuaia.engine.worker.connector.LocalSource;
+import com.kuaia.engine.worker.connector.MySQLSource;
 import com.kuaia.engine.worker.connector.PostgresSource;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import com.kuaia.engine.worker.connector.v2.BatchCommit;
@@ -272,6 +273,9 @@ public class LocalPipelineRunner {
         }
         if ("postgres".equals(sourceType)) {
             return new LocalSourceAdapter(new PostgresSource(config.getSource()), "postgres-0");
+        }
+        if ("mysql".equals(sourceType)) {
+            return new LocalSourceAdapter(new MySQLSource(config.getSource()), "mysql-0");
         }
         throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
     }

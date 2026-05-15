@@ -20,7 +20,8 @@ field types include primitive values, strings, and vectors.
 Current built-in sources are:
 
 - `FileSource` for local CSV and JSONL files,
-- `PostgresSource` for one bounded JDBC query.
+- `PostgresSource` for one bounded JDBC query,
+- `MySQLSource` for one bounded JDBC query.
 
 Local sources implement `LocalSource`:
 

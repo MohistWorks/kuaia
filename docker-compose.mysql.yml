@@ -1,0 +1,12 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: kuaia
+      MYSQL_USER: kuaia
+      MYSQL_PASSWORD: kuaia
+      MYSQL_ROOT_PASSWORD: kuaia-root
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./examples/mysql/init:/docker-entrypoint-initdb.d:ro

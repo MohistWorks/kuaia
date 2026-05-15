@@ -170,7 +170,7 @@ class PipelineConfigLoaderTest {
                 PipelineConfigException.class,
                 () -> new PipelineConfigLoader().load(configPath));
 
-        assertEquals("source.fetchSize is only supported for source.type: postgres", error.getMessage());
+        assertEquals("source.fetchSize is only supported for JDBC source types", error.getMessage());
     }
 
     @Test
@@ -1550,6 +1550,35 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsMysqlSourceConfig() throws Exception {
+        Path configPath = tempDir.resolve("mysql-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: mysql-source",
+                "source:",
+                "  type: mysql",
+                "  url: jdbc:mysql://localhost:3306/kuaia",
+                "  userEnv: KUAIA_MYSQL_USER",
+                "  passwordEnv: KUAIA_MYSQL_PASSWORD",
+                "  query: select id, content from documents order by id",
+                "  fetchSize: 256",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("mysql", config.getSource().getType());
+        assertEquals("jdbc:mysql://localhost:3306/kuaia", config.getSource().getUrl());
+        assertEquals("KUAIA_MYSQL_USER", config.getSource().getUserEnv());
+        assertEquals("KUAIA_MYSQL_PASSWORD", config.getSource().getPasswordEnv());
+        assertEquals("select id, content from documents order by id", config.getSource().getQuery());
+        assertEquals(256, config.getSource().getFetchSize());
+    }
+
+    @Test
     void rejectsMissingPostgresQuery() throws Exception {
         Path configPath = tempDir.resolve("missing-postgres-query.yaml");
         Files.write(configPath, String.join("\n",
@@ -1559,6 +1588,26 @@ class PipelineConfigLoaderTest {
                 "  url: jdbc:postgresql://localhost:5432/kuaia",
                 "  userEnv: KUAIA_POSTGRES_USER",
                 "  passwordEnv: KUAIA_POSTGRES_PASSWORD",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: source.query", error.getMessage());
+    }
+
+    @Test
+    void rejectsMissingMysqlQuery() throws Exception {
+        Path configPath = tempDir.resolve("missing-mysql-query.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-mysql-query",
+                "source:",
+                "  type: mysql",
+                "  url: jdbc:mysql://localhost:3306/kuaia",
+                "  userEnv: KUAIA_MYSQL_USER",
+                "  passwordEnv: KUAIA_MYSQL_PASSWORD",
                 "sink:",
                 "  type: console").getBytes(StandardCharsets.UTF_8));
 
