@@ -7,7 +7,8 @@ MVP. Internal design notes are not part of this tree.
 
 - [`product-scope.md`](product-scope.md): what Kuaia is today, who it is for,
   and what is outside the MVP.
-- [`roadmap.md`](roadmap.md): planned focus areas for the next public release.
+- [`roadmap.md`](roadmap.md): current release status, validation gate, and
+  deferred work.
 - [`examples.md`](examples.md): runnable examples, including the recommended
   no-service smoke path.
 - [`pipeline-yaml.md`](pipeline-yaml.md): the current declarative pipeline YAML
