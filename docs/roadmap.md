@@ -79,6 +79,8 @@ mvn -q test
 mvn -q package
 bin/kuaia help
 bin/kuaia examples
+bin/kuaia validate -f examples/local-file-to-file.yaml
+bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
 make public-mvp-smoke
 docker compose config
 git diff --check
