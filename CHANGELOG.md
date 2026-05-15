@@ -2,6 +2,16 @@
 
 All notable public changes to Kuaia are tracked here.
 
+## Unreleased
+
+### Changed
+
+- Main branch development version is now `0.2.0-SNAPSHOT` after the `v0.1.3`
+  release.
+- The public roadmap now defines the `0.2.0` Connector-ready runtime focus,
+  including MySQL batch source, source validation, connector contribution
+  documentation, and deferred non-goals.
+
 ## 0.1.3 - 2026-05-15
 
 ### Added
