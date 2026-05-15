@@ -39,4 +39,5 @@ jobs:
           java -jar "kuaia-engine/target/kuaia-engine-${VERSION}-cli.jar" help
           bin/kuaia help
           bin/kuaia validate -f examples/local-file-to-file.yaml
+          bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
           docker compose config

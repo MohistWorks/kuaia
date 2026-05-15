@@ -20,6 +20,8 @@ All notable public changes to Kuaia are tracked here.
   in `kuaia examples`.
 - Qdrant upserts now validate successful HTTP response bodies and reject
   application-level `status` values other than `ok`.
+- CI and release gates now run offline `kuaia validate` checks for both the
+  local file example and chunked JSONL-to-Qdrant example.
 
 ### Changed
 

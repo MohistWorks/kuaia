@@ -42,6 +42,7 @@ mvn -q package
 bin/kuaia help
 bin/kuaia examples
 bin/kuaia validate -f examples/local-file-to-file.yaml
+bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
 make public-mvp-smoke
 docker compose config
 git diff --check
@@ -55,7 +56,8 @@ git diff --check
 - [ ] CI includes `mvn -q test`.
 - [ ] CI includes `mvn -q package`.
 - [ ] CI includes `make public-mvp-smoke`.
-- [ ] CI validates CLI help and Docker Compose config.
+- [ ] CI validates CLI help, local file preflight, Qdrant preflight, and Docker
+  Compose config.
 
 ## Release Decision
 
