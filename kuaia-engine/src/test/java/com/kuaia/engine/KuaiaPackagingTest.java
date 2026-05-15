@@ -110,6 +110,9 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--batch-sizes 16,64,256"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--format csv"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.1.3 Status"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("0.1.3 is ready for release-candidate validation"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("Deferred Beyond 0.1.3"));
         assertTrue(read(root.resolve("docs/README.md")).contains("product-scope.md"));
         assertTrue(read(root.resolve("docs/README.md")).contains("pipeline-yaml.md"));
         assertTrue(read(root.resolve("docs/README.md")).contains("connector-development.md"));

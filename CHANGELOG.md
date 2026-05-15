@@ -24,6 +24,8 @@ All notable public changes to Kuaia are tracked here.
   local file example and chunked JSONL-to-Qdrant example.
 - CI and release gates now also validate the Postgres-to-Qdrant example config
   without connecting to external services.
+- The public roadmap now records `0.1.3` shipped scope, release-candidate gate,
+  and work deferred beyond `0.1.3`.
 
 ### Changed
 
