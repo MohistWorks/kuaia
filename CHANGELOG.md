@@ -13,6 +13,8 @@ All notable public changes to Kuaia are tracked here.
   documentation, and deferred non-goals.
 - Added `source.type: mysql` for one bounded JDBC batch query, plus a
   MySQL-to-Qdrant example and offline validation coverage.
+- JDBC source validation now rejects Postgres/MySQL source configs whose
+  `source.url` does not match the selected `source.type`.
 
 ## 0.1.3 - 2026-05-15
 

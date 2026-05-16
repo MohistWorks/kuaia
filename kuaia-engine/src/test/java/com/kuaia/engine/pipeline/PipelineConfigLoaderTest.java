@@ -1550,6 +1550,27 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void rejectsPostgresSourceWithNonPostgresJdbcUrl() throws Exception {
+        Path configPath = tempDir.resolve("postgres-with-mysql-url.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: postgres-with-mysql-url",
+                "source:",
+                "  type: postgres",
+                "  url: jdbc:mysql://localhost:3306/kuaia",
+                "  userEnv: KUAIA_POSTGRES_USER",
+                "  passwordEnv: KUAIA_POSTGRES_PASSWORD",
+                "  query: select id, content from documents order by id",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.url for source.type postgres must start with jdbc:postgresql:", error.getMessage());
+    }
+
+    @Test
     void loadsMysqlSourceConfig() throws Exception {
         Path configPath = tempDir.resolve("mysql-source.yaml");
         Files.write(configPath, String.join("\n",
@@ -1576,6 +1597,27 @@ class PipelineConfigLoaderTest {
         assertEquals("KUAIA_MYSQL_PASSWORD", config.getSource().getPasswordEnv());
         assertEquals("select id, content from documents order by id", config.getSource().getQuery());
         assertEquals(256, config.getSource().getFetchSize());
+    }
+
+    @Test
+    void rejectsMysqlSourceWithNonMysqlJdbcUrl() throws Exception {
+        Path configPath = tempDir.resolve("mysql-with-postgres-url.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: mysql-with-postgres-url",
+                "source:",
+                "  type: mysql",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: KUAIA_MYSQL_USER",
+                "  passwordEnv: KUAIA_MYSQL_PASSWORD",
+                "  query: select id, content from documents order by id",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.url for source.type mysql must start with jdbc:mysql:", error.getMessage());
     }
 
     @Test

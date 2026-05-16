@@ -175,11 +175,13 @@ public class PipelineConfigLoader {
             if (hasText(source.get("maxRowsPerSplit"))) {
                 throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
             }
+            String sourceUrl = require(source, "source.url");
+            validateJdbcSourceUrl(sourceType, sourceUrl);
             return new PipelineConfig.SourceConfig(
                     sourceType,
                     null,
                     null,
-                    require(source, "source.url"),
+                    sourceUrl,
                     require(source, "source.userEnv"),
                     require(source, "source.passwordEnv"),
                     require(source, "source.query"),
@@ -202,6 +204,24 @@ public class PipelineConfigLoader {
 
     private boolean isJdbcSource(String sourceType) {
         return "postgres".equals(sourceType) || "mysql".equals(sourceType);
+    }
+
+    private void validateJdbcSourceUrl(String sourceType, String sourceUrl) throws PipelineConfigException {
+        String prefix = expectedJdbcUrlPrefix(sourceType);
+        if (!sourceUrl.startsWith(prefix)) {
+            throw new PipelineConfigException(
+                    "source.url for source.type " + sourceType + " must start with " + prefix);
+        }
+    }
+
+    private String expectedJdbcUrlPrefix(String sourceType) {
+        if ("postgres".equals(sourceType)) {
+            return "jdbc:postgresql:";
+        }
+        if ("mysql".equals(sourceType)) {
+            return "jdbc:mysql:";
+        }
+        throw new IllegalArgumentException("Unsupported JDBC source.type: " + sourceType);
     }
 
     private PipelineConfig.TransformConfig loadEmbeddingTransform(Map<String, String> transform, String fieldPrefix)
