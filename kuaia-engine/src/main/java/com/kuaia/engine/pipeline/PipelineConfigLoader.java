@@ -53,7 +53,7 @@ public class PipelineConfigLoader {
         String sourceType = require(source, "source.type");
         String sinkType = require(sink, "sink.type");
 
-        requireSupported("source.type", sourceType, "file", "postgres");
+        requireSupported("source.type", sourceType, "file", "postgres", "mysql");
         requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant");
 
         PipelineConfig.SourceConfig sourceConfig = loadSource(path, sourceType, source);
@@ -171,12 +171,12 @@ public class PipelineConfigLoader {
 
     private PipelineConfig.SourceConfig loadSource(Path configPath, String sourceType, Map<String, String> source)
             throws PipelineConfigException {
-        if ("postgres".equals(sourceType)) {
+        if (isJdbcSource(sourceType)) {
             if (hasText(source.get("maxRowsPerSplit"))) {
                 throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
             }
             return new PipelineConfig.SourceConfig(
-                    "postgres",
+                    sourceType,
                     null,
                     null,
                     require(source, "source.url"),
@@ -188,7 +188,7 @@ public class PipelineConfigLoader {
         }
 
         if (hasText(source.get("fetchSize"))) {
-            throw new PipelineConfigException("source.fetchSize is only supported for source.type: postgres");
+            throw new PipelineConfigException("source.fetchSize is only supported for JDBC source types");
         }
         String sourcePath = resolveLocalPath(configPath, require(source, "source.path"), "source.path");
         String sourceFormat = require(source, "source.format");
@@ -198,6 +198,10 @@ public class PipelineConfigLoader {
                 sourcePath,
                 sourceFormat,
                 parseSourceMaxRowsPerSplit(source.get("maxRowsPerSplit")));
+    }
+
+    private boolean isJdbcSource(String sourceType) {
+        return "postgres".equals(sourceType) || "mysql".equals(sourceType);
     }
 
     private PipelineConfig.TransformConfig loadEmbeddingTransform(Map<String, String> transform, String fieldPrefix)

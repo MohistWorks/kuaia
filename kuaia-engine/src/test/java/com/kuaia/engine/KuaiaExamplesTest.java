@@ -84,9 +84,11 @@ class KuaiaExamplesTest {
         Path fileToQdrantPath = repoRoot().resolve("examples/local-file-to-qdrant.yaml");
         Path chunkToQdrantPath = repoRoot().resolve("examples/local-jsonl-chunk-to-qdrant.yaml");
         Path postgresToQdrantPath = repoRoot().resolve("examples/postgres-to-qdrant.yaml");
+        Path mysqlToQdrantPath = repoRoot().resolve("examples/mysql-to-qdrant.yaml");
         PipelineConfig fileToQdrant = new PipelineConfigLoader().load(fileToQdrantPath);
         PipelineConfig chunkToQdrant = new PipelineConfigLoader().load(chunkToQdrantPath);
         PipelineConfig postgresToQdrant = new PipelineConfigLoader().load(postgresToQdrantPath);
+        PipelineConfig mysqlToQdrant = new PipelineConfigLoader().load(mysqlToQdrantPath);
 
         assertTrue(read(fileToQdrantPath).contains("timeoutMs: 30000"));
         assertTrue(read(repoRoot().resolve("examples/local-jsonl-to-vector.yaml")).contains("type: trim"));
@@ -119,6 +121,8 @@ class KuaiaExamplesTest {
         assertTrue(read(chunkToQdrantPath).contains("includeOffsets: true"));
         assertTrue(read(postgresToQdrantPath).contains("fetchSize: 1000"));
         assertTrue(read(postgresToQdrantPath).contains("timeoutMs: 30000"));
+        assertTrue(read(mysqlToQdrantPath).contains("fetchSize: 1000"));
+        assertTrue(read(mysqlToQdrantPath).contains("timeoutMs: 30000"));
         assertEquals(30000, fileToQdrant.getSink().getTimeoutMs());
         assertEquals(Arrays.asList("id", "content"), fileToQdrant.getSink().getPayloadFields());
         assertEquals("chunk_index", chunkToQdrant.getSink().getChunkIndexField());
@@ -129,6 +133,10 @@ class KuaiaExamplesTest {
         assertEquals(1000, postgresToQdrant.getSource().getFetchSize());
         assertEquals(30000, postgresToQdrant.getSink().getTimeoutMs());
         assertEquals(Arrays.asList("id", "content"), postgresToQdrant.getSink().getPayloadFields());
+        assertEquals("mysql", mysqlToQdrant.getSource().getType());
+        assertEquals(1000, mysqlToQdrant.getSource().getFetchSize());
+        assertEquals(30000, mysqlToQdrant.getSink().getTimeoutMs());
+        assertEquals(Arrays.asList("id", "content"), mysqlToQdrant.getSink().getPayloadFields());
     }
 
     private CliResult run(String... args) throws Exception {

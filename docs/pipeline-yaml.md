@@ -113,6 +113,42 @@ Credentials are read from the environment at runtime and are never stored in
 YAML. Query failures and missing credential environment variables are fatal
 source errors.
 
+### mysql
+
+```yaml
+source:
+  type: mysql
+  url: jdbc:mysql://localhost:3306/kuaia
+  userEnv: KUAIA_MYSQL_USER
+  passwordEnv: KUAIA_MYSQL_PASSWORD
+  query: select id, content from documents order by id
+  fetchSize: 1000
+```
+
+`source.type: mysql` runs one batch JDBC query and streams the result rows
+through the local pipeline. It is not a CDC source.
+
+Fields:
+
+- `type`: must be `mysql`
+- `url`: MySQL JDBC URL
+- `userEnv`: environment variable containing the database user
+- `passwordEnv`: environment variable containing the database password
+- `query`: SQL query to execute
+- `fetchSize`: optional JDBC fetch size. Defaults to driver behavior and must
+  be a positive integer when configured.
+
+MySQL type rules:
+
+- integer-like columns are exposed as `LONG`,
+- all other columns are exposed as `STRING`,
+- result rows use 1-based source sequence ids in query order,
+- checkpoint reruns skip result rows at or before the last checkpoint sequence.
+
+Credentials are read from the environment at runtime and are never stored in
+YAML. Query failures and missing credential environment variables are fatal
+source errors.
+
 ## Transforms
 
 Transforms are optional and run in YAML order. The pipeline is linear, not a DAG.
@@ -760,6 +796,15 @@ export KUAIA_POSTGRES_PASSWORD=kuaia
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
+Run batch MySQL through mock embedding into Qdrant:
+
+```bash
+docker compose -f docker-compose.mysql.yml -f docker-compose.qdrant.yml up -d
+export KUAIA_MYSQL_USER=kuaia
+export KUAIA_MYSQL_PASSWORD=kuaia
+bin/kuaia run -f examples/mysql-to-qdrant.yaml
+```
+
 ## Validate Before Running
 
 Use `validate` to check a pipeline without executing it:
@@ -772,9 +817,10 @@ For `source.type: file`, validation opens the source enough to infer the row
 type, builds the transform chain, and checks sink field compatibility. It does
 not write sink output or checkpoint state.
 
-For `source.type: postgres`, validation parses the YAML and connector options
-without connecting to the database. Because the row type comes from JDBC result
-metadata, transform and sink row-type checks are deferred until `run`.
+For `source.type: postgres` and `source.type: mysql`, validation parses the
+YAML and connector options without connecting to the database. Because the row
+type comes from JDBC result metadata, transform and sink row-type checks are
+deferred until `run`.
 
 ## Benchmark Smoke
 
@@ -824,7 +870,7 @@ Common examples:
 - `Unsupported transform.type: <value>`
 - `Unsupported transforms[0].provider: <value>`
 - `source.maxRowsPerSplit is only supported for source.type: file`
-- `source.fetchSize is only supported for source.type: postgres`
+- `source.fetchSize is only supported for JDBC source types`
 - `Invalid source.fetchSize: <value>`
 - `sink.timeoutMs is only supported for sink.type: qdrant`
 - `sink.payloadFields is only supported for sink.type: qdrant`
@@ -847,6 +893,10 @@ Common examples:
 - `Postgres source query failed: <message>`
 - `Postgres source read failed: <message>`
 - `Invalid Postgres row seq=<seq>: field <field> is null`
+- `Missing MySQL environment variable: <name>`
+- `MySQL source query failed: <message>`
+- `MySQL source read failed: <message>`
+- `Invalid MySQL row seq=<seq>: field <field> is null`
 - `Embedding request failed with status <code>: <response>`
 - `Embedding response did not contain an embedding vector`
 - `Embedding response returned <n> embeddings but expected <m>`
@@ -883,7 +933,8 @@ The current YAML contract does not support:
 - expression filters, joins, casts, or aggregations,
 - CDC offsets,
 - CDC or streaming external connectors,
-- additional production-certified external connectors beyond batch PostgreSQL,
+- additional production-certified external connectors beyond batch PostgreSQL
+  and MySQL,
 - additional real vector databases beyond Qdrant,
 - provider-specific SDK integrations,
 - production deployment settings,

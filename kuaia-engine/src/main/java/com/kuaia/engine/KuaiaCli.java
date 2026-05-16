@@ -334,12 +334,14 @@ public class KuaiaCli {
         out.println("  Local document import: kuaia run -f examples/local-jsonl-chunk-to-vector.yaml");
         out.println("  FAQ import: kuaia run -f examples/local-faq-jsonl-to-vector.yaml");
         out.println("  Postgres to Qdrant: kuaia run -f examples/postgres-to-qdrant.yaml");
+        out.println("  MySQL to Qdrant: kuaia run -f examples/mysql-to-qdrant.yaml");
         out.println();
         out.println("External service examples:");
         out.println("  kuaia run -f examples/local-file-to-openai-compatible-vector.yaml");
         out.println("  kuaia run -f examples/local-file-to-qdrant.yaml");
         out.println("  kuaia run -f examples/local-jsonl-chunk-to-qdrant.yaml");
         out.println("  kuaia run -f examples/postgres-to-qdrant.yaml");
+        out.println("  kuaia run -f examples/mysql-to-qdrant.yaml");
         out.println();
         out.println("Docs:");
         out.println("  docs/examples.md");

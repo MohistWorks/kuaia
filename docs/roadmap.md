@@ -71,6 +71,7 @@ bin/kuaia examples
 bin/kuaia validate -f examples/local-file-to-file.yaml
 bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
+bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
 docker compose config
 git diff --check

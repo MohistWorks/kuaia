@@ -1,0 +1,25 @@
+name: mysql-to-qdrant
+source:
+  type: mysql
+  url: jdbc:mysql://localhost:3306/kuaia
+  userEnv: KUAIA_MYSQL_USER
+  passwordEnv: KUAIA_MYSQL_PASSWORD
+  query: select id, content from documents order by id
+  fetchSize: 1000
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: qdrant
+  url: http://localhost:6333
+  collection: kuaia_mysql_docs
+  idField: id
+  vectorField: embedding
+  wait: true
+  timeoutMs: 30000
+  payloadFields: [id, content]
+checkpoint:
+  stateDir: .kuaia/state/mysql-to-qdrant

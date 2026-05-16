@@ -13,7 +13,7 @@ currently an MVP focused on local, checkpoint-aware batch execution.
 
 Kuaia is useful when you want to:
 
-- run a local CSV, JSONL, or Postgres batch pipeline from YAML,
+- run a local CSV, JSONL, Postgres, or MySQL batch pipeline from YAML,
 - transform records through a typed `BinaryRow` model,
 - trim and filter empty text before embedding or chunking,
 - split JSONL document text into embed-ready chunks,
@@ -71,8 +71,9 @@ answer fields, filters empty values, and emits deterministic mock vectors.
 Use `kuaia validate -f <pipeline.yaml>` to check a pipeline before running it.
 For file sources, validation checks the source row type, transform field
 compatibility, and sink field compatibility without writing output or checkpoint
-state. For Postgres sources, validation parses connector configuration without
-connecting to the database, so row-type checks are deferred until run time.
+state. For Postgres and MySQL sources, validation parses connector
+configuration without connecting to the database, so row-type checks are
+deferred until run time.
 
 Validate the public MVP paths without external services:
 
@@ -248,6 +249,18 @@ export KUAIA_POSTGRES_PASSWORD=kuaia
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
+MySQL-to-Qdrant example:
+
+```bash
+docker compose -f docker-compose.mysql.yml -f docker-compose.qdrant.yml up -d
+curl -X PUT http://localhost:6333/collections/kuaia_mysql_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+export KUAIA_MYSQL_USER=kuaia
+export KUAIA_MYSQL_PASSWORD=kuaia
+bin/kuaia run -f examples/mysql-to-qdrant.yaml
+```
+
 Read [`docs/examples.md`](docs/examples.md) for the full example catalog and
 service requirements.
 
@@ -255,7 +268,7 @@ service requirements.
 
 | Area | Current support |
 | --- | --- |
-| Sources | `file` CSV and JSONL, batch `postgres` queries |
+| Sources | `file` CSV and JSONL, batch `postgres` and `mysql` queries |
 | Transforms | `select`, `rename`, `trim`, `lowercase`, `replace`, `filter` (`not-empty`, `min-length`, `contains`, `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`, `greater-than-or-equal`, `less-than`, `less-than-or-equal`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
 | Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant` |
 | Runtime | Linear batch pipeline, preflight validation, checkpoint resume, bad-record skip mode |

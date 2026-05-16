@@ -27,7 +27,7 @@ public class LocalPipelineValidator {
     }
 
     public void validate(PipelineConfig config, PrintStream out) throws Exception {
-        if ("postgres".equals(config.getSource().getType())) {
+        if (isDeferredSource(config.getSource().getType())) {
             printDeferredReport(config, out);
             return;
         }
@@ -50,10 +50,14 @@ public class LocalPipelineValidator {
 
     private void printDeferredReport(PipelineConfig config, PrintStream out) {
         out.println("Pipeline valid: " + config.getName());
-        out.println("Source: postgres fields=deferred");
+        out.println("Source: " + config.getSource().getType() + " fields=deferred");
         out.println("Transforms: " + config.getTransforms().size());
         out.println("Sink: " + config.getSink().getType());
-        out.println("Transform and sink row-type checks deferred for source.type: postgres");
+        out.println("Transform and sink row-type checks deferred for source.type: " + config.getSource().getType());
+    }
+
+    private boolean isDeferredSource(String sourceType) {
+        return "postgres".equals(sourceType) || "mysql".equals(sourceType);
     }
 
     private KuaiaRowType loadFileSourceType(PipelineConfig config) throws Exception {
