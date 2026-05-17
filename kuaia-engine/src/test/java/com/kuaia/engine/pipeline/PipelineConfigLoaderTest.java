@@ -174,6 +174,26 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void rejectsJdbcOnlyFieldsForFileSource() throws Exception {
+        assertFileSourceFieldRejected("url", "jdbc:mysql://localhost:3306/kuaia",
+                "source.url is only supported for JDBC source types");
+        assertFileSourceFieldRejected("userEnv", "KUAIA_USER",
+                "source.userEnv is only supported for JDBC source types");
+        assertFileSourceFieldRejected("passwordEnv", "KUAIA_PASSWORD",
+                "source.passwordEnv is only supported for JDBC source types");
+        assertFileSourceFieldRejected("query", "select id from documents",
+                "source.query is only supported for JDBC source types");
+    }
+
+    @Test
+    void rejectsFileOnlyFieldsForJdbcSource() throws Exception {
+        assertJdbcSourceFieldRejected("path", "data/documents.csv",
+                "source.path is only supported for source.type: file");
+        assertJdbcSourceFieldRejected("format", "csv",
+                "source.format is only supported for source.type: file");
+    }
+
+    @Test
     void loadsOpenAICompatibleEmbeddingConfig() throws Exception {
         Path configPath = tempDir.resolve("openai-compatible.yaml");
         Files.write(configPath, String.join("\n",
@@ -1772,6 +1792,46 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("Missing required field: transforms[0].output", error.getMessage());
+    }
+
+    private void assertFileSourceFieldRejected(String field, String value, String expectedMessage) throws Exception {
+        Path configPath = tempDir.resolve("file-source-" + field + ".yaml");
+        Files.write(configPath, String.join("\n",
+                "name: file-source-" + field,
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "  " + field + ": " + value,
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals(expectedMessage, error.getMessage());
+    }
+
+    private void assertJdbcSourceFieldRejected(String field, String value, String expectedMessage) throws Exception {
+        Path configPath = tempDir.resolve("mysql-source-" + field + ".yaml");
+        Files.write(configPath, String.join("\n",
+                "name: mysql-source-" + field,
+                "source:",
+                "  type: mysql",
+                "  url: jdbc:mysql://localhost:3306/kuaia",
+                "  userEnv: KUAIA_MYSQL_USER",
+                "  passwordEnv: KUAIA_MYSQL_PASSWORD",
+                "  query: select id, content from documents order by id",
+                "  " + field + ": " + value,
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals(expectedMessage, error.getMessage());
     }
 
     private Path writeConfig(String name, Path data, String input, String output, String dimensions) throws Exception {

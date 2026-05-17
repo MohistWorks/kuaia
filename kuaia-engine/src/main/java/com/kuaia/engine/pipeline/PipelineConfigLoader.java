@@ -172,6 +172,8 @@ public class PipelineConfigLoader {
     private PipelineConfig.SourceConfig loadSource(Path configPath, String sourceType, Map<String, String> source)
             throws PipelineConfigException {
         if (isJdbcSource(sourceType)) {
+            rejectIfPresent(source, "path", "source.path is only supported for source.type: file");
+            rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
             if (hasText(source.get("maxRowsPerSplit"))) {
                 throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
             }
@@ -189,6 +191,10 @@ public class PipelineConfigLoader {
                     parseSourceFetchSize(source.get("fetchSize")));
         }
 
+        rejectIfPresent(source, "url", "source.url is only supported for JDBC source types");
+        rejectIfPresent(source, "userEnv", "source.userEnv is only supported for JDBC source types");
+        rejectIfPresent(source, "passwordEnv", "source.passwordEnv is only supported for JDBC source types");
+        rejectIfPresent(source, "query", "source.query is only supported for JDBC source types");
         if (hasText(source.get("fetchSize"))) {
             throw new PipelineConfigException("source.fetchSize is only supported for JDBC source types");
         }
@@ -204,6 +210,12 @@ public class PipelineConfigLoader {
 
     private boolean isJdbcSource(String sourceType) {
         return "postgres".equals(sourceType) || "mysql".equals(sourceType);
+    }
+
+    private void rejectIfPresent(Map<String, String> values, String key, String message) throws PipelineConfigException {
+        if (hasText(values.get(key))) {
+            throw new PipelineConfigException(message);
+        }
     }
 
     private void validateJdbcSourceUrl(String sourceType, String sourceUrl) throws PipelineConfigException {
