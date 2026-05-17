@@ -47,6 +47,7 @@ bin/kuaia validate -f examples/postgres-to-qdrant.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
 docker compose config
+docker compose -f docker-compose.mysql.yml config
 git diff --check
 ```
 
@@ -59,7 +60,8 @@ git diff --check
 - [ ] CI includes `mvn -q package`.
 - [ ] CI includes `make public-mvp-smoke`.
 - [ ] CI validates CLI help, local file preflight, Qdrant preflight, Postgres
-  and MySQL config preflight, and Docker Compose config.
+  and MySQL config preflight, default Docker Compose config, and MySQL Docker
+  Compose config.
 
 ## Release Decision
 

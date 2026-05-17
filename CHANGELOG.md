@@ -17,6 +17,8 @@ All notable public changes to Kuaia are tracked here.
   `source.url` does not match the selected `source.type`.
 - Source YAML validation now rejects file-only fields on JDBC sources and
   JDBC-only fields on file sources instead of silently ignoring them.
+- CI and release gates now validate the MySQL Docker Compose configuration
+  alongside the default Compose configuration.
 
 ## 0.1.3 - 2026-05-15
 

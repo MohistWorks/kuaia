@@ -43,3 +43,4 @@ jobs:
           bin/kuaia validate -f examples/postgres-to-qdrant.yaml
           bin/kuaia validate -f examples/mysql-to-qdrant.yaml
           docker compose config
+          docker compose -f docker-compose.mysql.yml config
