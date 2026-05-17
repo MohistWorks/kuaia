@@ -17,6 +17,8 @@ Run the checks that match the change:
 - [ ] `mvn -q test`
 - [ ] `mvn -q package`
 - [ ] `make public-mvp-smoke`
+- [ ] `docker compose config`
+- [ ] `docker compose -f docker-compose.mysql.yml config`
 - [ ] `git diff --check`
 - [ ] Other:
 

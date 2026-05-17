@@ -74,5 +74,6 @@ bin/kuaia validate -f examples/postgres-to-qdrant.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
 docker compose config
+docker compose -f docker-compose.mysql.yml config
 git diff --check
 ```
