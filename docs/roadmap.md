@@ -26,14 +26,14 @@ Shipped in the `0.1.3` line:
 - CI and release gates covering Maven tests, packaging, CLI help, offline
   preflight checks, public smoke, and Docker Compose config.
 
-## 0.2.0 Planning
+## 0.2.0 release-ready
 
 `0.2.0` moves Kuaia from a runnable MVP toward a Connector-ready runtime. The
-goal is to make built-in connector boundaries easier to extend, validate, and
-document before Kuaia takes on CDC, streaming, DAG execution, or distributed
-operation.
+release-ready scope makes built-in connector boundaries easier to extend,
+validate, and document before Kuaia takes on CDC, streaming, DAG execution, or
+distributed operation.
 
-Planned focus areas:
+Release-ready focus areas:
 
 - MySQL batch source for one bounded JDBC query.
 - Stable source configuration validation for file, Postgres, and MySQL
@@ -60,8 +60,8 @@ The following remain future work and should not block `0.2.0`:
 
 ## Release Criteria
 
-`0.2.0` is ready when the connector-ready focus areas have either shipped or
-been explicitly deferred, and the public validation gate passes:
+`0.2.0` is ready to tag when the connector-ready focus areas have shipped and
+the public validation gate passes:
 
 ```bash
 mvn -q test
