@@ -135,6 +135,27 @@ class KuaiaCliTest {
     }
 
     @Test
+    void validateRejectsMysqlSourceWithPostgresJdbcUrl() throws Exception {
+        Path config = tempDir.resolve("validate-mysql-url-mismatch.yaml");
+        Files.write(config, String.join("\n",
+                "name: validate-mysql-url-mismatch",
+                "source:",
+                "  type: mysql",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: MYSQL_USER",
+                "  passwordEnv: MYSQL_PASSWORD",
+                "  query: SELECT id, content FROM documents",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("validate", "-f", config.toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("source.url for source.type mysql must start with jdbc:mysql:"));
+        assertFalse(result.output.contains("Pipeline valid:"));
+    }
+
+    @Test
     void validateRequiresConfigPath() throws Exception {
         CliResult result = run("validate");
 

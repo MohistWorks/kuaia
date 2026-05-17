@@ -871,6 +871,8 @@ Common examples:
 - `Unsupported transforms[0].provider: <value>`
 - `source.maxRowsPerSplit is only supported for source.type: file`
 - `source.fetchSize is only supported for JDBC source types`
+- `source.url for source.type postgres must start with jdbc:postgresql:`
+- `source.url for source.type mysql must start with jdbc:mysql:`
 - `Invalid source.fetchSize: <value>`
 - `sink.timeoutMs is only supported for sink.type: qdrant`
 - `sink.payloadFields is only supported for sink.type: qdrant`
