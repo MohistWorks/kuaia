@@ -869,7 +869,13 @@ Common examples:
 - `Unsupported errorPolicy.mode: <value>`
 - `Unsupported transform.type: <value>`
 - `Unsupported transforms[0].provider: <value>`
+- `source.path is only supported for source.type: file`
+- `source.format is only supported for source.type: file`
 - `source.maxRowsPerSplit is only supported for source.type: file`
+- `source.url is only supported for JDBC source types`
+- `source.userEnv is only supported for JDBC source types`
+- `source.passwordEnv is only supported for JDBC source types`
+- `source.query is only supported for JDBC source types`
 - `source.fetchSize is only supported for JDBC source types`
 - `source.url for source.type postgres must start with jdbc:postgresql:`
 - `source.url for source.type mysql must start with jdbc:mysql:`

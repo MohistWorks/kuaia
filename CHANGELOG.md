@@ -15,6 +15,8 @@ All notable public changes to Kuaia are tracked here.
   MySQL-to-Qdrant example and offline validation coverage.
 - JDBC source validation now rejects Postgres/MySQL source configs whose
   `source.url` does not match the selected `source.type`.
+- Source YAML validation now rejects file-only fields on JDBC sources and
+  JDBC-only fields on file sources instead of silently ignoring them.
 
 ## 0.1.3 - 2026-05-15
 
