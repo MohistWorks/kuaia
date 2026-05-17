@@ -114,6 +114,10 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--format csv"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.2.0 release-ready"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.2.x Roadmap"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("DuckDB batch source"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("Milvus vector sink"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("connector e2e gate"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("Connector-ready runtime"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("MySQL batch source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("0.1.3 shipped"));
@@ -123,6 +127,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/README.md")).contains("release-checklist.md"));
         assertTrue(read(root.resolve("docs/README.md")).contains("../CHANGELOG.md"));
         assertTrue(Files.exists(root.resolve("CHANGELOG.md")), "CHANGELOG.md should exist");
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("## Unreleased"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("0.2.1-SNAPSHOT"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.0 - 2026-05-17"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.3 - 2026-05-15"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.0 - 2026-05-11"));
@@ -144,9 +150,9 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("examples/mysql/init/01-documents.sql")), "MySQL init SQL should exist");
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
-        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.0</version>"));
-        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.0</version>"));
-        assertTrue(enginePom.contains("<version>0.2.0</version>"), enginePom);
+        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.1-SNAPSHOT</version>"));
+        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.1-SNAPSHOT</version>"));
+        assertTrue(enginePom.contains("<version>0.2.1-SNAPSHOT</version>"), enginePom);
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);
         assertTrue(enginePom.contains("mysql-connector-j"), enginePom);
         assertTrue(enginePom.contains("com.kuaia.engine.KuaiaCli"), enginePom);
