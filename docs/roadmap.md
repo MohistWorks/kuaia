@@ -48,23 +48,29 @@ Release-ready focus areas:
 ## 0.2.x Roadmap
 
 The `0.2.x` line should turn the connector-ready runtime into useful AI data
-pipeline coverage. Each minor release should add a concrete connector or e2e
-test capability that users can run locally or with Docker Compose.
+pipeline coverage. The current development line is still `0.2.1-SNAPSHOT`;
+only `v0.2.0` has been released. Roadmap bullets describe intended release
+scope, not already published versions.
 
-Planned `0.2.x` focus areas:
+`0.2.1` release candidate scope:
 
-- `0.2.1`: add a connector e2e gate and release-gate wrapper that prove the
-  existing file, Postgres, MySQL, and Qdrant paths with real local or Docker
-  backed runs through `make e2e` and `make release-gate`.
-- `0.2.2`: add a DuckDB batch source for local SQL over files, including common
-  CSV, JSON, and Parquet read paths exposed through DuckDB queries.
-- `0.2.3`: add local document-directory and S3-compatible object-storage
-  sources for common RAG ingestion inputs.
-- `0.2.4`: add a pgvector sink for teams that use Postgres as both the source
+- Connector e2e gate and release-gate wrapper that prove file, Postgres, MySQL,
+  DuckDB, document-directory, and Qdrant paths with real local or Docker-backed
+  runs through `make e2e` and `make release-gate`.
+- DuckDB batch source for local SQL over files, including common CSV, JSON, and
+  Parquet read paths exposed through DuckDB queries.
+- Local document-directory source for `.txt`, `.md`, and `.markdown` inputs,
+  including a document-directory-to-Qdrant example and e2e case.
+
+Planned follow-on `0.2.x` focus areas:
+
+- `0.2.2`: add an S3-compatible object-storage source with MinIO-backed e2e
+  coverage for common RAG ingestion inputs.
+- `0.2.3`: add a pgvector sink for teams that use Postgres as both the source
   database and vector store.
-- `0.2.5`: add a Milvus vector sink after Qdrant and pgvector e2e coverage is
+- `0.2.4`: add a Milvus vector sink after Qdrant and pgvector e2e coverage is
   stable.
-- `0.2.6`: harden OpenAI-compatible embedding provider e2e coverage and add
+- `0.2.5`: harden OpenAI-compatible embedding provider e2e coverage and add
   connector contract tests for built-in source and sink implementations.
 
 The intended AI connector coverage is:
