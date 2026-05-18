@@ -49,7 +49,7 @@ Release-ready focus areas:
 
 The `0.2.x` line should turn the connector-ready runtime into useful AI data
 pipeline coverage. The `0.2.1` scope shipped on 2026-05-18, the `0.2.2`
-scope shipped on 2026-05-18, and `0.2.3` is the current development scope.
+scope shipped on 2026-05-18, and the `0.2.3` scope is release-ready.
 Follow-on bullets describe intended future scope, not already published
 versions.
 
@@ -68,7 +68,7 @@ versions.
 - `0.2.2`: add an S3-compatible object-storage source with MinIO-backed e2e
   coverage for common RAG ingestion inputs.
 
-`0.2.3` current development scope:
+`0.2.3` release-ready scope:
 
 - `0.2.3`: add a pgvector sink for teams that use Postgres as both the source
   database and vector store.
