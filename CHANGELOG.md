@@ -4,6 +4,8 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+## 0.2.1 - 2026-05-18
+
 ### Added
 
 - Added a Docker-backed connector e2e gate plus `make e2e` and
@@ -20,12 +22,10 @@ All notable public changes to Kuaia are tracked here.
 
 ### Changed
 
-- Main branch development version is now `0.2.1-SNAPSHOT` after the `v0.2.0`
-  release.
-- The public roadmap now defines the `0.2.1` release-candidate connector and
-  e2e test scope, including DuckDB and document-directory support, while
-  keeping S3-compatible, pgvector, Milvus, embedding provider, and connector
-  contract work as follow-on `0.2.x` items.
+- The public roadmap now defines the `0.2.1` connector and e2e test scope,
+  including DuckDB and document-directory support, while keeping
+  S3-compatible, pgvector, Milvus, embedding provider, and connector contract
+  work as follow-on `0.2.x` items.
 
 ## 0.2.0 - 2026-05-17
 
