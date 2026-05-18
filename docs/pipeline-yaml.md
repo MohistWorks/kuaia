@@ -77,6 +77,37 @@ JSONL rules:
 - malformed JSONL rows are source row errors and can be skipped with
   `errorPolicy.mode: skip-bad-records`.
 
+### document-directory
+
+```yaml
+source:
+  type: document-directory
+  path: data/docs
+```
+
+`source.type: document-directory` recursively reads local text documents and
+emits one row per supported file. It is intended for small local RAG ingestion
+inputs where relative source paths should be kept as metadata.
+
+Fields:
+
+- `type`: must be `document-directory`
+- `path`: local directory path. Relative paths are resolved from the YAML file
+  directory.
+
+Document-directory type rules:
+
+- supported files are `.txt`, `.md`, and `.markdown`,
+- unsupported files are ignored,
+- documents are processed in stable relative-path order,
+- output fields are fixed as `id LONG`, `path STRING`, and `content STRING`,
+- `id` is the 1-based sequence id in sorted document order,
+- `path` is the slash-separated relative path under `source.path`,
+- `content` is the UTF-8 file content.
+
+Directory sources do not use `format`, `query`, `url`, `userEnv`,
+`passwordEnv`, `fetchSize`, or `maxRowsPerSplit`.
+
 ### postgres
 
 ```yaml
@@ -843,6 +874,13 @@ docker compose -f docker-compose.qdrant.yml up -d
 bin/kuaia run -f examples/duckdb-csv-to-qdrant.yaml
 ```
 
+Run a local document directory through mock embedding into Qdrant:
+
+```bash
+docker compose -f docker-compose.qdrant.yml up -d
+bin/kuaia run -f examples/document-directory-to-qdrant.yaml
+```
+
 Run batch MySQL through mock embedding into Qdrant:
 
 ```bash
@@ -860,9 +898,9 @@ Use `validate` to check a pipeline without executing it:
 bin/kuaia validate -f examples/local-file-to-file.yaml
 ```
 
-For `source.type: file`, validation opens the source enough to infer the row
-type, builds the transform chain, and checks sink field compatibility. It does
-not write sink output or checkpoint state.
+For `source.type: file` and `source.type: document-directory`, validation opens
+the source enough to infer the row type, builds the transform chain, and checks
+sink field compatibility. It does not write sink output or checkpoint state.
 
 For `source.type: duckdb`, `source.type: postgres`, and `source.type: mysql`,
 validation parses the YAML and connector options without connecting to the
@@ -916,7 +954,7 @@ Common examples:
 - `Unsupported errorPolicy.mode: <value>`
 - `Unsupported transform.type: <value>`
 - `Unsupported transforms[0].provider: <value>`
-- `source.path is only supported for source.type: file`
+- `source.path is only supported for local source types`
 - `source.format is only supported for source.type: file`
 - `source.maxRowsPerSplit is only supported for source.type: file`
 - `source.url is only supported for JDBC source types`
@@ -958,6 +996,11 @@ Common examples:
 - `DuckDB source query failed: <message>`
 - `DuckDB source read failed: <message>`
 - `Invalid DuckDB row seq=<seq>: field <field> is null`
+- `Document directory not found: <path>`
+- `Document source path is not a directory: <path>`
+- `Document directory scan failed: <path>: <message>`
+- `Document directory has no supported documents: <path>`
+- `Document source read failed at <path>: <message>`
 - `Embedding request failed with status <code>: <response>`
 - `Embedding response did not contain an embedding vector`
 - `Embedding response returned <n> embeddings but expected <m>`

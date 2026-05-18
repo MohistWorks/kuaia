@@ -1,0 +1,21 @@
+name: document-directory-to-qdrant
+source:
+  type: document-directory
+  path: data/docs
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: qdrant
+  url: http://localhost:6333
+  collection: kuaia_document_directory_docs
+  idField: id
+  vectorField: embedding
+  payloadFields: [id, path, content]
+  wait: true
+  timeoutMs: 30000
+checkpoint:
+  stateDir: .kuaia/state/document-directory-to-qdrant

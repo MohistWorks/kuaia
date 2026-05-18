@@ -14,6 +14,9 @@ All notable public changes to Kuaia are tracked here.
   without always running the full e2e gate.
 - Added `source.type: duckdb` as a local DuckDB batch source for bounded SQL
   over files, plus a DuckDB-to-Qdrant example and e2e case.
+- Added `source.type: document-directory` as a local document-directory source
+  for `.txt`, `.md`, and `.markdown` inputs, plus a
+  document-directory-to-Qdrant example and e2e case.
 
 ### Changed
 

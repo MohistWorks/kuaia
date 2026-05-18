@@ -12,6 +12,7 @@ bin/kuaia help
 bin/kuaia examples
 bin/kuaia validate -f examples/local-file-to-file.yaml
 bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
+bin/kuaia validate -f examples/document-directory-to-qdrant.yaml
 bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml

@@ -9,6 +9,7 @@ import com.kuaia.engine.pipeline.LocalPipelineCheckpointStore;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.pipeline.PipelineRunSummary;
 import com.kuaia.engine.worker.connector.ConsoleSink;
+import com.kuaia.engine.worker.connector.DocumentDirectorySource;
 import com.kuaia.engine.worker.connector.FakeSource;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
@@ -280,6 +281,11 @@ public class LocalPipelineRunner {
         }
         if ("duckdb".equals(sourceType)) {
             return new LocalSourceAdapter(new DuckDBSource(config.getSource()), "duckdb-0");
+        }
+        if ("document-directory".equals(sourceType)) {
+            return new LocalSourceAdapter(
+                    new DocumentDirectorySource(Paths.get(config.getSource().getPath())),
+                    "document-directory-0");
         }
         throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
     }

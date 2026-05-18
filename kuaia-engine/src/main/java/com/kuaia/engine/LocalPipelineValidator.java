@@ -6,6 +6,7 @@ import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
+import com.kuaia.engine.worker.connector.DocumentDirectorySource;
 import com.kuaia.engine.worker.connector.FileSource;
 
 import java.io.PrintStream;
@@ -32,7 +33,7 @@ public class LocalPipelineValidator {
             return;
         }
 
-        KuaiaRowType sourceType = runStage(SOURCE_STAGE, () -> loadFileSourceType(config));
+        KuaiaRowType sourceType = runStage(SOURCE_STAGE, () -> loadSourceType(config));
         TransformPipeline transforms = runStage(TRANSFORM_STAGE, () -> TransformPipeline.from(
                 sourceType,
                 config.getTransforms(),
@@ -60,19 +61,28 @@ public class LocalPipelineValidator {
         return "postgres".equals(sourceType) || "mysql".equals(sourceType) || "duckdb".equals(sourceType);
     }
 
-    private KuaiaRowType loadFileSourceType(PipelineConfig config) throws Exception {
-        if (!"file".equals(config.getSource().getType())) {
-            throw new PipelineExecutionException("Unsupported source.type: " + config.getSource().getType());
+    private KuaiaRowType loadSourceType(PipelineConfig config) throws Exception {
+        if ("file".equals(config.getSource().getType())) {
+            FileSource source = new FileSource(
+                    Paths.get(config.getSource().getPath()),
+                    config.getSource().getFormat());
+            try {
+                source.open();
+                return source.getRowType();
+            } finally {
+                source.close();
+            }
         }
-        FileSource source = new FileSource(
-                Paths.get(config.getSource().getPath()),
-                config.getSource().getFormat());
-        try {
-            source.open();
-            return source.getRowType();
-        } finally {
-            source.close();
+        if ("document-directory".equals(config.getSource().getType())) {
+            DocumentDirectorySource source = new DocumentDirectorySource(Paths.get(config.getSource().getPath()));
+            try {
+                source.open();
+                return source.getRowType();
+            } finally {
+                source.close();
+            }
         }
+        throw new PipelineExecutionException("Unsupported source.type: " + config.getSource().getType());
     }
 
     private void validateSink(PipelineConfig config, KuaiaRowType rowType) throws PipelineExecutionException {
