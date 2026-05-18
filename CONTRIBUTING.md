@@ -18,6 +18,12 @@ Run the focused public MVP smoke before submitting user-facing changes:
 make public-mvp-smoke
 ```
 
+Run a focused connector e2e case while iterating on one connector:
+
+```bash
+make e2e CASE=mysql-qdrant
+```
+
 Run the full local gate before submitting runtime or connector changes:
 
 ```bash

@@ -9,6 +9,9 @@ All notable public changes to Kuaia are tracked here.
 - Added a Docker-backed connector e2e gate plus `make e2e` and
   `make release-gate` for file-to-Qdrant, Postgres-to-Qdrant, and
   MySQL-to-Qdrant release validation.
+- Added single-case connector e2e selection for `file-qdrant`,
+  `postgres-qdrant`, and `mysql-qdrant` so connector changes can be tested
+  without always running the full e2e gate.
 
 ### Changed
 

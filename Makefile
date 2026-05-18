@@ -1,6 +1,7 @@
 .PHONY: test run-local run-transform run-vector benchmark public-mvp-smoke e2e release-gate clean-state
 
 KUAIA ?= ./bin/kuaia
+CASE ?= all
 
 test:
 	mvn -q test
@@ -22,7 +23,7 @@ public-mvp-smoke:
 
 e2e:
 	mvn -q package
-	./scripts/connector-e2e-smoke.sh
+	./scripts/connector-e2e-smoke.sh $(CASE)
 
 release-gate:
 	./scripts/release-gate.sh
