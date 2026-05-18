@@ -48,9 +48,9 @@ Release-ready focus areas:
 ## 0.2.x Roadmap
 
 The `0.2.x` line should turn the connector-ready runtime into useful AI data
-pipeline coverage. The `0.2.1` scope shipped on 2026-05-18, and `0.2.2` is
-the current development focus. Follow-on bullets describe intended future
-scope, not already published versions.
+pipeline coverage. The `0.2.1` scope shipped on 2026-05-18, and the `0.2.2`
+scope is release-ready. Follow-on bullets describe intended future scope, not
+already published versions.
 
 `0.2.1` shipped scope:
 
@@ -62,7 +62,7 @@ scope, not already published versions.
 - Local document-directory source for `.txt`, `.md`, and `.markdown` inputs,
   including a document-directory-to-Qdrant example and e2e case.
 
-`0.2.2` current development scope:
+`0.2.2` release-ready scope:
 
 - `0.2.2`: add an S3-compatible object-storage source with MinIO-backed e2e
   coverage for common RAG ingestion inputs.
