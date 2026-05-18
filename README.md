@@ -95,6 +95,17 @@ This starts local Postgres, MySQL, and Qdrant services with Docker Compose,
 runs file-to-Qdrant, Postgres-to-Qdrant, and MySQL-to-Qdrant pipelines, checks
 run summaries, and tears the services down.
 
+To iterate on one connector path, pass a case name:
+
+```bash
+make e2e CASE=file-qdrant
+make e2e CASE=postgres-qdrant
+make e2e CASE=mysql-qdrant
+./scripts/connector-e2e-smoke.sh --list
+```
+
+Single-case runs only start the services needed by that path.
+
 ## Build A Packaged Runtime
 
 ```bash

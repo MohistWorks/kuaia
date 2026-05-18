@@ -95,6 +95,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("docker compose up --build"));
         assertTrue(read(root.resolve("README.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e"));
+        assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=mysql-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
         assertTrue(read(root.resolve("README.md")).contains("SECURITY.md"));
         assertTrue(Files.exists(root.resolve("SECURITY.md")), "SECURITY.md should exist");
@@ -134,6 +135,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("0.2.1-SNAPSHOT"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("connector e2e gate"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("make release-gate"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("single-case connector e2e"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.0 - 2026-05-17"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.3 - 2026-05-15"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.0 - 2026-05-11"));
@@ -145,6 +147,16 @@ class KuaiaPackagingTest {
                 "scripts/connector-e2e-smoke.sh should exist");
         assertTrue(Files.exists(root.resolve("scripts/release-gate.sh")),
                 "scripts/release-gate.sh should exist");
+        assertTrue(read(root.resolve("scripts/release-gate.sh")).contains("make e2e CASE=all"));
+        String e2eScript = read(root.resolve("scripts/connector-e2e-smoke.sh"));
+        assertTrue(e2eScript.contains("Available e2e cases"), e2eScript);
+        assertTrue(e2eScript.contains("file-qdrant"), e2eScript);
+        assertTrue(e2eScript.contains("postgres-qdrant"), e2eScript);
+        assertTrue(e2eScript.contains("mysql-qdrant"), e2eScript);
+        assertTrue(e2eScript.contains("--list"), e2eScript);
+        assertTrue(e2eScript.contains("--help"), e2eScript);
+        assertTrue(read(root.resolve("Makefile")).contains("CASE ?= all"));
+        assertTrue(read(root.resolve("Makefile")).contains("./scripts/connector-e2e-smoke.sh $(CASE)"));
         assertTrue(read(root.resolve("Makefile")).contains("e2e:"));
         assertTrue(read(root.resolve("Makefile")).contains("release-gate:"));
         assertTrue(Files.exists(root.resolve("docs/connector-development.md")),

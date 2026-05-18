@@ -10,14 +10,66 @@ WORK_DIR="$ROOT_DIR/.kuaia/connector-e2e-smoke/$RUN_ID"
 E2E_COMPOSE="$WORK_DIR/docker-compose.e2e.yml"
 QDRANT_URL=""
 
+list_cases() {
+  echo "Available e2e cases:"
+  echo "  all"
+  echo "  file-qdrant"
+  echo "  postgres-qdrant"
+  echo "  mysql-qdrant"
+}
+
+usage() {
+  echo "Usage: $0 [all|file-qdrant|postgres-qdrant|mysql-qdrant|--list|--help]"
+  echo
+  list_cases
+}
+
+if [ "$#" -gt 1 ]; then
+  usage >&2
+  exit 2
+fi
+
+case "${1:-${CASE:-all}}" in
+  --help|-h)
+    usage
+    exit 0
+    ;;
+  --list)
+    list_cases
+    exit 0
+    ;;
+  all|file-qdrant|postgres-qdrant|mysql-qdrant)
+    SELECTED_CASE=${1:-${CASE:-all}}
+    ;;
+  *)
+    echo "Unknown e2e case: ${1:-${CASE:-all}}" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
 compose() {
   docker compose -p "$COMPOSE_PROJECT" -f "$E2E_COMPOSE" "$@"
 }
 
 cleanup() {
   status=$?
-  compose down -v >/dev/null 2>&1 || true
+  if [ -f "$E2E_COMPOSE" ]; then
+    compose down -v >/dev/null 2>&1 || true
+  fi
   exit "$status"
+}
+
+case_selected() {
+  [ "$SELECTED_CASE" = "all" ] || [ "$SELECTED_CASE" = "$1" ]
+}
+
+needs_postgres() {
+  case_selected postgres-qdrant
+}
+
+needs_mysql() {
+  case_selected mysql-qdrant
 }
 
 wait_for_qdrant() {
@@ -132,17 +184,13 @@ require_qdrant_count() {
   esac
 }
 
-trap cleanup EXIT INT TERM
-
-mkdir -p "$WORK_DIR/data" "$WORK_DIR/state" "$WORK_DIR/summaries"
-cp "$ROOT_DIR/examples/data/articles.jsonl" "$WORK_DIR/data/articles.jsonl"
-
-FILE_TO_QDRANT="$WORK_DIR/local-jsonl-chunk-to-qdrant.yaml"
-POSTGRES_TO_QDRANT="$WORK_DIR/postgres-to-qdrant.yaml"
-MYSQL_TO_QDRANT="$WORK_DIR/mysql-to-qdrant.yaml"
-
-cat > "$E2E_COMPOSE" <<EOF
+write_compose_file() {
+  cat > "$E2E_COMPOSE" <<EOF
 services:
+EOF
+
+  if needs_postgres; then
+    cat >> "$E2E_COMPOSE" <<EOF
   postgres:
     image: postgres:16-alpine
     environment:
@@ -155,6 +203,11 @@ services:
       - "$ROOT_DIR/examples/postgres/init:/docker-entrypoint-initdb.d:ro"
       - postgres-data:/var/lib/postgresql/data
 
+EOF
+  fi
+
+  if needs_mysql; then
+    cat >> "$E2E_COMPOSE" <<EOF
   mysql:
     image: mysql:8.4
     environment:
@@ -167,6 +220,10 @@ services:
     volumes:
       - "$ROOT_DIR/examples/mysql/init:/docker-entrypoint-initdb.d:ro"
 
+EOF
+  fi
+
+  cat >> "$E2E_COMPOSE" <<EOF
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -175,15 +232,41 @@ services:
       - qdrant-data:/qdrant/storage
 
 volumes:
-  postgres-data:
-  qdrant-data:
 EOF
 
-echo "Starting connector e2e services with Compose project $COMPOSE_PROJECT..."
+  if needs_postgres; then
+    cat >> "$E2E_COMPOSE" <<EOF
+  postgres-data:
+EOF
+  fi
+
+  cat >> "$E2E_COMPOSE" <<EOF
+  qdrant-data:
+EOF
+}
+
+trap cleanup EXIT INT TERM
+
+mkdir -p "$WORK_DIR/data" "$WORK_DIR/state" "$WORK_DIR/summaries"
+cp "$ROOT_DIR/examples/data/articles.jsonl" "$WORK_DIR/data/articles.jsonl"
+
+FILE_TO_QDRANT="$WORK_DIR/local-jsonl-chunk-to-qdrant.yaml"
+POSTGRES_TO_QDRANT="$WORK_DIR/postgres-to-qdrant.yaml"
+MYSQL_TO_QDRANT="$WORK_DIR/mysql-to-qdrant.yaml"
+
+write_compose_file
+
+echo "Starting connector e2e case $SELECTED_CASE with Compose project $COMPOSE_PROJECT..."
 compose up -d
 
-POSTGRES_PORT=$(service_port postgres 5432)
-MYSQL_PORT=$(service_port mysql 3306)
+POSTGRES_PORT=""
+MYSQL_PORT=""
+if needs_postgres; then
+  POSTGRES_PORT=$(service_port postgres 5432)
+fi
+if needs_mysql; then
+  MYSQL_PORT=$(service_port mysql 3306)
+fi
 QDRANT_PORT=$(service_port qdrant 6333)
 QDRANT_URL="http://127.0.0.1:$QDRANT_PORT"
 
@@ -285,47 +368,63 @@ checkpoint:
 EOF
 
 wait_for_qdrant
-wait_for_postgres
-wait_for_mysql
+if needs_postgres; then
+  wait_for_postgres
+fi
+if needs_mysql; then
+  wait_for_mysql
+fi
 
-create_qdrant_collection kuaia_e2e_article_chunks
-create_qdrant_collection kuaia_e2e_pg_docs
-create_qdrant_collection kuaia_e2e_mysql_docs
+if case_selected file-qdrant; then
+  create_qdrant_collection kuaia_e2e_article_chunks
+fi
+if case_selected postgres-qdrant; then
+  create_qdrant_collection kuaia_e2e_pg_docs
+fi
+if case_selected mysql-qdrant; then
+  create_qdrant_collection kuaia_e2e_mysql_docs
+fi
 
-KUAIA_POSTGRES_USER=kuaia \
-KUAIA_POSTGRES_PASSWORD=kuaia \
-KUAIA_MYSQL_USER=kuaia \
-KUAIA_MYSQL_PASSWORD=kuaia \
-run_pipeline_with_summary \
-  connector-e2e-jsonl-chunk-to-qdrant \
-  "$FILE_TO_QDRANT" \
-  "$WORK_DIR/summaries/local-jsonl-chunk-to-qdrant.json" \
-  2 \
-  6
-require_qdrant_count kuaia_e2e_article_chunks 6
+if case_selected file-qdrant; then
+  KUAIA_POSTGRES_USER=kuaia \
+  KUAIA_POSTGRES_PASSWORD=kuaia \
+  KUAIA_MYSQL_USER=kuaia \
+  KUAIA_MYSQL_PASSWORD=kuaia \
+  run_pipeline_with_summary \
+    connector-e2e-jsonl-chunk-to-qdrant \
+    "$FILE_TO_QDRANT" \
+    "$WORK_DIR/summaries/local-jsonl-chunk-to-qdrant.json" \
+    2 \
+    6
+  require_qdrant_count kuaia_e2e_article_chunks 6
+fi
 
-KUAIA_POSTGRES_USER=kuaia \
-KUAIA_POSTGRES_PASSWORD=kuaia \
-KUAIA_MYSQL_USER=kuaia \
-KUAIA_MYSQL_PASSWORD=kuaia \
-run_pipeline_with_summary \
-  connector-e2e-postgres-to-qdrant \
-  "$POSTGRES_TO_QDRANT" \
-  "$WORK_DIR/summaries/postgres-to-qdrant.json" \
-  2 \
-  2
-require_qdrant_count kuaia_e2e_pg_docs 2
+if case_selected postgres-qdrant; then
+  KUAIA_POSTGRES_USER=kuaia \
+  KUAIA_POSTGRES_PASSWORD=kuaia \
+  KUAIA_MYSQL_USER=kuaia \
+  KUAIA_MYSQL_PASSWORD=kuaia \
+  run_pipeline_with_summary \
+    connector-e2e-postgres-to-qdrant \
+    "$POSTGRES_TO_QDRANT" \
+    "$WORK_DIR/summaries/postgres-to-qdrant.json" \
+    2 \
+    2
+  require_qdrant_count kuaia_e2e_pg_docs 2
+fi
 
-KUAIA_POSTGRES_USER=kuaia \
-KUAIA_POSTGRES_PASSWORD=kuaia \
-KUAIA_MYSQL_USER=kuaia \
-KUAIA_MYSQL_PASSWORD=kuaia \
-run_pipeline_with_summary \
-  connector-e2e-mysql-to-qdrant \
-  "$MYSQL_TO_QDRANT" \
-  "$WORK_DIR/summaries/mysql-to-qdrant.json" \
-  3 \
-  3
-require_qdrant_count kuaia_e2e_mysql_docs 3
+if case_selected mysql-qdrant; then
+  KUAIA_POSTGRES_USER=kuaia \
+  KUAIA_POSTGRES_PASSWORD=kuaia \
+  KUAIA_MYSQL_USER=kuaia \
+  KUAIA_MYSQL_PASSWORD=kuaia \
+  run_pipeline_with_summary \
+    connector-e2e-mysql-to-qdrant \
+    "$MYSQL_TO_QDRANT" \
+    "$WORK_DIR/summaries/mysql-to-qdrant.json" \
+    3 \
+    3
+  require_qdrant_count kuaia_e2e_mysql_docs 3
+fi
 
-echo "Connector e2e smoke passed. Work dir: $WORK_DIR"
+echo "Connector e2e case $SELECTED_CASE passed. Work dir: $WORK_DIR"

@@ -15,7 +15,7 @@ bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
-make e2e
+make e2e CASE=all
 docker compose config >/dev/null
 docker compose -f docker-compose.mysql.yml config >/dev/null
 git diff --check
