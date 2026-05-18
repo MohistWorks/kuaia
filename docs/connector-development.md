@@ -69,7 +69,8 @@ Current built-in sinks are:
 - `console`,
 - local CSV `file`,
 - `mock-vector`,
-- `qdrant`.
+- `qdrant`,
+- `pgvector`.
 
 Sinks implement `SinkWriter`:
 

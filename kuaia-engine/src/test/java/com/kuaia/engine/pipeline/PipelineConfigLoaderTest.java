@@ -1500,7 +1500,7 @@ class PipelineConfigLoaderTest {
                 PipelineConfigException.class,
                 () -> new PipelineConfigLoader().load(configPath));
 
-        assertEquals("sink.payloadFields is only supported for sink.type: qdrant", error.getMessage());
+        assertEquals("sink.payloadFields is only supported for sink.type: qdrant or pgvector", error.getMessage());
     }
 
     @Test
@@ -1546,7 +1546,7 @@ class PipelineConfigLoaderTest {
                 PipelineConfigException.class,
                 () -> new PipelineConfigLoader().load(configPath));
 
-        assertEquals("sink.timeoutMs is only supported for sink.type: qdrant", error.getMessage());
+        assertEquals("sink.timeoutMs is only supported for sink.type: qdrant or pgvector", error.getMessage());
     }
 
     @Test
@@ -1569,6 +1569,68 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("Missing required field: sink.collection", error.getMessage());
+    }
+
+    @Test
+    void loadsPgvectorSinkConfig() throws Exception {
+        Path configPath = tempDir.resolve("pgvector-sink.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: pgvector-sink",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "sink:",
+                "  type: pgvector",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  table: document_vectors",
+                "  userEnv: KUAIA_POSTGRES_USER",
+                "  passwordEnv: KUAIA_POSTGRES_PASSWORD",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  payloadFields: [content]",
+                "  timeoutMs: 12000").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("pgvector", config.getSink().getType());
+        assertEquals("jdbc:postgresql://localhost:5432/kuaia", config.getSink().getUrl());
+        assertEquals("document_vectors", config.getSink().getTable());
+        assertEquals("KUAIA_POSTGRES_USER", config.getSink().getUserEnv());
+        assertEquals("KUAIA_POSTGRES_PASSWORD", config.getSink().getPasswordEnv());
+        assertEquals("id", config.getSink().getIdField());
+        assertEquals("embedding", config.getSink().getVectorField());
+        assertEquals(java.util.Collections.singletonList("content"), config.getSink().getPayloadFields());
+        assertEquals(12000, config.getSink().getTimeoutMs());
+    }
+
+    @Test
+    void rejectsMissingPgvectorTable() throws Exception {
+        Path configPath = tempDir.resolve("missing-pgvector-table.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: missing-pgvector-table",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "sink:",
+                "  type: pgvector",
+                "  url: jdbc:postgresql://localhost:5432/kuaia",
+                "  userEnv: KUAIA_POSTGRES_USER",
+                "  passwordEnv: KUAIA_POSTGRES_PASSWORD",
+                "  idField: id",
+                "  vectorField: embedding").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Missing required field: sink.table", error.getMessage());
     }
 
     @Test

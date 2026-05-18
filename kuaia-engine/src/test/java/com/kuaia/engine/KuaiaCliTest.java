@@ -205,6 +205,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("FAQ import: kuaia run -f examples/local-faq-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("DuckDB to Qdrant: kuaia run -f examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(result.output.contains("Postgres to Qdrant: kuaia run -f examples/postgres-to-qdrant.yaml"));
+        assertTrue(result.output.contains("Postgres to pgvector: kuaia run -f examples/postgres-to-pgvector.yaml"));
         assertTrue(result.output.contains("MySQL to Qdrant: kuaia run -f examples/mysql-to-qdrant.yaml"));
         assertTrue(result.output.contains("External service examples:"));
         assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));
@@ -213,6 +214,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/document-directory-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/postgres-to-qdrant.yaml"));
+        assertTrue(result.output.contains("examples/postgres-to-pgvector.yaml"));
         assertTrue(result.output.contains("examples/mysql-to-qdrant.yaml"));
     }
 

@@ -54,7 +54,7 @@ public class PipelineConfigLoader {
         String sinkType = require(sink, "sink.type");
 
         requireSupported("source.type", sourceType, "file", "document-directory", "postgres", "mysql", "duckdb", "s3");
-        requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant");
+        requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant", "pgvector");
 
         PipelineConfig.SourceConfig sourceConfig = loadSource(path, sourceType, source);
         PipelineConfig.SinkConfig sinkConfig = loadSink(path, sinkType, sink);
@@ -474,8 +474,11 @@ public class PipelineConfigLoader {
         if ("qdrant".equals(sinkType)) {
             return loadQdrantSink(sink);
         }
+        if ("pgvector".equals(sinkType)) {
+            return loadPgvectorSink(sink);
+        }
         if (hasText(sink.get("timeoutMs"))) {
-            throw new PipelineConfigException("sink.timeoutMs is only supported for sink.type: qdrant");
+            throw new PipelineConfigException("sink.timeoutMs is only supported for sink.type: qdrant or pgvector");
         }
         if (hasText(sink.get("chunkIndexField"))) {
             throw new PipelineConfigException("sink.chunkIndexField is only supported for sink.type: qdrant");
@@ -484,7 +487,7 @@ public class PipelineConfigLoader {
             throw new PipelineConfigException("sink.chunkIdMultiplier is only supported for sink.type: qdrant");
         }
         if (hasText(sink.get("payloadFields"))) {
-            throw new PipelineConfigException("sink.payloadFields is only supported for sink.type: qdrant");
+            throw new PipelineConfigException("sink.payloadFields is only supported for sink.type: qdrant or pgvector");
         }
         if (!"file".equals(sinkType)) {
             return new PipelineConfig.SinkConfig(sinkType);
@@ -537,6 +540,30 @@ public class PipelineConfigLoader {
                 payloadFields);
     }
 
+    private PipelineConfig.SinkConfig loadPgvectorSink(Map<String, String> sink) throws PipelineConfigException {
+        String idField = require(sink, "sink.idField");
+        String vectorField = require(sink, "sink.vectorField");
+        List<String> payloadFields = parsePayloadFields(sink.get("payloadFields"), vectorField);
+        return new PipelineConfig.SinkConfig(
+                "pgvector",
+                null,
+                null,
+                null,
+                require(sink, "sink.url"),
+                null,
+                null,
+                idField,
+                vectorField,
+                true,
+                parseSinkTimeoutMs(sink.get("timeoutMs"), DEFAULT_QDRANT_TIMEOUT_MS),
+                null,
+                0L,
+                payloadFields,
+                require(sink, "sink.table"),
+                require(sink, "sink.userEnv"),
+                require(sink, "sink.passwordEnv"));
+    }
+
     private PipelineConfig.ErrorPolicyConfig loadErrorPolicy(Map<String, String> errorPolicy)
             throws PipelineConfigException {
         String mode = "fail-fast";
@@ -571,6 +598,10 @@ public class PipelineConfigLoader {
     }
 
     private List<String> parseQdrantPayloadFields(String value, String vectorField) throws PipelineConfigException {
+        return parsePayloadFields(value, vectorField);
+    }
+
+    private List<String> parsePayloadFields(String value, String vectorField) throws PipelineConfigException {
         if (value == null || value.trim().isEmpty()) {
             return new ArrayList<>();
         }

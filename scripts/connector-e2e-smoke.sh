@@ -18,11 +18,12 @@ list_cases() {
   echo "  duckdb-qdrant"
   echo "  s3-qdrant"
   echo "  postgres-qdrant"
+  echo "  postgres-pgvector"
   echo "  mysql-qdrant"
 }
 
 usage() {
-  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|postgres-qdrant|mysql-qdrant|--list|--help]"
+  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|postgres-qdrant|postgres-pgvector|mysql-qdrant|--list|--help]"
   echo
   list_cases
 }
@@ -41,7 +42,7 @@ case "${1:-${CASE:-all}}" in
     list_cases
     exit 0
     ;;
-  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|postgres-qdrant|mysql-qdrant)
+  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|postgres-qdrant|postgres-pgvector|mysql-qdrant)
     SELECTED_CASE=${1:-${CASE:-all}}
     ;;
   *)
@@ -68,7 +69,7 @@ case_selected() {
 }
 
 needs_postgres() {
-  case_selected postgres-qdrant
+  case_selected postgres-qdrant || case_selected postgres-pgvector
 }
 
 needs_mysql() {
@@ -226,6 +227,16 @@ require_qdrant_count() {
   esac
 }
 
+require_postgres_count() {
+  table=$1
+  expected=$2
+  actual=$(compose exec -T postgres psql -U kuaia -d kuaia -tAc "select count(*) from $table" | tr -d '[:space:]')
+  if [ "$actual" != "$expected" ]; then
+    echo "Expected Postgres table $table to contain $expected rows, got $actual." >&2
+    return 1
+  fi
+}
+
 write_compose_file() {
   cat > "$E2E_COMPOSE" <<EOF
 services:
@@ -234,7 +245,7 @@ EOF
   if needs_postgres; then
     cat >> "$E2E_COMPOSE" <<EOF
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: kuaia
       POSTGRES_USER: kuaia
@@ -321,6 +332,7 @@ DOCUMENT_DIRECTORY_TO_QDRANT="$WORK_DIR/document-directory-to-qdrant.yaml"
 DUCKDB_TO_QDRANT="$WORK_DIR/duckdb-csv-to-qdrant.yaml"
 S3_TO_QDRANT="$WORK_DIR/s3-docs-to-qdrant.yaml"
 POSTGRES_TO_QDRANT="$WORK_DIR/postgres-to-qdrant.yaml"
+POSTGRES_TO_PGVECTOR="$WORK_DIR/postgres-to-pgvector.yaml"
 MYSQL_TO_QDRANT="$WORK_DIR/mysql-to-qdrant.yaml"
 
 write_compose_file
@@ -491,6 +503,35 @@ checkpoint:
   stateDir: $WORK_DIR/state/postgres-to-qdrant
 EOF
 
+cat > "$POSTGRES_TO_PGVECTOR" <<EOF
+name: connector-e2e-postgres-to-pgvector
+source:
+  type: postgres
+  url: jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/kuaia
+  userEnv: KUAIA_POSTGRES_USER
+  passwordEnv: KUAIA_POSTGRES_PASSWORD
+  query: select id, content from documents order by id
+  fetchSize: 1000
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: pgvector
+  url: jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/kuaia
+  table: document_vectors
+  userEnv: KUAIA_POSTGRES_USER
+  passwordEnv: KUAIA_POSTGRES_PASSWORD
+  idField: id
+  vectorField: embedding
+  payloadFields: [content]
+  timeoutMs: 30000
+checkpoint:
+  stateDir: $WORK_DIR/state/postgres-to-pgvector
+EOF
+
 cat > "$MYSQL_TO_QDRANT" <<EOF
 name: connector-e2e-mysql-to-qdrant
 source:
@@ -608,6 +649,18 @@ if case_selected postgres-qdrant; then
     2 \
     2
   require_qdrant_count kuaia_e2e_pg_docs 2
+fi
+
+if case_selected postgres-pgvector; then
+  KUAIA_POSTGRES_USER=kuaia \
+  KUAIA_POSTGRES_PASSWORD=kuaia \
+  run_pipeline_with_summary \
+    connector-e2e-postgres-to-pgvector \
+    "$POSTGRES_TO_PGVECTOR" \
+    "$WORK_DIR/summaries/postgres-to-pgvector.json" \
+    2 \
+    2
+  require_postgres_count document_vectors 2
 fi
 
 if case_selected mysql-qdrant; then

@@ -310,7 +310,7 @@ public class LocalPipelineRunner {
         SinkWriter sink;
         if ("console".equals(sinkType)) {
             sink = new ConsoleSink(rowType, out);
-        } else if ("mock-vector".equals(sinkType) || "qdrant".equals(sinkType)) {
+        } else if ("mock-vector".equals(sinkType) || "qdrant".equals(sinkType) || "pgvector".equals(sinkType)) {
             sink = sinkFactories.create(sinkType, rowType, out, config.getSink());
         } else if ("file".equals(sinkType)) {
             sink = new FileSink(
