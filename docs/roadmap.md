@@ -48,10 +48,9 @@ Release-ready focus areas:
 ## 0.2.x Roadmap
 
 The `0.2.x` line should turn the connector-ready runtime into useful AI data
-pipeline coverage. The `0.2.1` scope shipped on 2026-05-18, the `0.2.2`
-scope shipped on 2026-05-18, and the `0.2.3` scope is release-ready.
-Follow-on bullets describe intended future scope, not already published
-versions.
+pipeline coverage. The `0.2.1` scope shipped on 2026-05-18 and the `0.2.2`
+scope shipped on 2026-05-18. The `0.2.3` scope remains open and is the final
+planned `0.2.x` release.
 
 `0.2.1` shipped scope:
 
@@ -68,17 +67,17 @@ versions.
 - `0.2.2`: add an S3-compatible object-storage source with MinIO-backed e2e
   coverage for common RAG ingestion inputs.
 
-`0.2.3` release-ready scope:
+`0.2.3` final `0.2.x` development scope:
 
-- `0.2.3`: add a pgvector sink for teams that use Postgres as both the source
-  database and vector store.
-
-Planned follow-on `0.2.x` focus areas:
-
-- `0.2.4`: add a Milvus vector sink after Qdrant and pgvector e2e coverage is
-  stable.
-- `0.2.5`: harden OpenAI-compatible embedding provider e2e coverage and add
-  connector contract tests for built-in source and sink implementations.
+- pgvector sink for teams that use Postgres as both the source database and
+  vector store.
+- Milvus vector sink with Docker-backed e2e coverage after Qdrant and pgvector
+  e2e coverage is stable.
+- OpenAI-compatible embedding provider e2e coverage using a local fake
+  embedding service instead of a real hosted provider.
+- Connector contract tests for built-in source and sink implementations.
+- Documentation and release-gate alignment for the final `0.2.x` connector
+  coverage.
 
 The intended AI connector coverage is:
 
@@ -120,11 +119,19 @@ bin/kuaia help
 bin/kuaia examples
 bin/kuaia validate -f examples/local-file-to-file.yaml
 bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
+bin/kuaia validate -f examples/document-directory-to-qdrant.yaml
+bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml
+bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
+bin/kuaia validate -f examples/postgres-to-pgvector.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
 make e2e
 docker compose config
+docker compose -f docker-compose.postgres.yml config
 docker compose -f docker-compose.mysql.yml config
 git diff --check
 ```
+
+After `0.2.3`, do not cut a new version until at least five public changes have
+landed since the previous release.

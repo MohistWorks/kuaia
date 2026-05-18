@@ -53,10 +53,12 @@ bin/kuaia validate -f examples/document-directory-to-qdrant.yaml
 bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml
 bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
+bin/kuaia validate -f examples/postgres-to-pgvector.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
 make e2e
 docker compose config
+docker compose -f docker-compose.postgres.yml config
 docker compose -f docker-compose.mysql.yml config
 git diff --check
 ```
@@ -68,9 +70,9 @@ git diff --check
 - [ ] GitHub Actions `CI` completes successfully on `main`.
 - [ ] CI includes `make release-gate`.
 - [ ] CI validates Maven tests, packaging, CLI help, local file preflight,
-  Qdrant preflight, S3/Postgres/MySQL config preflight, public smoke,
-  connector e2e, default Docker Compose config, and MySQL Docker Compose
-  config.
+  Qdrant preflight, S3/Postgres/MySQL/pgvector config preflight, public smoke,
+  connector e2e, default Docker Compose config, and Postgres/MySQL Docker
+  Compose config.
 
 ## Release Decision
 
@@ -80,6 +82,8 @@ Before tagging or announcing an MVP release:
 - [ ] Confirm the exact version name if tagging.
 - [ ] Confirm the target repository and branch.
 - [ ] Update `CHANGELOG.md` for the final public state.
+- [ ] After `0.2.3`, confirm the release contains at least five public changes
+  since the previous version.
 - [ ] After tagging a release, bump `main` to the next development version.
 - [ ] Re-run the local validation gate after the final commit.
 - [ ] Confirm the latest remote CI run is successful.

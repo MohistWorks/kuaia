@@ -24,7 +24,8 @@ Kuaia is useful when you want to:
   preserving object keys,
 - import small FAQ JSONL datasets while preserving question and answer fields,
 - generate mock or OpenAI-compatible embeddings,
-- write to console, local CSV or JSONL files, mock vector output, or Qdrant,
+- write to console, local CSV or JSONL files, mock vector output, Qdrant, or
+  pgvector,
 - resume local runs from checkpoint state,
 - run a local batch benchmark with split, checkpoint, embedding, and sink
   counters,
@@ -98,8 +99,8 @@ make e2e
 
 This starts local Postgres, MySQL, and Qdrant services with Docker Compose,
 runs file-to-Qdrant, document-directory-to-Qdrant, DuckDB-to-Qdrant,
-S3-to-Qdrant, Postgres-to-Qdrant, and MySQL-to-Qdrant pipelines, checks run
-summaries, and tears the services down.
+S3-to-Qdrant, Postgres-to-Qdrant, Postgres-to-pgvector, and MySQL-to-Qdrant
+pipelines, checks run summaries, and tears the services down.
 
 To iterate on one connector path, pass a case name:
 
