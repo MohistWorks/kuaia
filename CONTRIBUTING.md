@@ -10,6 +10,7 @@ Requirements:
 
 - JDK 8 or newer
 - Maven 3.8+
+- Docker with Compose support for connector e2e and release-gate checks
 
 Run the focused public MVP smoke before submitting user-facing changes:
 
@@ -20,10 +21,7 @@ make public-mvp-smoke
 Run the full local gate before submitting runtime or connector changes:
 
 ```bash
-mvn -q test
-mvn -q package
-make public-mvp-smoke
-git diff --check
+make release-gate
 ```
 
 ## Workflow
@@ -43,8 +41,9 @@ commands that were run.
 ## Current Scope
 
 The MVP supports local declarative batch pipelines, typed `BinaryRow` records,
-checkpointed execution, local CSV and batch Postgres sources, file/console/mock
-vector/Qdrant sinks, and a bounded Raft HA prototype for state-store validation.
+checkpointed execution, local CSV, JSONL, batch Postgres, and batch MySQL
+sources, file/console/mock-vector/Qdrant sinks, and a bounded Raft HA prototype
+for state-store validation.
 
 The project does not yet provide CDC, streaming DAG execution, production
 deployment packaging, a web UI, a connector marketplace, or exactly-once
@@ -61,6 +60,7 @@ changes should include:
   services,
 - documentation updates in [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md),
 - public MVP smoke coverage when the change affects default examples.
+- connector e2e coverage when the change touches external connector behavior.
 
 ## Security Reports
 

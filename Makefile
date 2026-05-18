@@ -1,4 +1,4 @@
-.PHONY: test run-local run-transform run-vector benchmark public-mvp-smoke clean-state
+.PHONY: test run-local run-transform run-vector benchmark public-mvp-smoke e2e release-gate clean-state
 
 KUAIA ?= ./bin/kuaia
 
@@ -19,6 +19,13 @@ benchmark:
 
 public-mvp-smoke:
 	./scripts/public-mvp-smoke.sh
+
+e2e:
+	mvn -q package
+	./scripts/connector-e2e-smoke.sh
+
+release-gate:
+	./scripts/release-gate.sh
 
 clean-state:
 	rm -rf .kuaia kuaia-engine/.kuaia

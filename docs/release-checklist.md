@@ -37,6 +37,12 @@ not create a tag by itself.
 Run from the repository root:
 
 ```bash
+make release-gate
+```
+
+The release-gate wrapper expands to:
+
+```bash
 mvn -q test
 mvn -q package
 bin/kuaia help
@@ -46,6 +52,7 @@ bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
+make e2e
 docker compose config
 docker compose -f docker-compose.mysql.yml config
 git diff --check
@@ -56,12 +63,11 @@ git diff --check
 - [ ] The protected `main` branch requires GitHub Actions `CI` to pass before
   pull requests can merge.
 - [ ] GitHub Actions `CI` completes successfully on `main`.
-- [ ] CI includes `mvn -q test`.
-- [ ] CI includes `mvn -q package`.
-- [ ] CI includes `make public-mvp-smoke`.
-- [ ] CI validates CLI help, local file preflight, Qdrant preflight, Postgres
-  and MySQL config preflight, default Docker Compose config, and MySQL Docker
-  Compose config.
+- [ ] CI includes `make release-gate`.
+- [ ] CI validates Maven tests, packaging, CLI help, local file preflight,
+  Qdrant preflight, Postgres and MySQL config preflight, public smoke,
+  connector e2e, default Docker Compose config, and MySQL Docker Compose
+  config.
 
 ## Release Decision
 
