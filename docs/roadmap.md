@@ -55,7 +55,7 @@ Planned `0.2.x` focus areas:
 
 - `0.2.1`: add a connector e2e gate and release-gate wrapper that prove the
   existing file, Postgres, MySQL, and Qdrant paths with real local or Docker
-  backed runs.
+  backed runs through `make e2e` and `make release-gate`.
 - `0.2.2`: add a DuckDB batch source for local SQL over files, including common
   CSV, JSON, and Parquet read paths exposed through DuckDB queries.
 - `0.2.3`: add local document-directory and S3-compatible object-storage
@@ -91,8 +91,14 @@ The following remain future work and should not block `0.2.0`:
 
 ## Release Criteria
 
-`0.2.0` is ready to tag when the connector-ready focus areas have shipped and
-the public validation gate passes:
+Each `0.2.x` release is ready to tag when its connector focus area has shipped
+and the public validation gate passes:
+
+```bash
+make release-gate
+```
+
+The release gate currently runs:
 
 ```bash
 mvn -q test
@@ -104,6 +110,7 @@ bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
+make e2e
 docker compose config
 docker compose -f docker-compose.mysql.yml config
 git diff --check

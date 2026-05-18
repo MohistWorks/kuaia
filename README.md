@@ -85,6 +85,16 @@ This smoke test runs file-to-file, quoted CSV, JSONL cleanup, mock-vector,
 FAQ import, and bad-record handling examples in an isolated local state
 directory.
 
+Run the Docker-backed connector e2e gate when changing connector behavior:
+
+```bash
+make e2e
+```
+
+This starts local Postgres, MySQL, and Qdrant services with Docker Compose,
+runs file-to-Qdrant, Postgres-to-Qdrant, and MySQL-to-Qdrant pipelines, checks
+run summaries, and tears the services down.
+
 ## Build A Packaged Runtime
 
 ```bash
@@ -102,6 +112,8 @@ Useful Make targets:
 ```bash
 make test
 make public-mvp-smoke
+make e2e
+make release-gate
 make run-vector
 make benchmark
 make clean-state
@@ -298,11 +310,22 @@ YAML paths outside the YAML directory or repository `.kuaia/`.
 Contributions should stay aligned with the current MVP scope and keep public
 user-facing documentation in `README.md` or `docs/`.
 
-Before submitting runtime or connector changes, run:
+Before submitting runtime or connector changes, run the release gate:
+
+```bash
+make release-gate
+```
+
+It includes Maven tests, packaging, CLI validation, public smoke coverage,
+Docker-backed connector e2e coverage, Compose config validation, and
+`git diff --check`.
+
+For a focused local check while iterating, run:
 
 ```bash
 mvn -q test
 mvn -q package
+make e2e
 make public-mvp-smoke
 git diff --check
 ```

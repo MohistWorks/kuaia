@@ -4,6 +4,12 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+### Added
+
+- Added a Docker-backed connector e2e gate plus `make e2e` and
+  `make release-gate` for file-to-Qdrant, Postgres-to-Qdrant, and
+  MySQL-to-Qdrant release validation.
+
 ### Changed
 
 - Main branch development version is now `0.2.1-SNAPSHOT` after the `v0.2.0`

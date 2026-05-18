@@ -93,6 +93,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("mvn -q package"));
         assertTrue(read(root.resolve("README.md")).contains("kuaia-engine/target/kuaia-engine-${VERSION}-cli.jar"));
         assertTrue(read(root.resolve("README.md")).contains("docker compose up --build"));
+        assertTrue(read(root.resolve("README.md")).contains("make release-gate"));
+        assertTrue(read(root.resolve("README.md")).contains("make e2e"));
         assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
         assertTrue(read(root.resolve("README.md")).contains("SECURITY.md"));
         assertTrue(Files.exists(root.resolve("SECURITY.md")), "SECURITY.md should exist");
@@ -118,6 +120,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("DuckDB batch source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("Milvus vector sink"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("connector e2e gate"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("Connector-ready runtime"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("MySQL batch source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("0.1.3 shipped"));
@@ -129,11 +132,21 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("CHANGELOG.md")), "CHANGELOG.md should exist");
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## Unreleased"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("0.2.1-SNAPSHOT"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("connector e2e gate"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.0 - 2026-05-17"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.3 - 2026-05-15"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.0 - 2026-05-11"));
         assertTrue(read(root.resolve("docs/release-checklist.md")).contains("CHANGELOG.md"));
+        assertTrue(read(root.resolve("docs/release-checklist.md")).contains("make release-gate"));
+        assertTrue(read(root.resolve("docs/release-checklist.md")).contains("make e2e"));
         assertTrue(read(root.resolve("docs/release-checklist.md")).contains("requires GitHub Actions `CI` to pass"));
+        assertTrue(Files.exists(root.resolve("scripts/connector-e2e-smoke.sh")),
+                "scripts/connector-e2e-smoke.sh should exist");
+        assertTrue(Files.exists(root.resolve("scripts/release-gate.sh")),
+                "scripts/release-gate.sh should exist");
+        assertTrue(read(root.resolve("Makefile")).contains("e2e:"));
+        assertTrue(read(root.resolve("Makefile")).contains("release-gate:"));
         assertTrue(Files.exists(root.resolve("docs/connector-development.md")),
                 "docs/connector-development.md should exist");
         assertTrue(Files.exists(root.resolve("docs/release-checklist.md")),
@@ -159,6 +172,7 @@ class KuaiaPackagingTest {
         assertTrue(enginePom.contains("<createDependencyReducedPom>false</createDependencyReducedPom>"), enginePom);
         assertTrue(enginePom.contains("<shadedArtifactAttached>true</shadedArtifactAttached>"), enginePom);
         assertTrue(enginePom.contains("<shadedClassifierName>cli</shadedClassifierName>"), enginePom);
+        assertTrue(enginePom.contains("ServicesResourceTransformer"), enginePom);
     }
 
     @Test
@@ -167,17 +181,7 @@ class KuaiaPackagingTest {
         String workflow = read(root.resolve(".github/workflows/ci.yml"));
 
         assertTrue(workflow.contains("workflow_dispatch:"), workflow);
-        assertTrue(workflow.contains("mvn -q test"), workflow);
-        assertTrue(workflow.contains("mvn -q package"), workflow);
-        assertTrue(workflow.contains("make public-mvp-smoke"), workflow);
-        assertTrue(workflow.contains("VERSION=$(sed -n"), workflow);
-        assertTrue(workflow.contains("java -jar \"kuaia-engine/target/kuaia-engine-${VERSION}-cli.jar\" help"), workflow);
-        assertTrue(workflow.contains("bin/kuaia help"), workflow);
-        assertTrue(workflow.contains("bin/kuaia validate -f examples/local-file-to-file.yaml"), workflow);
-        assertTrue(workflow.contains("bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml"), workflow);
-        assertTrue(workflow.contains("bin/kuaia validate -f examples/postgres-to-qdrant.yaml"), workflow);
-        assertTrue(workflow.contains("bin/kuaia validate -f examples/mysql-to-qdrant.yaml"), workflow);
-        assertTrue(workflow.contains("docker compose config"), workflow);
+        assertTrue(workflow.contains("make release-gate"), workflow);
     }
 
     private Path repoRoot() {
