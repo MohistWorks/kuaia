@@ -4,17 +4,12 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+## 0.2.2 - 2026-05-18
+
 ### Added
 
 - Added `source.type: s3` for S3-compatible object-storage document ingestion,
   plus an S3-to-Qdrant example and MinIO-backed connector e2e case.
-
-### Changed
-
-- Main branch development version is now `0.2.2-SNAPSHOT` after the
-  `v0.2.1` release.
-- The public roadmap now marks `0.2.1` as shipped and opens `0.2.2` for
-  S3-compatible object-storage source work with MinIO-backed e2e coverage.
 
 ## 0.2.1 - 2026-05-18
 

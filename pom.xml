@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.kuaia</groupId>
     <artifactId>kuaia-parent</artifactId>
-    <version>0.2.2-SNAPSHOT</version>
+    <version>0.2.2</version>
     <packaging>pom</packaging>
     <modules>
         <module>kuaia-common</module>
