@@ -109,6 +109,7 @@ make e2e CASE=document-directory-qdrant
 make e2e CASE=duckdb-qdrant
 make e2e CASE=s3-qdrant
 make e2e CASE=postgres-qdrant
+make e2e CASE=postgres-pgvector
 make e2e CASE=mysql-qdrant
 ./scripts/connector-e2e-smoke.sh --list
 ```
@@ -281,6 +282,19 @@ export KUAIA_POSTGRES_PASSWORD=kuaia
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
+Postgres-to-pgvector example:
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+export KUAIA_POSTGRES_USER=kuaia
+export KUAIA_POSTGRES_PASSWORD=kuaia
+bin/kuaia run -f examples/postgres-to-pgvector.yaml
+```
+
+The pgvector example writes into the pre-created `document_vectors` table from
+`examples/postgres/init/01-documents.sql`; Kuaia does not create target tables
+automatically.
+
 DuckDB-to-Qdrant example:
 
 ```bash
@@ -325,7 +339,7 @@ service requirements.
 | --- | --- |
 | Sources | `file` CSV and JSONL, `document-directory`, `s3`, batch `duckdb`, `postgres`, and `mysql` queries |
 | Transforms | `select`, `rename`, `trim`, `lowercase`, `replace`, `filter` (`not-empty`, `min-length`, `contains`, `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`, `greater-than-or-equal`, `less-than`, `less-than-or-equal`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
-| Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant` |
+| Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant`, `pgvector` |
 | Runtime | Linear batch pipeline, preflight validation, checkpoint resume, bad-record skip mode |
 | State | Local checkpoint state, in-memory and RocksDB state stores |
 | Extension points | Source, transform, sink, split reader, and batch writer boundaries |

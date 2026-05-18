@@ -560,6 +560,9 @@ public class PipelineConfig {
         private final String chunkIndexField;
         private final long chunkIdMultiplier;
         private final List<String> payloadFields;
+        private final String table;
+        private final String userEnv;
+        private final String passwordEnv;
 
         public SinkConfig(String type) {
             this(type, null, null, null);
@@ -567,7 +570,7 @@ public class PipelineConfig {
 
         public SinkConfig(String type, String path, String format, String mode) {
             this(type, path, format, mode, null, null, null, null, null, true, 0, null, 0L,
-                    Collections.emptyList());
+                    Collections.emptyList(), null, null, null);
         }
 
         public SinkConfig(
@@ -633,6 +636,28 @@ public class PipelineConfig {
                 String chunkIndexField,
                 long chunkIdMultiplier,
                 List<String> payloadFields) {
+            this(type, path, format, mode, url, collection, apiKeyEnv, idField, vectorField, wait, timeoutMs,
+                    chunkIndexField, chunkIdMultiplier, payloadFields, null, null, null);
+        }
+
+        public SinkConfig(
+                String type,
+                String path,
+                String format,
+                String mode,
+                String url,
+                String collection,
+                String apiKeyEnv,
+                String idField,
+                String vectorField,
+                boolean wait,
+                int timeoutMs,
+                String chunkIndexField,
+                long chunkIdMultiplier,
+                List<String> payloadFields,
+                String table,
+                String userEnv,
+                String passwordEnv) {
             if (timeoutMs < 0) {
                 throw new IllegalArgumentException("timeoutMs must not be negative");
             }
@@ -654,6 +679,9 @@ public class PipelineConfig {
             this.chunkIdMultiplier = chunkIdMultiplier;
             this.payloadFields = Collections.unmodifiableList(new ArrayList<>(
                     payloadFields == null ? Collections.emptyList() : payloadFields));
+            this.table = table;
+            this.userEnv = userEnv;
+            this.passwordEnv = passwordEnv;
         }
 
         public String getType() {
@@ -710,6 +738,18 @@ public class PipelineConfig {
 
         public List<String> getPayloadFields() {
             return payloadFields;
+        }
+
+        public String getTable() {
+            return table;
+        }
+
+        public String getUserEnv() {
+            return userEnv;
+        }
+
+        public String getPasswordEnv() {
+            return passwordEnv;
         }
     }
 

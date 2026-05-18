@@ -1,0 +1,25 @@
+name: postgres-to-pgvector
+source:
+  type: postgres
+  url: jdbc:postgresql://localhost:5432/kuaia
+  userEnv: KUAIA_POSTGRES_USER
+  passwordEnv: KUAIA_POSTGRES_PASSWORD
+  query: select id, content from documents order by id
+  fetchSize: 1000
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+sink:
+  type: pgvector
+  url: jdbc:postgresql://localhost:5432/kuaia
+  table: document_vectors
+  userEnv: KUAIA_POSTGRES_USER
+  passwordEnv: KUAIA_POSTGRES_PASSWORD
+  idField: id
+  vectorField: embedding
+  payloadFields: [content]
+  timeoutMs: 30000
+checkpoint:
+  stateDir: .kuaia/state/postgres-to-pgvector

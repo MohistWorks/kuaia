@@ -68,7 +68,8 @@ Supported sinks:
 - `console`,
 - local CSV or JSONL `file`,
 - `mock-vector`,
-- Qdrant vector upserts.
+- Qdrant vector upserts,
+- pgvector JDBC batch upserts into pre-created PostgreSQL tables.
 
 Supported runtime behavior:
 

@@ -106,6 +106,10 @@ public class LocalPipelineValidator {
             validateQdrantSink(config, rowType);
             return;
         }
+        if ("pgvector".equals(sinkType)) {
+            validatePgvectorSink(config, rowType);
+            return;
+        }
         throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
     }
 
@@ -139,6 +143,45 @@ public class LocalPipelineValidator {
             if (type != DataType.LONG && type != DataType.STRING) {
                 throw new PipelineExecutionException("Qdrant sink does not support payload field type: " + type.name());
             }
+        }
+    }
+
+    private void validatePgvectorSink(PipelineConfig config, KuaiaRowType rowType) throws PipelineExecutionException {
+        int vectorOrdinal = requireField(
+                rowType,
+                config.getSink().getVectorField(),
+                DataType.VECTOR,
+                "Pgvector sink");
+        int idOrdinal = requireField(rowType, config.getSink().getIdField(), DataType.LONG, "Pgvector sink");
+        if (config.getSink().getPayloadFields().isEmpty()) {
+            for (int i = 0; i < rowType.getFieldNames().length; i++) {
+                if (i != idOrdinal && i != vectorOrdinal) {
+                    validatePgvectorPayloadField(rowType, i);
+                }
+            }
+            return;
+        }
+        for (String payloadField : config.getSink().getPayloadFields()) {
+            int ordinal = rowType.getIndex(payloadField);
+            if (ordinal < 0) {
+                throw new PipelineExecutionException("Pgvector sink requires payload field: " + payloadField);
+            }
+            if (ordinal == idOrdinal) {
+                throw new PipelineExecutionException("Pgvector payload field must not be the id field: " + payloadField);
+            }
+            if (ordinal == vectorOrdinal) {
+                throw new PipelineExecutionException(
+                        "Pgvector payload field must not be the vector field: " + payloadField);
+            }
+            validatePgvectorPayloadField(rowType, ordinal);
+        }
+    }
+
+    private void validatePgvectorPayloadField(KuaiaRowType rowType, int ordinal) throws PipelineExecutionException {
+        DataType type = rowType.getFieldTypes()[ordinal];
+        if (type != DataType.LONG && type != DataType.STRING) {
+            throw new PipelineExecutionException(
+                    "Pgvector sink does not support payload field type: " + type.name());
         }
     }
 

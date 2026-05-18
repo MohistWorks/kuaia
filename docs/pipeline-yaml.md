@@ -634,9 +634,9 @@ Rules:
 - output row type must include `embedding` as `VECTOR`.
 
 Implementation note: `mock-vector` is backed by Kuaia's local mock vector sink
-factory. The sink factory registry is an internal extension point for future
-vector database integrations. Use `qdrant` for the current real vector database
-sink.
+factory. The sink factory registry is an internal extension point for vector
+database integrations. Use `qdrant` or `pgvector` for current real vector
+database sinks.
 
 ### qdrant
 
@@ -700,6 +700,58 @@ When `apiKeyEnv` is configured, Kuaia reads that environment variable at runtime
 and sends it as Qdrant's `api-key` header. Missing API keys, missing id/vector
 fields, non-2xx Qdrant responses, and 2xx responses whose JSON `status` is not
 `ok` are fatal sink errors.
+
+### pgvector
+
+```yaml
+sink:
+  type: pgvector
+  url: jdbc:postgresql://localhost:5432/kuaia
+  table: document_vectors
+  userEnv: KUAIA_POSTGRES_USER
+  passwordEnv: KUAIA_POSTGRES_PASSWORD
+  idField: id
+  vectorField: embedding
+  payloadFields: [content]
+  timeoutMs: 30000
+```
+
+`sink.type: pgvector` writes vectors to a pre-created PostgreSQL table that has
+a pgvector `vector` column. Kuaia writes rows with JDBC batch upserts using
+`INSERT ... ON CONFLICT (id) DO UPDATE`.
+
+Fields:
+
+- `type`: must be `pgvector`
+- `url`: PostgreSQL JDBC URL
+- `table`: target table name, optionally schema-qualified
+- `userEnv`: environment variable containing the database user
+- `passwordEnv`: environment variable containing the database password
+- `idField`: `LONG` field used as the table primary key column
+- `vectorField`: `VECTOR` field written to the pgvector column
+- `payloadFields`: optional list of `LONG` or `STRING` fields to write as
+  additional table columns; when omitted, all non-id and non-vector fields are
+  included
+- `timeoutMs`: optional JDBC connect/socket timeout in milliseconds. Defaults
+  to `30000` and must be a positive integer when configured.
+
+Kuaia does not create pgvector tables automatically. Create the target table
+before running `examples/postgres-to-pgvector.yaml`:
+
+```sql
+create extension if not exists vector;
+
+create table if not exists document_vectors (
+  id bigint primary key,
+  content text not null,
+  embedding vector(4) not null
+);
+```
+
+The id field and vector field cannot be included in `payloadFields`, since they
+are already written as dedicated columns. Missing credential environment
+variables, missing id/vector/payload fields, unsupported payload field types, and
+JDBC write failures are fatal sink errors.
 
 ## Error Policy
 
@@ -910,6 +962,15 @@ export KUAIA_POSTGRES_PASSWORD=kuaia
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
+Run batch Postgres through mock embedding into pgvector:
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+export KUAIA_POSTGRES_USER=kuaia
+export KUAIA_POSTGRES_PASSWORD=kuaia
+bin/kuaia run -f examples/postgres-to-pgvector.yaml
+```
+
 Run local DuckDB SQL over CSV through mock embedding into Qdrant:
 
 ```bash
@@ -1011,8 +1072,8 @@ Common examples:
 - `source.url for source.type mysql must start with jdbc:mysql:`
 - `source.url for source.type duckdb must start with jdbc:duckdb:`
 - `Invalid source.fetchSize: <value>`
-- `sink.timeoutMs is only supported for sink.type: qdrant`
-- `sink.payloadFields is only supported for sink.type: qdrant`
+- `sink.timeoutMs is only supported for sink.type: qdrant or pgvector`
+- `sink.payloadFields is only supported for sink.type: qdrant or pgvector`
 - `sink.payloadFields must not include sink.vectorField: <field>`
 - `Duplicate value in sink.payloadFields: <field>`
 - `Invalid sink.timeoutMs: <value>`

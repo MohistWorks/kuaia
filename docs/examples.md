@@ -35,7 +35,7 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 - fatal malformed CSV diagnostics with a stable `Source stage failed:` prefix.
 
 After that, run individual examples below when you want to inspect one pipeline
-at a time. Qdrant, Postgres, MySQL, document-directory-to-Qdrant,
+at a time. Qdrant, pgvector, Postgres, MySQL, document-directory-to-Qdrant,
 DuckDB-to-Qdrant, S3-to-Qdrant, and OpenAI-compatible examples require external
 services or credentials and are not part of the default smoke.
 
@@ -70,6 +70,13 @@ bin/kuaia run -f examples/duckdb-csv-to-qdrant.yaml
 bin/kuaia run -f examples/s3-docs-to-qdrant.yaml
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 bin/kuaia run -f examples/mysql-to-qdrant.yaml
+```
+
+For a Postgres-only vector-store path, start Postgres with pgvector support and
+run:
+
+```bash
+bin/kuaia run -f examples/postgres-to-pgvector.yaml
 ```
 
 ## Local File To Console
@@ -382,6 +389,29 @@ The example reads rows from the `documents` table initialized by
 embeddings, and upserts points into Qdrant collection `kuaia_pg_docs` with
 `payloadFields: [id, content]`. It is not part of default automated tests
 because it requires running Postgres and Qdrant services.
+
+## Postgres To pgvector
+
+Start Postgres with pgvector support:
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+```
+
+Run the batch Postgres-to-pgvector pipeline:
+
+```bash
+export KUAIA_POSTGRES_USER=kuaia
+export KUAIA_POSTGRES_PASSWORD=kuaia
+bin/kuaia run -f examples/postgres-to-pgvector.yaml
+```
+
+The example reads rows from the `documents` table initialized by
+`examples/postgres/init/01-documents.sql`, creates deterministic mock
+embeddings, and upserts rows into the pre-created `document_vectors` table with
+`payloadFields: [content]`. Kuaia does not create pgvector tables
+automatically. For an automated local proof, run
+`make e2e CASE=postgres-pgvector`.
 
 ## MySQL To Qdrant
 

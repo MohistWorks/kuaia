@@ -21,6 +21,7 @@ public class SinkFactoryRegistry {
         Map<String, VectorSinkFactory> factories = new HashMap<>();
         factories.put("mock-vector", new MockVectorSinkFactory());
         factories.put("qdrant", new QdrantVectorSinkFactory());
+        factories.put("pgvector", new PgvectorVectorSinkFactory());
         return new SinkFactoryRegistry(factories);
     }
 

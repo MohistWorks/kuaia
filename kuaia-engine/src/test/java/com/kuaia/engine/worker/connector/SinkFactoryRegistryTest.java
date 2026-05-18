@@ -75,4 +75,37 @@ class SinkFactoryRegistryTest {
 
         assertTrue(sink instanceof QdrantVectorSink);
     }
+
+    @Test
+    void defaultRegistryCreatesPgvectorSink() throws Exception {
+        KuaiaRowType rowType = new KuaiaRowType(
+                new String[]{"id", "content", "embedding"},
+                new DataType[]{DataType.LONG, DataType.STRING, DataType.VECTOR});
+        PipelineConfig.SinkConfig config = new PipelineConfig.SinkConfig(
+                "pgvector",
+                null,
+                null,
+                null,
+                "jdbc:postgresql://localhost:5432/kuaia",
+                null,
+                null,
+                "id",
+                "embedding",
+                true,
+                0,
+                null,
+                0L,
+                java.util.Collections.singletonList("content"),
+                "document_vectors",
+                "KUAIA_POSTGRES_USER",
+                "KUAIA_POSTGRES_PASSWORD");
+
+        SinkWriter sink = SinkFactoryRegistry.defaultRegistry().create(
+                "pgvector",
+                rowType,
+                System.out,
+                config);
+
+        assertTrue(sink instanceof PgvectorVectorSink);
+    }
 }

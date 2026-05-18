@@ -4,6 +4,11 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+### Added
+
+- Added `sink.type: pgvector` for JDBC batch upserts into pre-created
+  PostgreSQL pgvector tables, plus a Postgres-to-pgvector example and e2e case.
+
 ### Changed
 
 - Main branch development version is now `0.2.3-SNAPSHOT` after the `v0.2.2`
