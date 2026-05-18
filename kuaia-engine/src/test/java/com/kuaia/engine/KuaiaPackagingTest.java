@@ -12,6 +12,7 @@ import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KuaiaPackagingTest {
@@ -125,8 +126,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.2.0 release-ready"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.2.x Roadmap"));
-        assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.1` release candidate scope"));
-        assertTrue(read(root.resolve("docs/roadmap.md")).contains("only `v0.2.0` has been released"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.1` release-ready scope"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("The `0.2.1` scope is release-ready"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("DuckDB batch source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("document-directory source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("S3-compatible object-storage source"));
@@ -143,13 +144,14 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/README.md")).contains("../CHANGELOG.md"));
         assertTrue(Files.exists(root.resolve("CHANGELOG.md")), "CHANGELOG.md should exist");
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## Unreleased"));
-        assertTrue(read(root.resolve("CHANGELOG.md")).contains("0.2.1-SNAPSHOT"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.1 - 2026-05-18"));
+        assertFalse(read(root.resolve("CHANGELOG.md")).contains("0.2.1-SNAPSHOT"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("connector e2e gate"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("single-case connector e2e"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("DuckDB batch source"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("document-directory source"));
-        assertTrue(read(root.resolve("CHANGELOG.md")).contains("0.2.1` release-candidate"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.1 - 2026-05-18"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.0 - 2026-05-17"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.3 - 2026-05-15"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.0 - 2026-05-11"));
@@ -202,9 +204,9 @@ class KuaiaPackagingTest {
                 .contains("bin/kuaia validate -f examples/document-directory-to-qdrant.yaml"));
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
-        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.1-SNAPSHOT</version>"));
-        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.1-SNAPSHOT</version>"));
-        assertTrue(enginePom.contains("<version>0.2.1-SNAPSHOT</version>"), enginePom);
+        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.1</version>"));
+        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.1</version>"));
+        assertTrue(enginePom.contains("<version>0.2.1</version>"), enginePom);
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);
         assertTrue(enginePom.contains("mysql-connector-j"), enginePom);
         assertTrue(enginePom.contains("duckdb_jdbc"), enginePom);

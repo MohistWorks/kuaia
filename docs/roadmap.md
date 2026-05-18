@@ -48,11 +48,10 @@ Release-ready focus areas:
 ## 0.2.x Roadmap
 
 The `0.2.x` line should turn the connector-ready runtime into useful AI data
-pipeline coverage. The current development line is still `0.2.1-SNAPSHOT`;
-only `v0.2.0` has been released. Roadmap bullets describe intended release
-scope, not already published versions.
+pipeline coverage. The `0.2.1` scope is release-ready; follow-on bullets
+describe intended future scope, not already published versions.
 
-`0.2.1` release candidate scope:
+`0.2.1` release-ready scope:
 
 - Connector e2e gate and release-gate wrapper that prove file, Postgres, MySQL,
   DuckDB, document-directory, and Qdrant paths with real local or Docker-backed
