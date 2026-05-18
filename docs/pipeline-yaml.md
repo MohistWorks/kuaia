@@ -149,6 +149,46 @@ Credentials are read from the environment at runtime and are never stored in
 YAML. Query failures and missing credential environment variables are fatal
 source errors.
 
+### duckdb
+
+```yaml
+source:
+  type: duckdb
+  query: select id, content from read_csv_auto('examples/data/documents.csv') order by id
+  fetchSize: 1000
+```
+
+`source.type: duckdb` runs one bounded DuckDB SQL query in an in-process DuckDB
+database. It is intended for local SQL over files, including CSV, JSON, and
+Parquet paths that DuckDB can read from SQL.
+
+Fields:
+
+- `type`: must be `duckdb`
+- `query`: SQL query to execute
+- `url`: optional DuckDB JDBC URL. Defaults to `jdbc:duckdb:` for an in-memory
+  database and must start with `jdbc:duckdb:` when configured.
+- `fetchSize`: optional JDBC fetch size. Defaults to driver behavior and must
+  be a positive integer when configured.
+
+DuckDB query examples:
+
+```sql
+select id, content from read_csv_auto('examples/data/documents.csv') order by id
+select id, content from read_json_auto('examples/data/documents.jsonl') order by id
+select id, content from read_parquet('target/data/documents.parquet') order by id
+```
+
+DuckDB type rules:
+
+- integer-like columns are exposed as `LONG`,
+- all other columns are exposed as `STRING`,
+- result rows use 1-based source sequence ids in query order,
+- checkpoint reruns skip result rows at or before the last checkpoint sequence.
+
+DuckDB sources do not use `userEnv` or `passwordEnv`. Query failures are fatal
+source errors.
+
 ## Transforms
 
 Transforms are optional and run in YAML order. The pipeline is linear, not a DAG.
@@ -796,6 +836,13 @@ export KUAIA_POSTGRES_PASSWORD=kuaia
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
+Run local DuckDB SQL over CSV through mock embedding into Qdrant:
+
+```bash
+docker compose -f docker-compose.qdrant.yml up -d
+bin/kuaia run -f examples/duckdb-csv-to-qdrant.yaml
+```
+
 Run batch MySQL through mock embedding into Qdrant:
 
 ```bash
@@ -817,10 +864,10 @@ For `source.type: file`, validation opens the source enough to infer the row
 type, builds the transform chain, and checks sink field compatibility. It does
 not write sink output or checkpoint state.
 
-For `source.type: postgres` and `source.type: mysql`, validation parses the
-YAML and connector options without connecting to the database. Because the row
-type comes from JDBC result metadata, transform and sink row-type checks are
-deferred until `run`.
+For `source.type: duckdb`, `source.type: postgres`, and `source.type: mysql`,
+validation parses the YAML and connector options without connecting to the
+source. Because the row type comes from query result metadata, transform and
+sink row-type checks are deferred until `run`.
 
 ## Benchmark Smoke
 
@@ -875,10 +922,13 @@ Common examples:
 - `source.url is only supported for JDBC source types`
 - `source.userEnv is only supported for JDBC source types`
 - `source.passwordEnv is only supported for JDBC source types`
+- `source.userEnv is not supported for source.type: duckdb`
+- `source.passwordEnv is not supported for source.type: duckdb`
 - `source.query is only supported for JDBC source types`
 - `source.fetchSize is only supported for JDBC source types`
 - `source.url for source.type postgres must start with jdbc:postgresql:`
 - `source.url for source.type mysql must start with jdbc:mysql:`
+- `source.url for source.type duckdb must start with jdbc:duckdb:`
 - `Invalid source.fetchSize: <value>`
 - `sink.timeoutMs is only supported for sink.type: qdrant`
 - `sink.payloadFields is only supported for sink.type: qdrant`
@@ -905,6 +955,9 @@ Common examples:
 - `MySQL source query failed: <message>`
 - `MySQL source read failed: <message>`
 - `Invalid MySQL row seq=<seq>: field <field> is null`
+- `DuckDB source query failed: <message>`
+- `DuckDB source read failed: <message>`
+- `Invalid DuckDB row seq=<seq>: field <field> is null`
 - `Embedding request failed with status <code>: <response>`
 - `Embedding response did not contain an embedding vector`
 - `Embedding response returned <n> embeddings but expected <m>`

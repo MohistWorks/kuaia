@@ -21,6 +21,7 @@ class JdbcQuerySource implements LocalSource {
     private final String sourceName;
     private final String user;
     private final String password;
+    private final boolean credentialsRequired;
 
     private Connection connection;
     private PreparedStatement statement;
@@ -29,19 +30,33 @@ class JdbcQuerySource implements LocalSource {
 
     JdbcQuerySource(PipelineConfig.SourceConfig config, Map<String, String> environment, String sourceName)
             throws PipelineExecutionException {
+        this(config, environment, sourceName, true);
+    }
+
+    JdbcQuerySource(
+            PipelineConfig.SourceConfig config,
+            Map<String, String> environment,
+            String sourceName,
+            boolean credentialsRequired)
+            throws PipelineExecutionException {
         this.config = config;
         this.sourceName = sourceName;
-        this.user = requireEnv(config.getUserEnv(), environment);
-        this.password = requireEnv(config.getPasswordEnv(), environment);
+        this.credentialsRequired = credentialsRequired;
+        this.user = credentialsRequired ? requireEnv(config.getUserEnv(), environment) : null;
+        this.password = credentialsRequired ? requireEnv(config.getPasswordEnv(), environment) : null;
     }
 
     @Override
     public void open() throws PipelineExecutionException {
         try {
             Properties properties = new Properties();
-            properties.setProperty("user", user);
-            properties.setProperty("password", password);
-            connection = DriverManager.getConnection(config.getUrl(), properties);
+            if (credentialsRequired) {
+                properties.setProperty("user", user);
+                properties.setProperty("password", password);
+                connection = DriverManager.getConnection(config.getUrl(), properties);
+            } else {
+                connection = DriverManager.getConnection(config.getUrl());
+            }
             statement = connection.prepareStatement(config.getQuery());
             if (config.getFetchSize() > 0) {
                 statement.setFetchSize(config.getFetchSize());

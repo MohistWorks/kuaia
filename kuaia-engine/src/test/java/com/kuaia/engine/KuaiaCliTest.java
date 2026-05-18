@@ -135,6 +135,25 @@ class KuaiaCliTest {
     }
 
     @Test
+    void validateDoesNotConnectToDuckdb() throws Exception {
+        Path config = tempDir.resolve("validate-duckdb.yaml");
+        Files.write(config, String.join("\n",
+                "name: validate-duckdb",
+                "source:",
+                "  type: duckdb",
+                "  query: SELECT id, content FROM read_csv_auto('missing.csv')",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("validate", "-f", config.toString());
+
+        assertEquals(0, result.exitCode);
+        assertTrue(result.output.contains("Pipeline valid: validate-duckdb"));
+        assertTrue(result.output.contains("Source: duckdb fields=deferred"));
+        assertTrue(result.output.contains("Transform and sink row-type checks deferred for source.type: duckdb"));
+    }
+
+    @Test
     void validateRejectsMysqlSourceWithPostgresJdbcUrl() throws Exception {
         Path config = tempDir.resolve("validate-mysql-url-mismatch.yaml");
         Files.write(config, String.join("\n",
@@ -183,12 +202,14 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/local-file-skip-bad-records.yaml"));
         assertTrue(result.output.contains("Common RAG flows:"));
         assertTrue(result.output.contains("FAQ import: kuaia run -f examples/local-faq-jsonl-to-vector.yaml"));
+        assertTrue(result.output.contains("DuckDB to Qdrant: kuaia run -f examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(result.output.contains("Postgres to Qdrant: kuaia run -f examples/postgres-to-qdrant.yaml"));
         assertTrue(result.output.contains("MySQL to Qdrant: kuaia run -f examples/mysql-to-qdrant.yaml"));
         assertTrue(result.output.contains("External service examples:"));
         assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-chunk-to-qdrant.yaml"));
+        assertTrue(result.output.contains("examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/postgres-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/mysql-to-qdrant.yaml"));
     }
@@ -362,6 +383,40 @@ class KuaiaCliTest {
                         "id,name",
                         "1,Alice",
                         "2,Bob"),
+                String.join("\n", Files.readAllLines(output, StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void runReadsDuckdbCsvQueryToFile() throws Exception {
+        Path data = tempDir.resolve("duckdb-documents.csv");
+        Files.write(data, String.join("\n",
+                "id,content",
+                "1,Alpha",
+                "2,Beta").getBytes(StandardCharsets.UTF_8));
+        Path output = tempDir.resolve("out/duckdb-documents.csv");
+        Path config = tempDir.resolve("duckdb-to-file.yaml");
+        Files.write(config, String.join("\n",
+                "name: duckdb-to-file",
+                "source:",
+                "  type: duckdb",
+                "  query: select id, content from read_csv_auto('" + sqlString(data) + "') order by id",
+                "sink:",
+                "  type: file",
+                "  path: " + output,
+                "  format: csv",
+                "  mode: overwrite").getBytes(StandardCharsets.UTF_8));
+
+        CliResult result = run("run", "-f", config.toString());
+
+        assertEquals(0, result.exitCode, result.output);
+        assertTrue(result.output.contains("Starting pipeline: duckdb-to-file"));
+        assertTrue(result.output.contains("Pipeline Finished. rows=2"));
+        assertTrue(result.output.contains(
+                "Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED sourceSplits=1 sinkBatches=2 durationMs="));
+        assertEquals(String.join("\n",
+                        "id,content",
+                        "1,Alpha",
+                        "2,Beta"),
                 String.join("\n", Files.readAllLines(output, StandardCharsets.UTF_8)));
     }
 
@@ -1055,6 +1110,10 @@ class KuaiaCliTest {
                 "checkpoint:",
                 "  stateDir: " + stateDir).getBytes(StandardCharsets.UTF_8));
         return config;
+    }
+
+    private String sqlString(Path path) {
+        return path.toAbsolutePath().normalize().toString().replace("'", "''");
     }
 
     private Path writePipelineConfigWithoutCheckpoint(String name, Path data) throws Exception {

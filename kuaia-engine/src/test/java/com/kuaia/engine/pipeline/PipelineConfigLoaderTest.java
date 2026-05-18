@@ -1620,6 +1620,50 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsDuckdbSourceConfig() throws Exception {
+        Path configPath = tempDir.resolve("duckdb-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: duckdb-source",
+                "source:",
+                "  type: duckdb",
+                "  query: select id, content from read_csv_auto('data/documents.csv') order by id",
+                "  fetchSize: 128",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("duckdb", config.getSource().getType());
+        assertEquals("jdbc:duckdb:", config.getSource().getUrl());
+        assertEquals("select id, content from read_csv_auto('data/documents.csv') order by id",
+                config.getSource().getQuery());
+        assertEquals(128, config.getSource().getFetchSize());
+    }
+
+    @Test
+    void rejectsDuckdbCredentials() throws Exception {
+        Path configPath = tempDir.resolve("duckdb-credentials.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: duckdb-credentials",
+                "source:",
+                "  type: duckdb",
+                "  userEnv: KUAIA_DUCKDB_USER",
+                "  query: select 1 as id",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.userEnv is not supported for source.type: duckdb", error.getMessage());
+    }
+
+    @Test
     void rejectsMysqlSourceWithNonMysqlJdbcUrl() throws Exception {
         Path configPath = tempDir.resolve("mysql-with-postgres-url.yaml");
         Files.write(configPath, String.join("\n",

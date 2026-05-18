@@ -13,7 +13,7 @@ currently an MVP focused on local, checkpoint-aware batch execution.
 
 Kuaia is useful when you want to:
 
-- run a local CSV, JSONL, Postgres, or MySQL batch pipeline from YAML,
+- run a local CSV, JSONL, DuckDB, Postgres, or MySQL batch pipeline from YAML,
 - transform records through a typed `BinaryRow` model,
 - trim and filter empty text before embedding or chunking,
 - split JSONL document text into embed-ready chunks,
@@ -99,6 +99,7 @@ To iterate on one connector path, pass a case name:
 
 ```bash
 make e2e CASE=file-qdrant
+make e2e CASE=duckdb-qdrant
 make e2e CASE=postgres-qdrant
 make e2e CASE=mysql-qdrant
 ./scripts/connector-e2e-smoke.sh --list
@@ -272,6 +273,16 @@ export KUAIA_POSTGRES_PASSWORD=kuaia
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 ```
 
+DuckDB-to-Qdrant example:
+
+```bash
+docker compose -f docker-compose.qdrant.yml up -d
+curl -X PUT http://localhost:6333/collections/kuaia_duckdb_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+bin/kuaia run -f examples/duckdb-csv-to-qdrant.yaml
+```
+
 MySQL-to-Qdrant example:
 
 ```bash
@@ -291,7 +302,7 @@ service requirements.
 
 | Area | Current support |
 | --- | --- |
-| Sources | `file` CSV and JSONL, batch `postgres` and `mysql` queries |
+| Sources | `file` CSV and JSONL, batch `duckdb`, `postgres`, and `mysql` queries |
 | Transforms | `select`, `rename`, `trim`, `lowercase`, `replace`, `filter` (`not-empty`, `min-length`, `contains`, `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`, `greater-than-or-equal`, `less-than`, `less-than-or-equal`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
 | Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant` |
 | Runtime | Linear batch pipeline, preflight validation, checkpoint resume, bad-record skip mode |

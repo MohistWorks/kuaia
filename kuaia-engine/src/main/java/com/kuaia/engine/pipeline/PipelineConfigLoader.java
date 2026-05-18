@@ -53,7 +53,7 @@ public class PipelineConfigLoader {
         String sourceType = require(source, "source.type");
         String sinkType = require(sink, "sink.type");
 
-        requireSupported("source.type", sourceType, "file", "postgres", "mysql");
+        requireSupported("source.type", sourceType, "file", "postgres", "mysql", "duckdb");
         requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant");
 
         PipelineConfig.SourceConfig sourceConfig = loadSource(path, sourceType, source);
@@ -171,7 +171,29 @@ public class PipelineConfigLoader {
 
     private PipelineConfig.SourceConfig loadSource(Path configPath, String sourceType, Map<String, String> source)
             throws PipelineConfigException {
-        if (isJdbcSource(sourceType)) {
+        if ("duckdb".equals(sourceType)) {
+            rejectIfPresent(source, "path", "source.path is only supported for source.type: file");
+            rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
+            rejectIfPresent(source, "userEnv", "source.userEnv is not supported for source.type: duckdb");
+            rejectIfPresent(source, "passwordEnv", "source.passwordEnv is not supported for source.type: duckdb");
+            if (hasText(source.get("maxRowsPerSplit"))) {
+                throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
+            }
+            String sourceUrl = hasText(source.get("url")) ? source.get("url") : "jdbc:duckdb:";
+            validateJdbcSourceUrl(sourceType, sourceUrl);
+            return new PipelineConfig.SourceConfig(
+                    sourceType,
+                    null,
+                    null,
+                    sourceUrl,
+                    null,
+                    null,
+                    require(source, "source.query"),
+                    0,
+                    parseSourceFetchSize(source.get("fetchSize")));
+        }
+
+        if (isCredentialJdbcSource(sourceType)) {
             rejectIfPresent(source, "path", "source.path is only supported for source.type: file");
             rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
             if (hasText(source.get("maxRowsPerSplit"))) {
@@ -208,7 +230,7 @@ public class PipelineConfigLoader {
                 parseSourceMaxRowsPerSplit(source.get("maxRowsPerSplit")));
     }
 
-    private boolean isJdbcSource(String sourceType) {
+    private boolean isCredentialJdbcSource(String sourceType) {
         return "postgres".equals(sourceType) || "mysql".equals(sourceType);
     }
 
@@ -232,6 +254,9 @@ public class PipelineConfigLoader {
         }
         if ("mysql".equals(sourceType)) {
             return "jdbc:mysql:";
+        }
+        if ("duckdb".equals(sourceType)) {
+            return "jdbc:duckdb:";
         }
         throw new IllegalArgumentException("Unsupported JDBC source.type: " + sourceType);
     }

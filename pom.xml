@@ -20,6 +20,7 @@
         <rocksdb.version>8.1.1.1</rocksdb.version>
         <postgresql.version>42.7.10</postgresql.version>
         <mysql.version>8.4.0</mysql.version>
+        <duckdb.version>1.5.2.1</duckdb.version>
         <roaringbitmap.version>0.9.44</roaringbitmap.version>
         <arrow.version>12.0.0</arrow.version>
         <jackson.version>2.17.3</jackson.version>
