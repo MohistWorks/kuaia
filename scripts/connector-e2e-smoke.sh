@@ -14,12 +14,13 @@ list_cases() {
   echo "Available e2e cases:"
   echo "  all"
   echo "  file-qdrant"
+  echo "  duckdb-qdrant"
   echo "  postgres-qdrant"
   echo "  mysql-qdrant"
 }
 
 usage() {
-  echo "Usage: $0 [all|file-qdrant|postgres-qdrant|mysql-qdrant|--list|--help]"
+  echo "Usage: $0 [all|file-qdrant|duckdb-qdrant|postgres-qdrant|mysql-qdrant|--list|--help]"
   echo
   list_cases
 }
@@ -38,7 +39,7 @@ case "${1:-${CASE:-all}}" in
     list_cases
     exit 0
     ;;
-  all|file-qdrant|postgres-qdrant|mysql-qdrant)
+  all|file-qdrant|duckdb-qdrant|postgres-qdrant|mysql-qdrant)
     SELECTED_CASE=${1:-${CASE:-all}}
     ;;
   *)
@@ -249,8 +250,10 @@ trap cleanup EXIT INT TERM
 
 mkdir -p "$WORK_DIR/data" "$WORK_DIR/state" "$WORK_DIR/summaries"
 cp "$ROOT_DIR/examples/data/articles.jsonl" "$WORK_DIR/data/articles.jsonl"
+cp "$ROOT_DIR/examples/data/documents.csv" "$WORK_DIR/data/documents.csv"
 
 FILE_TO_QDRANT="$WORK_DIR/local-jsonl-chunk-to-qdrant.yaml"
+DUCKDB_TO_QDRANT="$WORK_DIR/duckdb-csv-to-qdrant.yaml"
 POSTGRES_TO_QDRANT="$WORK_DIR/postgres-to-qdrant.yaml"
 MYSQL_TO_QDRANT="$WORK_DIR/mysql-to-qdrant.yaml"
 
@@ -309,6 +312,30 @@ sink:
   timeoutMs: 30000
 checkpoint:
   stateDir: $WORK_DIR/state/local-jsonl-chunk-to-qdrant
+EOF
+
+cat > "$DUCKDB_TO_QDRANT" <<EOF
+name: connector-e2e-duckdb-to-qdrant
+source:
+  type: duckdb
+  query: select id, content from read_csv_auto('$WORK_DIR/data/documents.csv') order by id
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: qdrant
+  url: $QDRANT_URL
+  collection: kuaia_e2e_duckdb_docs
+  idField: id
+  vectorField: embedding
+  payloadFields: [id, content]
+  wait: true
+  timeoutMs: 30000
+checkpoint:
+  stateDir: $WORK_DIR/state/duckdb-to-qdrant
 EOF
 
 cat > "$POSTGRES_TO_QDRANT" <<EOF
@@ -378,6 +405,9 @@ fi
 if case_selected file-qdrant; then
   create_qdrant_collection kuaia_e2e_article_chunks
 fi
+if case_selected duckdb-qdrant; then
+  create_qdrant_collection kuaia_e2e_duckdb_docs
+fi
 if case_selected postgres-qdrant; then
   create_qdrant_collection kuaia_e2e_pg_docs
 fi
@@ -397,6 +427,16 @@ if case_selected file-qdrant; then
     2 \
     6
   require_qdrant_count kuaia_e2e_article_chunks 6
+fi
+
+if case_selected duckdb-qdrant; then
+  run_pipeline_with_summary \
+    connector-e2e-duckdb-to-qdrant \
+    "$DUCKDB_TO_QDRANT" \
+    "$WORK_DIR/summaries/duckdb-to-qdrant.json" \
+    2 \
+    2
+  require_qdrant_count kuaia_e2e_duckdb_docs 2
 fi
 
 if case_selected postgres-qdrant; then

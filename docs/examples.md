@@ -35,8 +35,9 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 - fatal malformed CSV diagnostics with a stable `Source stage failed:` prefix.
 
 After that, run individual examples below when you want to inspect one pipeline
-at a time. Qdrant, Postgres, MySQL, and OpenAI-compatible examples require
-external services or credentials and are not part of the default smoke.
+at a time. Qdrant, Postgres, MySQL, DuckDB-to-Qdrant, and OpenAI-compatible
+examples require external services or credentials and are not part of the
+default smoke.
 
 ## Common RAG Flows
 
@@ -54,9 +55,10 @@ bin/kuaia run -f examples/local-faq-jsonl-to-vector.yaml
 ```
 
 For a production-like batch source into Qdrant, start Postgres or MySQL with
-Qdrant and then run:
+Qdrant, or use DuckDB over local files with Qdrant, and then run:
 
 ```bash
+bin/kuaia run -f examples/duckdb-csv-to-qdrant.yaml
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 bin/kuaia run -f examples/mysql-to-qdrant.yaml
 ```
@@ -255,6 +257,35 @@ each other. It also sets
 `dropInput: true` and `includeOffsets: true` so Qdrant payloads keep `chunk`,
 `chunk_index`, `chunk_start`, and `chunk_end` without repeating the full source
 document text on every point, and pins those fields with `payloadFields`.
+
+## DuckDB CSV To Qdrant
+
+Start Qdrant:
+
+```bash
+docker compose -f docker-compose.qdrant.yml up -d
+```
+
+Create the example Qdrant collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_duckdb_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Run the DuckDB CSV-to-Qdrant pipeline:
+
+```bash
+bin/kuaia run -f examples/duckdb-csv-to-qdrant.yaml
+```
+
+The example uses DuckDB SQL to read `examples/data/documents.csv` with
+`read_csv_auto(...)`, creates deterministic mock embeddings, and upserts points
+into Qdrant collection `kuaia_duckdb_docs` with
+`payloadFields: [id, content]`. The same `source.type: duckdb` connector can
+run queries that use DuckDB's `read_json_auto(...)` and `read_parquet(...)`
+functions when those files are available locally.
 
 ## Postgres To Qdrant
 

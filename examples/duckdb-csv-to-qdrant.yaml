@@ -1,0 +1,21 @@
+name: duckdb-csv-to-qdrant
+source:
+  type: duckdb
+  query: select id, content from read_csv_auto('examples/data/documents.csv') order by id
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: qdrant
+  url: http://localhost:6333
+  collection: kuaia_duckdb_docs
+  idField: id
+  vectorField: embedding
+  payloadFields: [id, content]
+  wait: true
+  timeoutMs: 30000
+checkpoint:
+  stateDir: .kuaia/state/duckdb-csv-to-qdrant

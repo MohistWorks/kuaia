@@ -96,6 +96,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=mysql-qdrant"));
+        assertTrue(read(root.resolve("README.md")).contains("DuckDB"));
         assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
         assertTrue(read(root.resolve("README.md")).contains("SECURITY.md"));
         assertTrue(Files.exists(root.resolve("SECURITY.md")), "SECURITY.md should exist");
@@ -108,9 +109,11 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.postgres.yml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("mysql-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.mysql.yml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("duckdb-csv-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: postgres"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: mysql"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: duckdb"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("bin/kuaia benchmark"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--max-rows-per-split"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--batch-sizes 16,64,256"));
@@ -136,6 +139,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("connector e2e gate"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("single-case connector e2e"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("DuckDB batch source"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.0 - 2026-05-17"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.3 - 2026-05-15"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.0 - 2026-05-11"));
@@ -173,6 +177,11 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("examples/mysql-to-qdrant.yaml")), "MySQL to Qdrant example should exist");
         assertTrue(Files.exists(root.resolve("docker-compose.mysql.yml")), "MySQL compose file should exist");
         assertTrue(Files.exists(root.resolve("examples/mysql/init/01-documents.sql")), "MySQL init SQL should exist");
+        assertTrue(Files.exists(root.resolve("examples/duckdb-csv-to-qdrant.yaml")),
+                "DuckDB to Qdrant example should exist");
+        assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("duckdb-qdrant"));
+        assertTrue(read(root.resolve("scripts/release-gate.sh"))
+                .contains("bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml"));
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
         assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.1-SNAPSHOT</version>"));
@@ -180,6 +189,7 @@ class KuaiaPackagingTest {
         assertTrue(enginePom.contains("<version>0.2.1-SNAPSHOT</version>"), enginePom);
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);
         assertTrue(enginePom.contains("mysql-connector-j"), enginePom);
+        assertTrue(enginePom.contains("duckdb_jdbc"), enginePom);
         assertTrue(enginePom.contains("com.kuaia.engine.KuaiaCli"), enginePom);
         assertTrue(enginePom.contains("<createDependencyReducedPom>false</createDependencyReducedPom>"), enginePom);
         assertTrue(enginePom.contains("<shadedArtifactAttached>true</shadedArtifactAttached>"), enginePom);

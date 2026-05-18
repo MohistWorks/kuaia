@@ -12,6 +12,8 @@ All notable public changes to Kuaia are tracked here.
 - Added single-case connector e2e selection for `file-qdrant`,
   `postgres-qdrant`, and `mysql-qdrant` so connector changes can be tested
   without always running the full e2e gate.
+- Added `source.type: duckdb` as a local DuckDB batch source for bounded SQL
+  over files, plus a DuckDB-to-Qdrant example and e2e case.
 
 ### Changed
 
