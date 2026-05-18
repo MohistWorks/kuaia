@@ -125,9 +125,13 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("docs/examples.md"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.2.0 release-ready"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.2.x Roadmap"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.1` release candidate scope"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("only `v0.2.0` has been released"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("DuckDB batch source"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("document-directory source"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("S3-compatible object-storage source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("Milvus vector sink"));
-        assertTrue(read(root.resolve("docs/roadmap.md")).contains("connector e2e gate"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("Connector e2e gate"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("Connector-ready runtime"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("MySQL batch source"));
@@ -145,6 +149,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("single-case connector e2e"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("DuckDB batch source"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("document-directory source"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("0.2.1` release-candidate"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.0 - 2026-05-17"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.3 - 2026-05-15"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.1.0 - 2026-05-11"));
