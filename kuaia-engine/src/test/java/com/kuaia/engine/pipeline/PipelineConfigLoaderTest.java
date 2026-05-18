@@ -188,7 +188,7 @@ class PipelineConfigLoaderTest {
     @Test
     void rejectsFileOnlyFieldsForJdbcSource() throws Exception {
         assertJdbcSourceFieldRejected("path", "data/documents.csv",
-                "source.path is only supported for source.type: file");
+                "source.path is only supported for local source types");
         assertJdbcSourceFieldRejected("format", "csv",
                 "source.format is only supported for source.type: file");
     }
@@ -1661,6 +1661,50 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("source.userEnv is not supported for source.type: duckdb", error.getMessage());
+    }
+
+    @Test
+    void loadsDocumentDirectorySourceConfig() throws Exception {
+        Path docs = tempDir.resolve("docs");
+        Files.createDirectories(docs);
+        Path configPath = tempDir.resolve("document-directory-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: document-directory-source",
+                "source:",
+                "  type: document-directory",
+                "  path: docs",
+                "transforms:",
+                "  - type: chunk",
+                "    input: content",
+                "    output: content",
+                "    chunkSize: 100",
+                "sink:",
+                "  type: mock-vector").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("document-directory", config.getSource().getType());
+        assertEquals(docs.toString(), config.getSource().getPath());
+        assertEquals(null, config.getSource().getFormat());
+    }
+
+    @Test
+    void rejectsDocumentDirectoryFormat() throws Exception {
+        Path configPath = tempDir.resolve("document-directory-format.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: document-directory-format",
+                "source:",
+                "  type: document-directory",
+                "  path: docs",
+                "  format: jsonl",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.format is only supported for source.type: file", error.getMessage());
     }
 
     @Test

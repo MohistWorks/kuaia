@@ -35,9 +35,9 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 - fatal malformed CSV diagnostics with a stable `Source stage failed:` prefix.
 
 After that, run individual examples below when you want to inspect one pipeline
-at a time. Qdrant, Postgres, MySQL, DuckDB-to-Qdrant, and OpenAI-compatible
-examples require external services or credentials and are not part of the
-default smoke.
+at a time. Qdrant, Postgres, MySQL, document-directory-to-Qdrant,
+DuckDB-to-Qdrant, and OpenAI-compatible examples require external services or
+credentials and are not part of the default smoke.
 
 ## Common RAG Flows
 
@@ -45,6 +45,13 @@ For a local document import path, start with:
 
 ```bash
 bin/kuaia run -f examples/local-jsonl-chunk-to-vector.yaml
+```
+
+For a local directory of `.txt` or Markdown documents into Qdrant, start
+Qdrant and then run:
+
+```bash
+bin/kuaia run -f examples/document-directory-to-qdrant.yaml
 ```
 
 For an FAQ import path that keeps question and answer metadata together, start
@@ -257,6 +264,34 @@ each other. It also sets
 `dropInput: true` and `includeOffsets: true` so Qdrant payloads keep `chunk`,
 `chunk_index`, `chunk_start`, and `chunk_end` without repeating the full source
 document text on every point, and pins those fields with `payloadFields`.
+
+## Document Directory To Qdrant
+
+Start Qdrant:
+
+```bash
+docker compose -f docker-compose.qdrant.yml up -d
+```
+
+Create the example Qdrant collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_document_directory_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Run the document-directory-to-Qdrant pipeline:
+
+```bash
+bin/kuaia run -f examples/document-directory-to-qdrant.yaml
+```
+
+The example reads `.md` and `.txt` files from `examples/data/docs`, creates
+deterministic mock embeddings from `content`, and upserts points into Qdrant
+collection `kuaia_document_directory_docs`. The sink uses
+`payloadFields: [id, path, content]` so each vector keeps the generated document
+id, relative path, and source content.
 
 ## DuckDB CSV To Qdrant
 

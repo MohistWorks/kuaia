@@ -20,6 +20,8 @@ field types include primitive values, strings, and vectors.
 Current built-in sources are:
 
 - `FileSource` for local CSV and JSONL files,
+- `DocumentDirectorySource` for local `.txt`, `.md`, and `.markdown`
+  document directories,
 - `DuckDBSource` for one bounded local DuckDB SQL query,
 - `PostgresSource` for one bounded JDBC query,
 - `MySQLSource` for one bounded JDBC query.

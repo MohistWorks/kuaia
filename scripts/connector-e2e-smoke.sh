@@ -14,13 +14,14 @@ list_cases() {
   echo "Available e2e cases:"
   echo "  all"
   echo "  file-qdrant"
+  echo "  document-directory-qdrant"
   echo "  duckdb-qdrant"
   echo "  postgres-qdrant"
   echo "  mysql-qdrant"
 }
 
 usage() {
-  echo "Usage: $0 [all|file-qdrant|duckdb-qdrant|postgres-qdrant|mysql-qdrant|--list|--help]"
+  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|postgres-qdrant|mysql-qdrant|--list|--help]"
   echo
   list_cases
 }
@@ -39,7 +40,7 @@ case "${1:-${CASE:-all}}" in
     list_cases
     exit 0
     ;;
-  all|file-qdrant|duckdb-qdrant|postgres-qdrant|mysql-qdrant)
+  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|postgres-qdrant|mysql-qdrant)
     SELECTED_CASE=${1:-${CASE:-all}}
     ;;
   *)
@@ -251,8 +252,10 @@ trap cleanup EXIT INT TERM
 mkdir -p "$WORK_DIR/data" "$WORK_DIR/state" "$WORK_DIR/summaries"
 cp "$ROOT_DIR/examples/data/articles.jsonl" "$WORK_DIR/data/articles.jsonl"
 cp "$ROOT_DIR/examples/data/documents.csv" "$WORK_DIR/data/documents.csv"
+cp -R "$ROOT_DIR/examples/data/docs" "$WORK_DIR/data/docs"
 
 FILE_TO_QDRANT="$WORK_DIR/local-jsonl-chunk-to-qdrant.yaml"
+DOCUMENT_DIRECTORY_TO_QDRANT="$WORK_DIR/document-directory-to-qdrant.yaml"
 DUCKDB_TO_QDRANT="$WORK_DIR/duckdb-csv-to-qdrant.yaml"
 POSTGRES_TO_QDRANT="$WORK_DIR/postgres-to-qdrant.yaml"
 MYSQL_TO_QDRANT="$WORK_DIR/mysql-to-qdrant.yaml"
@@ -312,6 +315,30 @@ sink:
   timeoutMs: 30000
 checkpoint:
   stateDir: $WORK_DIR/state/local-jsonl-chunk-to-qdrant
+EOF
+
+cat > "$DOCUMENT_DIRECTORY_TO_QDRANT" <<EOF
+name: connector-e2e-document-directory-to-qdrant
+source:
+  type: document-directory
+  path: $WORK_DIR/data/docs
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: qdrant
+  url: $QDRANT_URL
+  collection: kuaia_e2e_document_directory_docs
+  idField: id
+  vectorField: embedding
+  payloadFields: [id, path, content]
+  wait: true
+  timeoutMs: 30000
+checkpoint:
+  stateDir: $WORK_DIR/state/document-directory-to-qdrant
 EOF
 
 cat > "$DUCKDB_TO_QDRANT" <<EOF
@@ -405,6 +432,9 @@ fi
 if case_selected file-qdrant; then
   create_qdrant_collection kuaia_e2e_article_chunks
 fi
+if case_selected document-directory-qdrant; then
+  create_qdrant_collection kuaia_e2e_document_directory_docs
+fi
 if case_selected duckdb-qdrant; then
   create_qdrant_collection kuaia_e2e_duckdb_docs
 fi
@@ -427,6 +457,16 @@ if case_selected file-qdrant; then
     2 \
     6
   require_qdrant_count kuaia_e2e_article_chunks 6
+fi
+
+if case_selected document-directory-qdrant; then
+  run_pipeline_with_summary \
+    connector-e2e-document-directory-to-qdrant \
+    "$DOCUMENT_DIRECTORY_TO_QDRANT" \
+    "$WORK_DIR/summaries/document-directory-to-qdrant.json" \
+    2 \
+    2
+  require_qdrant_count kuaia_e2e_document_directory_docs 2
 fi
 
 if case_selected duckdb-qdrant; then
