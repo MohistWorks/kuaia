@@ -74,6 +74,13 @@ public class PipelineConfig {
         private final String query;
         private final int maxRowsPerSplit;
         private final int fetchSize;
+        private final String endpoint;
+        private final String region;
+        private final String bucket;
+        private final String prefix;
+        private final String accessKeyEnv;
+        private final String secretKeyEnv;
+        private final boolean pathStyleAccess;
 
         public SourceConfig(String type, String path, String format) {
             this(type, path, format, 0);
@@ -116,6 +123,40 @@ public class PipelineConfig {
                 String query,
                 int maxRowsPerSplit,
                 int fetchSize) {
+            this(type, path, format, url, userEnv, passwordEnv, query, maxRowsPerSplit, fetchSize,
+                    null, null, null, null, null, null, false);
+        }
+
+        public SourceConfig(
+                String type,
+                String endpoint,
+                String region,
+                String bucket,
+                String prefix,
+                String accessKeyEnv,
+                String secretKeyEnv,
+                boolean pathStyleAccess) {
+            this(type, null, null, null, null, null, null, 0, 0,
+                    endpoint, region, bucket, prefix, accessKeyEnv, secretKeyEnv, pathStyleAccess);
+        }
+
+        private SourceConfig(
+                String type,
+                String path,
+                String format,
+                String url,
+                String userEnv,
+                String passwordEnv,
+                String query,
+                int maxRowsPerSplit,
+                int fetchSize,
+                String endpoint,
+                String region,
+                String bucket,
+                String prefix,
+                String accessKeyEnv,
+                String secretKeyEnv,
+                boolean pathStyleAccess) {
             if (maxRowsPerSplit < 0) {
                 throw new IllegalArgumentException("maxRowsPerSplit must not be negative");
             }
@@ -131,6 +172,13 @@ public class PipelineConfig {
             this.query = query;
             this.maxRowsPerSplit = maxRowsPerSplit;
             this.fetchSize = fetchSize;
+            this.endpoint = endpoint;
+            this.region = region;
+            this.bucket = bucket;
+            this.prefix = prefix;
+            this.accessKeyEnv = accessKeyEnv;
+            this.secretKeyEnv = secretKeyEnv;
+            this.pathStyleAccess = pathStyleAccess;
         }
 
         public String getType() {
@@ -167,6 +215,34 @@ public class PipelineConfig {
 
         public int getFetchSize() {
             return fetchSize;
+        }
+
+        public String getEndpoint() {
+            return endpoint;
+        }
+
+        public String getRegion() {
+            return region;
+        }
+
+        public String getBucket() {
+            return bucket;
+        }
+
+        public String getPrefix() {
+            return prefix;
+        }
+
+        public String getAccessKeyEnv() {
+            return accessKeyEnv;
+        }
+
+        public String getSecretKeyEnv() {
+            return secretKeyEnv;
+        }
+
+        public boolean isPathStyleAccess() {
+            return pathStyleAccess;
         }
     }
 

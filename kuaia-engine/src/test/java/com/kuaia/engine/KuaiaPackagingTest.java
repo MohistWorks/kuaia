@@ -98,7 +98,9 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("make e2e"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=mysql-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=document-directory-qdrant"));
+        assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=s3-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains("DuckDB"));
+        assertTrue(read(root.resolve("README.md")).contains("S3-compatible object storage"));
         assertTrue(read(root.resolve("README.md")).contains("document directory"));
         assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
         assertTrue(read(root.resolve("README.md")).contains("SECURITY.md"));
@@ -114,11 +116,13 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.mysql.yml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("duckdb-csv-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("document-directory-to-qdrant.yaml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("s3-docs-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: postgres"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: mysql"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: duckdb"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: document-directory"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: s3"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("bin/kuaia benchmark"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--max-rows-per-split"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--batch-sizes 16,64,256"));
@@ -170,6 +174,7 @@ class KuaiaPackagingTest {
         assertTrue(e2eScript.contains("Available e2e cases"), e2eScript);
         assertTrue(e2eScript.contains("file-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("document-directory-qdrant"), e2eScript);
+        assertTrue(e2eScript.contains("s3-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("postgres-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("mysql-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("--list"), e2eScript);
@@ -196,14 +201,19 @@ class KuaiaPackagingTest {
                 "DuckDB to Qdrant example should exist");
         assertTrue(Files.exists(root.resolve("examples/document-directory-to-qdrant.yaml")),
                 "Document directory to Qdrant example should exist");
+        assertTrue(Files.exists(root.resolve("examples/s3-docs-to-qdrant.yaml")),
+                "S3 to Qdrant example should exist");
         assertTrue(Files.exists(root.resolve("examples/data/docs/intro.md")),
                 "Document directory example data should exist");
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("duckdb-qdrant"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("document-directory-qdrant"));
+        assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("s3-qdrant"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/document-directory-to-qdrant.yaml"));
+        assertTrue(read(root.resolve("scripts/release-gate.sh"))
+                .contains("bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml"));
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
         assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.2-SNAPSHOT</version>"));
@@ -212,6 +222,7 @@ class KuaiaPackagingTest {
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);
         assertTrue(enginePom.contains("mysql-connector-j"), enginePom);
         assertTrue(enginePom.contains("duckdb_jdbc"), enginePom);
+        assertTrue(enginePom.contains("<artifactId>s3</artifactId>"), enginePom);
         assertTrue(enginePom.contains("com.kuaia.engine.KuaiaCli"), enginePom);
         assertTrue(enginePom.contains("<createDependencyReducedPom>false</createDependencyReducedPom>"), enginePom);
         assertTrue(enginePom.contains("<shadedArtifactAttached>true</shadedArtifactAttached>"), enginePom);

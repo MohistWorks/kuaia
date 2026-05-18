@@ -13,13 +13,15 @@ currently an MVP focused on local, checkpoint-aware batch execution.
 
 Kuaia is useful when you want to:
 
-- run a local CSV, JSONL, document directory, DuckDB, Postgres, or MySQL batch
-  pipeline from YAML,
+- run a local CSV, JSONL, document directory, S3-compatible object storage,
+  DuckDB, Postgres, or MySQL batch pipeline from YAML,
 - transform records through a typed `BinaryRow` model,
 - trim and filter empty text before embedding or chunking,
 - split JSONL document text into embed-ready chunks,
 - ingest local `.txt`, `.md`, and `.markdown` document directories while
   preserving relative paths,
+- ingest text-like objects from S3-compatible storage such as MinIO while
+  preserving object keys,
 - import small FAQ JSONL datasets while preserving question and answer fields,
 - generate mock or OpenAI-compatible embeddings,
 - write to console, local CSV or JSONL files, mock vector output, or Qdrant,
@@ -74,9 +76,9 @@ answer fields, filters empty values, and emits deterministic mock vectors.
 Use `kuaia validate -f <pipeline.yaml>` to check a pipeline before running it.
 For file and document-directory sources, validation checks the source row type,
 transform field compatibility, and sink field compatibility without writing
-output or checkpoint state. For DuckDB, Postgres, and MySQL sources, validation
-parses connector configuration without connecting to the source, so row-type
-checks are deferred until run time.
+output or checkpoint state. For S3, DuckDB, Postgres, and MySQL sources,
+validation parses connector configuration without connecting to the source, so
+row-type checks are deferred until run time.
 
 Validate the public MVP paths without external services:
 
@@ -96,8 +98,8 @@ make e2e
 
 This starts local Postgres, MySQL, and Qdrant services with Docker Compose,
 runs file-to-Qdrant, document-directory-to-Qdrant, DuckDB-to-Qdrant,
-Postgres-to-Qdrant, and MySQL-to-Qdrant pipelines, checks run summaries, and
-tears the services down.
+S3-to-Qdrant, Postgres-to-Qdrant, and MySQL-to-Qdrant pipelines, checks run
+summaries, and tears the services down.
 
 To iterate on one connector path, pass a case name:
 
@@ -105,6 +107,7 @@ To iterate on one connector path, pass a case name:
 make e2e CASE=file-qdrant
 make e2e CASE=document-directory-qdrant
 make e2e CASE=duckdb-qdrant
+make e2e CASE=s3-qdrant
 make e2e CASE=postgres-qdrant
 make e2e CASE=mysql-qdrant
 ./scripts/connector-e2e-smoke.sh --list
@@ -288,6 +291,19 @@ curl -X PUT http://localhost:6333/collections/kuaia_duckdb_docs \
 bin/kuaia run -f examples/duckdb-csv-to-qdrant.yaml
 ```
 
+S3-compatible object storage to Qdrant example:
+
+```bash
+export KUAIA_S3_ACCESS_KEY=...
+export KUAIA_S3_SECRET_KEY=...
+bin/kuaia run -f examples/s3-docs-to-qdrant.yaml
+```
+
+The example expects a bucket named `kuaia-docs` with text-like objects under
+the `docs/` prefix, plus a running Qdrant collection named `kuaia_s3_docs`.
+For an automated local proof with MinIO and Qdrant, run
+`make e2e CASE=s3-qdrant`.
+
 MySQL-to-Qdrant example:
 
 ```bash
@@ -307,7 +323,7 @@ service requirements.
 
 | Area | Current support |
 | --- | --- |
-| Sources | `file` CSV and JSONL, batch `duckdb`, `postgres`, and `mysql` queries |
+| Sources | `file` CSV and JSONL, `document-directory`, `s3`, batch `duckdb`, `postgres`, and `mysql` queries |
 | Transforms | `select`, `rename`, `trim`, `lowercase`, `replace`, `filter` (`not-empty`, `min-length`, `contains`, `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`, `greater-than-or-equal`, `less-than`, `less-than-or-equal`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
 | Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant` |
 | Runtime | Linear batch pipeline, preflight validation, checkpoint resume, bad-record skip mode |

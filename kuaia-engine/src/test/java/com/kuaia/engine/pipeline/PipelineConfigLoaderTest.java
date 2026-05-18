@@ -70,6 +70,35 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void loadsS3SourceConfig() throws Exception {
+        Path configPath = tempDir.resolve("s3-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: s3-source",
+                "source:",
+                "  type: s3",
+                "  endpoint: http://127.0.0.1:9000",
+                "  region: us-east-1",
+                "  bucket: kuaia-docs",
+                "  prefix: docs/",
+                "  accessKeyEnv: KUAIA_S3_ACCESS_KEY",
+                "  secretKeyEnv: KUAIA_S3_SECRET_KEY",
+                "  pathStyleAccess: true",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("s3", config.getSource().getType());
+        assertEquals("http://127.0.0.1:9000", config.getSource().getEndpoint());
+        assertEquals("us-east-1", config.getSource().getRegion());
+        assertEquals("kuaia-docs", config.getSource().getBucket());
+        assertEquals("docs/", config.getSource().getPrefix());
+        assertEquals("KUAIA_S3_ACCESS_KEY", config.getSource().getAccessKeyEnv());
+        assertEquals("KUAIA_S3_SECRET_KEY", config.getSource().getSecretKeyEnv());
+        assertEquals(true, config.getSource().isPathStyleAccess());
+    }
+
+    @Test
     void rejectsInvalidFileSourceMaxRowsPerSplit() throws Exception {
         Path configPath = tempDir.resolve("invalid-file-source-split.yaml");
         Files.write(configPath, String.join("\n",

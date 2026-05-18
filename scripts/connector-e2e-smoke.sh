@@ -16,12 +16,13 @@ list_cases() {
   echo "  file-qdrant"
   echo "  document-directory-qdrant"
   echo "  duckdb-qdrant"
+  echo "  s3-qdrant"
   echo "  postgres-qdrant"
   echo "  mysql-qdrant"
 }
 
 usage() {
-  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|postgres-qdrant|mysql-qdrant|--list|--help]"
+  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|postgres-qdrant|mysql-qdrant|--list|--help]"
   echo
   list_cases
 }
@@ -40,7 +41,7 @@ case "${1:-${CASE:-all}}" in
     list_cases
     exit 0
     ;;
-  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|postgres-qdrant|mysql-qdrant)
+  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|postgres-qdrant|mysql-qdrant)
     SELECTED_CASE=${1:-${CASE:-all}}
     ;;
   *)
@@ -74,6 +75,10 @@ needs_mysql() {
   case_selected mysql-qdrant
 }
 
+needs_minio() {
+  case_selected s3-qdrant
+}
+
 wait_for_qdrant() {
   attempts=0
   while [ "$attempts" -lt 60 ]; do
@@ -87,6 +92,41 @@ wait_for_qdrant() {
   echo "Qdrant did not become ready." >&2
   compose logs qdrant >&2 || true
   return 1
+}
+
+wait_for_minio() {
+  attempts=0
+  while [ "$attempts" -lt 60 ]; do
+    if curl -fsS "http://127.0.0.1:$MINIO_PORT/minio/health/ready" >/dev/null 2>&1; then
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    sleep 2
+  done
+
+  echo "MinIO did not become ready." >&2
+  compose logs minio >&2 || true
+  return 1
+}
+
+setup_minio() {
+  docker run --rm \
+    --network "${COMPOSE_PROJECT}_default" \
+    -v "$WORK_DIR/data/docs:/seed/docs:ro" \
+    --entrypoint /bin/sh \
+    minio/mc:latest \
+    -c 'set -eu
+attempts=0
+until mc alias set local http://minio:9000 kuaia kuaia123 >/dev/null 2>&1; do
+  attempts=$((attempts + 1))
+  if [ "$attempts" -ge 60 ]; then
+    echo "Could not configure MinIO alias." >&2
+    exit 1
+  fi
+  sleep 2
+done
+mc mb -p local/kuaia-docs >/dev/null 2>&1 || true
+mc cp --recursive /seed/docs/ local/kuaia-docs/docs/ >/dev/null'
 }
 
 wait_for_postgres() {
@@ -225,6 +265,22 @@ EOF
 EOF
   fi
 
+  if needs_minio; then
+    cat >> "$E2E_COMPOSE" <<EOF
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: kuaia
+      MINIO_ROOT_PASSWORD: kuaia123
+    ports:
+      - "127.0.0.1::9000"
+    volumes:
+      - minio-data:/data
+
+EOF
+  fi
+
   cat >> "$E2E_COMPOSE" <<EOF
   qdrant:
     image: qdrant/qdrant:latest
@@ -239,6 +295,12 @@ EOF
   if needs_postgres; then
     cat >> "$E2E_COMPOSE" <<EOF
   postgres-data:
+EOF
+  fi
+
+  if needs_minio; then
+    cat >> "$E2E_COMPOSE" <<EOF
+  minio-data:
 EOF
   fi
 
@@ -257,6 +319,7 @@ cp -R "$ROOT_DIR/examples/data/docs" "$WORK_DIR/data/docs"
 FILE_TO_QDRANT="$WORK_DIR/local-jsonl-chunk-to-qdrant.yaml"
 DOCUMENT_DIRECTORY_TO_QDRANT="$WORK_DIR/document-directory-to-qdrant.yaml"
 DUCKDB_TO_QDRANT="$WORK_DIR/duckdb-csv-to-qdrant.yaml"
+S3_TO_QDRANT="$WORK_DIR/s3-docs-to-qdrant.yaml"
 POSTGRES_TO_QDRANT="$WORK_DIR/postgres-to-qdrant.yaml"
 MYSQL_TO_QDRANT="$WORK_DIR/mysql-to-qdrant.yaml"
 
@@ -267,14 +330,19 @@ compose up -d
 
 POSTGRES_PORT=""
 MYSQL_PORT=""
+MINIO_PORT=""
 if needs_postgres; then
   POSTGRES_PORT=$(service_port postgres 5432)
 fi
 if needs_mysql; then
   MYSQL_PORT=$(service_port mysql 3306)
 fi
+if needs_minio; then
+  MINIO_PORT=$(service_port minio 9000)
+fi
 QDRANT_PORT=$(service_port qdrant 6333)
 QDRANT_URL="http://127.0.0.1:$QDRANT_PORT"
+MINIO_ENDPOINT="http://127.0.0.1:$MINIO_PORT"
 
 cat > "$FILE_TO_QDRANT" <<EOF
 name: connector-e2e-jsonl-chunk-to-qdrant
@@ -365,6 +433,36 @@ checkpoint:
   stateDir: $WORK_DIR/state/duckdb-to-qdrant
 EOF
 
+cat > "$S3_TO_QDRANT" <<EOF
+name: connector-e2e-s3-to-qdrant
+source:
+  type: s3
+  endpoint: $MINIO_ENDPOINT
+  region: us-east-1
+  bucket: kuaia-docs
+  prefix: docs/
+  accessKeyEnv: KUAIA_S3_ACCESS_KEY
+  secretKeyEnv: KUAIA_S3_SECRET_KEY
+  pathStyleAccess: true
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: qdrant
+  url: $QDRANT_URL
+  collection: kuaia_e2e_s3_docs
+  idField: id
+  vectorField: embedding
+  payloadFields: [id, key, content]
+  wait: true
+  timeoutMs: 30000
+checkpoint:
+  stateDir: $WORK_DIR/state/s3-to-qdrant
+EOF
+
 cat > "$POSTGRES_TO_QDRANT" <<EOF
 name: connector-e2e-postgres-to-qdrant
 source:
@@ -428,6 +526,10 @@ fi
 if needs_mysql; then
   wait_for_mysql
 fi
+if needs_minio; then
+  wait_for_minio
+  setup_minio
+fi
 
 if case_selected file-qdrant; then
   create_qdrant_collection kuaia_e2e_article_chunks
@@ -437,6 +539,9 @@ if case_selected document-directory-qdrant; then
 fi
 if case_selected duckdb-qdrant; then
   create_qdrant_collection kuaia_e2e_duckdb_docs
+fi
+if case_selected s3-qdrant; then
+  create_qdrant_collection kuaia_e2e_s3_docs
 fi
 if case_selected postgres-qdrant; then
   create_qdrant_collection kuaia_e2e_pg_docs
@@ -477,6 +582,18 @@ if case_selected duckdb-qdrant; then
     2 \
     2
   require_qdrant_count kuaia_e2e_duckdb_docs 2
+fi
+
+if case_selected s3-qdrant; then
+  KUAIA_S3_ACCESS_KEY=kuaia \
+  KUAIA_S3_SECRET_KEY=kuaia123 \
+  run_pipeline_with_summary \
+    connector-e2e-s3-to-qdrant \
+    "$S3_TO_QDRANT" \
+    "$WORK_DIR/summaries/s3-to-qdrant.json" \
+    2 \
+    2
+  require_qdrant_count kuaia_e2e_s3_docs 2
 fi
 
 if case_selected postgres-qdrant; then
