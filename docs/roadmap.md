@@ -48,9 +48,10 @@ Release-ready focus areas:
 ## 0.2.x Roadmap
 
 The `0.2.x` line should turn the connector-ready runtime into useful AI data
-pipeline coverage. The `0.2.1` scope shipped on 2026-05-18, and the `0.2.2`
-scope is release-ready. Follow-on bullets describe intended future scope, not
-already published versions.
+pipeline coverage. The `0.2.1` scope shipped on 2026-05-18, the `0.2.2`
+scope shipped on 2026-05-18, and `0.2.3` is the current development scope.
+Follow-on bullets describe intended future scope, not already published
+versions.
 
 `0.2.1` shipped scope:
 
@@ -62,15 +63,18 @@ already published versions.
 - Local document-directory source for `.txt`, `.md`, and `.markdown` inputs,
   including a document-directory-to-Qdrant example and e2e case.
 
-`0.2.2` release-ready scope:
+`0.2.2` shipped scope:
 
 - `0.2.2`: add an S3-compatible object-storage source with MinIO-backed e2e
   coverage for common RAG ingestion inputs.
 
-Planned follow-on `0.2.x` focus areas:
+`0.2.3` current development scope:
 
 - `0.2.3`: add a pgvector sink for teams that use Postgres as both the source
   database and vector store.
+
+Planned follow-on `0.2.x` focus areas:
+
 - `0.2.4`: add a Milvus vector sink after Qdrant and pgvector e2e coverage is
   stable.
 - `0.2.5`: harden OpenAI-compatible embedding provider e2e coverage and add
