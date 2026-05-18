@@ -53,7 +53,7 @@ public class PipelineConfigLoader {
         String sourceType = require(source, "source.type");
         String sinkType = require(sink, "sink.type");
 
-        requireSupported("source.type", sourceType, "file", "document-directory", "postgres", "mysql", "duckdb");
+        requireSupported("source.type", sourceType, "file", "document-directory", "postgres", "mysql", "duckdb", "s3");
         requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant");
 
         PipelineConfig.SourceConfig sourceConfig = loadSource(path, sourceType, source);
@@ -191,6 +191,30 @@ public class PipelineConfigLoader {
                     require(source, "source.query"),
                     0,
                     parseSourceFetchSize(source.get("fetchSize")));
+        }
+
+        if ("s3".equals(sourceType)) {
+            rejectIfPresent(source, "path", "source.path is only supported for local source types");
+            rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
+            rejectIfPresent(source, "url", "source.url is only supported for JDBC source types");
+            rejectIfPresent(source, "userEnv", "source.userEnv is only supported for JDBC source types");
+            rejectIfPresent(source, "passwordEnv", "source.passwordEnv is only supported for JDBC source types");
+            rejectIfPresent(source, "query", "source.query is only supported for JDBC source types");
+            if (hasText(source.get("fetchSize"))) {
+                throw new PipelineConfigException("source.fetchSize is only supported for JDBC source types");
+            }
+            if (hasText(source.get("maxRowsPerSplit"))) {
+                throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
+            }
+            return new PipelineConfig.SourceConfig(
+                    sourceType,
+                    require(source, "source.endpoint"),
+                    require(source, "source.region"),
+                    require(source, "source.bucket"),
+                    source.getOrDefault("prefix", ""),
+                    require(source, "source.accessKeyEnv"),
+                    require(source, "source.secretKeyEnv"),
+                    parseBoolean(source.get("pathStyleAccess"), "source.pathStyleAccess", true));
         }
 
         if (isCredentialJdbcSource(sourceType)) {

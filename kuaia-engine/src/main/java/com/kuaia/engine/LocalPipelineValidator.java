@@ -58,7 +58,10 @@ public class LocalPipelineValidator {
     }
 
     private boolean isDeferredSource(String sourceType) {
-        return "postgres".equals(sourceType) || "mysql".equals(sourceType) || "duckdb".equals(sourceType);
+        return "postgres".equals(sourceType)
+                || "mysql".equals(sourceType)
+                || "duckdb".equals(sourceType)
+                || "s3".equals(sourceType);
     }
 
     private KuaiaRowType loadSourceType(PipelineConfig config) throws Exception {

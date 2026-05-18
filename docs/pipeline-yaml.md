@@ -108,6 +108,49 @@ Document-directory type rules:
 Directory sources do not use `format`, `query`, `url`, `userEnv`,
 `passwordEnv`, `fetchSize`, or `maxRowsPerSplit`.
 
+### s3
+
+```yaml
+source:
+  type: s3
+  endpoint: http://localhost:9000
+  region: us-east-1
+  bucket: kuaia-docs
+  prefix: docs/
+  accessKeyEnv: KUAIA_S3_ACCESS_KEY
+  secretKeyEnv: KUAIA_S3_SECRET_KEY
+  pathStyleAccess: true
+```
+
+`source.type: s3` reads text-like objects from an S3-compatible object store.
+It is intended for small RAG ingestion inputs stored in services such as MinIO,
+Ceph, or S3-compatible cloud buckets.
+
+Fields:
+
+- `type`: must be `s3`
+- `endpoint`: S3-compatible endpoint URL, for example `http://localhost:9000`
+- `region`: signing region, for example `us-east-1`
+- `bucket`: bucket name
+- `prefix`: optional object key prefix. Defaults to an empty prefix.
+- `accessKeyEnv`: environment variable containing the access key
+- `secretKeyEnv`: environment variable containing the secret key
+- `pathStyleAccess`: optional boolean. Defaults to `true`, which is the common
+  setting for MinIO and other S3-compatible endpoints.
+
+S3 type rules:
+
+- supported objects are `.txt`, `.md`, `.markdown`, `.jsonl`, and `.csv`,
+- keys ending in `/` and unsupported extensions are ignored,
+- objects are processed in stable key order,
+- output fields are fixed as `id LONG`, `key STRING`, and `content STRING`,
+- `id` is the 1-based sequence id in sorted object order,
+- `key` is the full object key,
+- `content` is the UTF-8 object content.
+
+S3 sources do not use `path`, `format`, `query`, `url`, `userEnv`,
+`passwordEnv`, `fetchSize`, or `maxRowsPerSplit`.
+
 ### postgres
 
 ```yaml

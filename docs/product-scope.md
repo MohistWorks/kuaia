@@ -28,8 +28,8 @@ Kuaia is currently useful for:
 - developers evaluating AI/RAG data preparation flows,
 - contributors exploring source, transform, and sink connector boundaries,
 - users who want a small local pipeline from CSV, JSONL, document directories,
-  DuckDB, Postgres, or MySQL into CSV/JSONL files, console output, mock vector
-  output, or Qdrant,
+  S3-compatible object storage, DuckDB, Postgres, or MySQL into CSV/JSONL
+  files, console output, mock vector output, or Qdrant,
 - maintainers validating checkpoint and state-store behavior before broader
   distributed execution work.
 
@@ -43,6 +43,7 @@ Supported sources:
 - local CSV and JSONL files through `source.type: file`,
 - local `.txt`, `.md`, and `.markdown` directories through
   `source.type: document-directory`,
+- S3-compatible object storage through `source.type: s3`,
 - local DuckDB SQL queries through `source.type: duckdb`,
 - batch PostgreSQL queries through `source.type: postgres`,
 - batch MySQL queries through `source.type: mysql`.

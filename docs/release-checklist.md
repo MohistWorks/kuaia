@@ -51,6 +51,7 @@ bin/kuaia validate -f examples/local-file-to-file.yaml
 bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
 bin/kuaia validate -f examples/document-directory-to-qdrant.yaml
 bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml
+bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml
 make public-mvp-smoke
@@ -67,7 +68,7 @@ git diff --check
 - [ ] GitHub Actions `CI` completes successfully on `main`.
 - [ ] CI includes `make release-gate`.
 - [ ] CI validates Maven tests, packaging, CLI help, local file preflight,
-  Qdrant preflight, Postgres and MySQL config preflight, public smoke,
+  Qdrant preflight, S3/Postgres/MySQL config preflight, public smoke,
   connector e2e, default Docker Compose config, and MySQL Docker Compose
   config.
 

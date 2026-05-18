@@ -22,6 +22,7 @@ Run a focused connector e2e case while iterating on one connector:
 
 ```bash
 make e2e CASE=mysql-qdrant
+make e2e CASE=s3-qdrant
 ```
 
 Run the full local gate before submitting runtime or connector changes:
@@ -47,9 +48,10 @@ commands that were run.
 ## Current Scope
 
 The MVP supports local declarative batch pipelines, typed `BinaryRow` records,
-checkpointed execution, local CSV, JSONL, batch Postgres, and batch MySQL
-sources, file/console/mock-vector/Qdrant sinks, and a bounded Raft HA prototype
-for state-store validation.
+checkpointed execution, local CSV, JSONL, document directory, S3-compatible
+object storage, DuckDB, batch Postgres, and batch MySQL sources,
+file/console/mock-vector/Qdrant sinks, and a bounded Raft HA prototype for
+state-store validation.
 
 The project does not yet provide CDC, streaming DAG execution, production
 deployment packaging, a web UI, a connector marketplace, or exactly-once

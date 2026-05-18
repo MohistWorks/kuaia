@@ -20,6 +20,7 @@ import com.kuaia.engine.worker.connector.DuckDBSource;
 import com.kuaia.engine.worker.connector.LocalSource;
 import com.kuaia.engine.worker.connector.MySQLSource;
 import com.kuaia.engine.worker.connector.PostgresSource;
+import com.kuaia.engine.worker.connector.S3ObjectSource;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import com.kuaia.engine.worker.connector.v2.BatchCommit;
 import com.kuaia.engine.worker.connector.v2.BatchSinkWriter;
@@ -286,6 +287,9 @@ public class LocalPipelineRunner {
             return new LocalSourceAdapter(
                     new DocumentDirectorySource(Paths.get(config.getSource().getPath())),
                     "document-directory-0");
+        }
+        if ("s3".equals(sourceType)) {
+            return new LocalSourceAdapter(new S3ObjectSource(config.getSource()), "s3-0");
         }
         throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
     }

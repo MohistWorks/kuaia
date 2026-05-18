@@ -22,6 +22,7 @@ Current built-in sources are:
 - `FileSource` for local CSV and JSONL files,
 - `DocumentDirectorySource` for local `.txt`, `.md`, and `.markdown`
   document directories,
+- `S3ObjectSource` for S3-compatible object-storage document objects,
 - `DuckDBSource` for one bounded local DuckDB SQL query,
 - `PostgresSource` for one bounded JDBC query,
 - `MySQLSource` for one bounded JDBC query.

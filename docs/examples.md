@@ -36,8 +36,8 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 
 After that, run individual examples below when you want to inspect one pipeline
 at a time. Qdrant, Postgres, MySQL, document-directory-to-Qdrant,
-DuckDB-to-Qdrant, and OpenAI-compatible examples require external services or
-credentials and are not part of the default smoke.
+DuckDB-to-Qdrant, S3-to-Qdrant, and OpenAI-compatible examples require external
+services or credentials and are not part of the default smoke.
 
 ## Common RAG Flows
 
@@ -61,11 +61,13 @@ with:
 bin/kuaia run -f examples/local-faq-jsonl-to-vector.yaml
 ```
 
-For a production-like batch source into Qdrant, start Postgres or MySQL with
-Qdrant, or use DuckDB over local files with Qdrant, and then run:
+For a production-like batch source into Qdrant, start Postgres, MySQL, or an
+S3-compatible object store with Qdrant, or use DuckDB over local files with
+Qdrant, and then run:
 
 ```bash
 bin/kuaia run -f examples/duckdb-csv-to-qdrant.yaml
+bin/kuaia run -f examples/s3-docs-to-qdrant.yaml
 bin/kuaia run -f examples/postgres-to-qdrant.yaml
 bin/kuaia run -f examples/mysql-to-qdrant.yaml
 ```
@@ -321,6 +323,35 @@ into Qdrant collection `kuaia_duckdb_docs` with
 `payloadFields: [id, content]`. The same `source.type: duckdb` connector can
 run queries that use DuckDB's `read_json_auto(...)` and `read_parquet(...)`
 functions when those files are available locally.
+
+## S3-Compatible Object Storage To Qdrant
+
+Start an S3-compatible object store such as MinIO and Qdrant. The example
+expects a bucket named `kuaia-docs` with text-like objects under the `docs/`
+prefix.
+
+Create the example Qdrant collection:
+
+```bash
+curl -X PUT http://localhost:6333/collections/kuaia_s3_docs \
+  -H 'Content-Type: application/json' \
+  --data '{"vectors":{"size":4,"distance":"Cosine"}}'
+```
+
+Run the S3-to-Qdrant pipeline:
+
+```bash
+export KUAIA_S3_ACCESS_KEY=...
+export KUAIA_S3_SECRET_KEY=...
+bin/kuaia run -f examples/s3-docs-to-qdrant.yaml
+```
+
+The example reads `.txt`, `.md`, `.markdown`, `.jsonl`, and `.csv` objects from
+`s3://kuaia-docs/docs/`, creates deterministic mock embeddings from `content`,
+and upserts points into Qdrant collection `kuaia_s3_docs` with
+`payloadFields: [id, key, content]`. It is not part of default smoke because it
+requires object storage and Qdrant services. For an automated local proof, run
+`make e2e CASE=s3-qdrant`; the e2e case starts MinIO and Qdrant with Docker.
 
 ## Postgres To Qdrant
 
