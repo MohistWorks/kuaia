@@ -9,6 +9,8 @@ COMPOSE_PROJECT=$(printf "kuaia-e2e-%s" "$RUN_ID" | tr '[:upper:]' '[:lower:]' |
 WORK_DIR="$ROOT_DIR/.kuaia/connector-e2e-smoke/$RUN_ID"
 E2E_COMPOSE="$WORK_DIR/docker-compose.e2e.yml"
 QDRANT_URL=""
+MILVUS_URL=""
+MILVUS_TOKEN="root:Milvus"
 
 list_cases() {
   echo "Available e2e cases:"
@@ -17,13 +19,14 @@ list_cases() {
   echo "  document-directory-qdrant"
   echo "  duckdb-qdrant"
   echo "  s3-qdrant"
+  echo "  file-milvus"
   echo "  postgres-qdrant"
   echo "  postgres-pgvector"
   echo "  mysql-qdrant"
 }
 
 usage() {
-  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|postgres-qdrant|postgres-pgvector|mysql-qdrant|--list|--help]"
+  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant|--list|--help]"
   echo
   list_cases
 }
@@ -42,7 +45,7 @@ case "${1:-${CASE:-all}}" in
     list_cases
     exit 0
     ;;
-  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|postgres-qdrant|postgres-pgvector|mysql-qdrant)
+  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant)
     SELECTED_CASE=${1:-${CASE:-all}}
     ;;
   *)
@@ -72,12 +75,25 @@ needs_postgres() {
   case_selected postgres-qdrant || case_selected postgres-pgvector
 }
 
+needs_qdrant() {
+  case_selected file-qdrant \
+    || case_selected document-directory-qdrant \
+    || case_selected duckdb-qdrant \
+    || case_selected s3-qdrant \
+    || case_selected postgres-qdrant \
+    || case_selected mysql-qdrant
+}
+
+needs_milvus() {
+  case_selected file-milvus
+}
+
 needs_mysql() {
   case_selected mysql-qdrant
 }
 
 needs_minio() {
-  case_selected s3-qdrant
+  case_selected s3-qdrant || needs_milvus
 }
 
 wait_for_qdrant() {
@@ -110,6 +126,21 @@ wait_for_minio() {
   return 1
 }
 
+wait_for_milvus() {
+  attempts=0
+  while [ "$attempts" -lt 90 ]; do
+    if curl -fsS "http://127.0.0.1:$MILVUS_HEALTH_PORT/healthz" >/dev/null 2>&1; then
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    sleep 2
+  done
+
+  echo "Milvus did not become ready." >&2
+  compose logs milvus >&2 || true
+  return 1
+}
+
 setup_minio() {
   docker run --rm \
     --network "${COMPOSE_PROJECT}_default" \
@@ -118,7 +149,7 @@ setup_minio() {
     minio/mc:latest \
     -c 'set -eu
 attempts=0
-until mc alias set local http://minio:9000 kuaia kuaia123 >/dev/null 2>&1; do
+until mc alias set local http://minio:9000 minioadmin minioadmin >/dev/null 2>&1; do
   attempts=$((attempts + 1))
   if [ "$attempts" -ge 60 ]; then
     echo "Could not configure MinIO alias." >&2
@@ -128,6 +159,66 @@ until mc alias set local http://minio:9000 kuaia kuaia123 >/dev/null 2>&1; do
 done
 mc mb -p local/kuaia-docs >/dev/null 2>&1 || true
 mc cp --recursive /seed/docs/ local/kuaia-docs/docs/ >/dev/null'
+}
+
+create_milvus_collection() {
+  collection=$1
+  response=$(curl -fsS \
+    -X POST "$MILVUS_URL/v2/vectordb/collections/create" \
+    -H "Authorization: Bearer $MILVUS_TOKEN" \
+    -H "Content-Type: application/json" \
+    --data "{\"collectionName\":\"$collection\",\"schema\":{\"autoID\":false,\"enableDynamicField\":true,\"fields\":[{\"fieldName\":\"id\",\"dataType\":\"Int64\",\"isPrimary\":true,\"autoID\":false},{\"fieldName\":\"embedding\",\"dataType\":\"FloatVector\",\"elementTypeParams\":{\"dim\":4}}]},\"indexParams\":[{\"fieldName\":\"embedding\",\"metricType\":\"COSINE\",\"indexType\":\"AUTOINDEX\"}]}" \
+    | tr -d '[:space:]')
+
+  case "$response" in
+    *"\"code\":0"*) ;;
+    *)
+      echo "Could not create Milvus collection $collection." >&2
+      echo "Actual response: $response" >&2
+      return 1
+      ;;
+  esac
+}
+
+load_milvus_collection() {
+  collection=$1
+  response=$(curl -fsS \
+    -X POST "$MILVUS_URL/v2/vectordb/collections/load" \
+    -H "Authorization: Bearer $MILVUS_TOKEN" \
+    -H "Content-Type: application/json" \
+    --data "{\"collectionName\":\"$collection\"}" \
+    | tr -d '[:space:]')
+
+  case "$response" in
+    *"\"code\":0"*) ;;
+    *)
+      echo "Could not load Milvus collection $collection." >&2
+      echo "Actual response: $response" >&2
+      return 1
+      ;;
+  esac
+
+  attempts=0
+  while [ "$attempts" -lt 60 ]; do
+    response=$(curl -fsS \
+      -X POST "$MILVUS_URL/v2/vectordb/collections/get_load_state" \
+      -H "Authorization: Bearer $MILVUS_TOKEN" \
+      -H "Content-Type: application/json" \
+      --data "{\"collectionName\":\"$collection\"}" \
+      | tr -d '[:space:]')
+
+    case "$response" in
+      *"\"loadState\":\"LoadStateLoaded\""*) return 0 ;;
+      *) ;;
+    esac
+
+    attempts=$((attempts + 1))
+    sleep 1
+  done
+
+  echo "Milvus collection $collection did not load." >&2
+  echo "Actual response: $response" >&2
+  return 1
 }
 
 wait_for_postgres() {
@@ -227,6 +318,33 @@ require_qdrant_count() {
   esac
 }
 
+require_milvus_count() {
+  collection=$1
+  expected=$2
+  attempts=0
+  response=""
+  while [ "$attempts" -lt 30 ]; do
+    response=$(curl -fsS \
+      -X POST "$MILVUS_URL/v2/vectordb/entities/query" \
+      -H "Authorization: Bearer $MILVUS_TOKEN" \
+      -H "Content-Type: application/json" \
+      --data "{\"collectionName\":\"$collection\",\"filter\":\"id >= 0\",\"outputFields\":[\"count(*)\"]}" \
+      | tr -d '[:space:]')
+
+    case "$response" in
+      *"\"code\":0"*\""count(*)\":$expected"*) return 0 ;;
+      *) ;;
+    esac
+
+    attempts=$((attempts + 1))
+    sleep 1
+  done
+
+  echo "Expected Milvus collection $collection to contain $expected entities." >&2
+  echo "Actual response: $response" >&2
+  return 1
+}
+
 require_postgres_count() {
   table=$1
   expected=$2
@@ -279,20 +397,61 @@ EOF
   if needs_minio; then
     cat >> "$E2E_COMPOSE" <<EOF
   minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    command: minio server /minio_data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: kuaia
-      MINIO_ROOT_PASSWORD: kuaia123
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
     ports:
       - "127.0.0.1::9000"
     volumes:
-      - minio-data:/data
+      - minio-data:/minio_data
 
 EOF
   fi
 
-  cat >> "$E2E_COMPOSE" <<EOF
+  if needs_milvus; then
+    cat >> "$E2E_COMPOSE" <<EOF
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.25
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command:
+      - etcd
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --data-dir=/etcd
+    volumes:
+      - etcd-data:/etcd
+
+  milvus:
+    image: milvusdb/milvus:v2.6.15
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MQ_TYPE: woodpecker
+    ports:
+      - "127.0.0.1::19530"
+      - "127.0.0.1::9091"
+    volumes:
+      - milvus-data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+
+EOF
+  fi
+
+  if needs_qdrant; then
+    cat >> "$E2E_COMPOSE" <<EOF
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -300,6 +459,10 @@ EOF
     volumes:
       - qdrant-data:/qdrant/storage
 
+EOF
+  fi
+
+  cat >> "$E2E_COMPOSE" <<EOF
 volumes:
 EOF
 
@@ -315,9 +478,18 @@ EOF
 EOF
   fi
 
-  cat >> "$E2E_COMPOSE" <<EOF
+  if needs_milvus; then
+    cat >> "$E2E_COMPOSE" <<EOF
+  etcd-data:
+  milvus-data:
+EOF
+  fi
+
+  if needs_qdrant; then
+    cat >> "$E2E_COMPOSE" <<EOF
   qdrant-data:
 EOF
+  fi
 }
 
 trap cleanup EXIT INT TERM
@@ -328,6 +500,7 @@ cp "$ROOT_DIR/examples/data/documents.csv" "$WORK_DIR/data/documents.csv"
 cp -R "$ROOT_DIR/examples/data/docs" "$WORK_DIR/data/docs"
 
 FILE_TO_QDRANT="$WORK_DIR/local-jsonl-chunk-to-qdrant.yaml"
+FILE_TO_MILVUS="$WORK_DIR/local-file-to-milvus.yaml"
 DOCUMENT_DIRECTORY_TO_QDRANT="$WORK_DIR/document-directory-to-qdrant.yaml"
 DUCKDB_TO_QDRANT="$WORK_DIR/duckdb-csv-to-qdrant.yaml"
 S3_TO_QDRANT="$WORK_DIR/s3-docs-to-qdrant.yaml"
@@ -343,6 +516,8 @@ compose up -d
 POSTGRES_PORT=""
 MYSQL_PORT=""
 MINIO_PORT=""
+MILVUS_PORT=""
+MILVUS_HEALTH_PORT=""
 if needs_postgres; then
   POSTGRES_PORT=$(service_port postgres 5432)
 fi
@@ -352,8 +527,15 @@ fi
 if needs_minio; then
   MINIO_PORT=$(service_port minio 9000)
 fi
-QDRANT_PORT=$(service_port qdrant 6333)
-QDRANT_URL="http://127.0.0.1:$QDRANT_PORT"
+if needs_milvus; then
+  MILVUS_PORT=$(service_port milvus 19530)
+  MILVUS_HEALTH_PORT=$(service_port milvus 9091)
+  MILVUS_URL="http://127.0.0.1:$MILVUS_PORT"
+fi
+if needs_qdrant; then
+  QDRANT_PORT=$(service_port qdrant 6333)
+  QDRANT_URL="http://127.0.0.1:$QDRANT_PORT"
+fi
 MINIO_ENDPOINT="http://127.0.0.1:$MINIO_PORT"
 
 cat > "$FILE_TO_QDRANT" <<EOF
@@ -395,6 +577,31 @@ sink:
   timeoutMs: 30000
 checkpoint:
   stateDir: $WORK_DIR/state/local-jsonl-chunk-to-qdrant
+EOF
+
+cat > "$FILE_TO_MILVUS" <<EOF
+name: connector-e2e-file-to-milvus
+source:
+  type: file
+  path: data/documents.csv
+  format: csv
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+    batchSize: 32
+sink:
+  type: milvus
+  url: $MILVUS_URL
+  collection: kuaia_e2e_milvus_docs
+  apiKeyEnv: KUAIA_MILVUS_TOKEN
+  idField: id
+  vectorField: embedding
+  payloadFields: [content]
+  timeoutMs: 30000
+checkpoint:
+  stateDir: $WORK_DIR/state/file-to-milvus
 EOF
 
 cat > "$DOCUMENT_DIRECTORY_TO_QDRANT" <<EOF
@@ -560,7 +767,9 @@ checkpoint:
   stateDir: $WORK_DIR/state/mysql-to-qdrant
 EOF
 
-wait_for_qdrant
+if needs_qdrant; then
+  wait_for_qdrant
+fi
 if needs_postgres; then
   wait_for_postgres
 fi
@@ -569,7 +778,12 @@ if needs_mysql; then
 fi
 if needs_minio; then
   wait_for_minio
+fi
+if case_selected s3-qdrant; then
   setup_minio
+fi
+if needs_milvus; then
+  wait_for_milvus
 fi
 
 if case_selected file-qdrant; then
@@ -589,6 +803,10 @@ if case_selected postgres-qdrant; then
 fi
 if case_selected mysql-qdrant; then
   create_qdrant_collection kuaia_e2e_mysql_docs
+fi
+if case_selected file-milvus; then
+  create_milvus_collection kuaia_e2e_milvus_docs
+  load_milvus_collection kuaia_e2e_milvus_docs
 fi
 
 if case_selected file-qdrant; then
@@ -615,6 +833,17 @@ if case_selected document-directory-qdrant; then
   require_qdrant_count kuaia_e2e_document_directory_docs 2
 fi
 
+if case_selected file-milvus; then
+  KUAIA_MILVUS_TOKEN=$MILVUS_TOKEN \
+  run_pipeline_with_summary \
+    connector-e2e-file-to-milvus \
+    "$FILE_TO_MILVUS" \
+    "$WORK_DIR/summaries/file-to-milvus.json" \
+    2 \
+    2
+  require_milvus_count kuaia_e2e_milvus_docs 2
+fi
+
 if case_selected duckdb-qdrant; then
   run_pipeline_with_summary \
     connector-e2e-duckdb-to-qdrant \
@@ -626,8 +855,8 @@ if case_selected duckdb-qdrant; then
 fi
 
 if case_selected s3-qdrant; then
-  KUAIA_S3_ACCESS_KEY=kuaia \
-  KUAIA_S3_SECRET_KEY=kuaia123 \
+  KUAIA_S3_ACCESS_KEY=minioadmin \
+  KUAIA_S3_SECRET_KEY=minioadmin \
   run_pipeline_with_summary \
     connector-e2e-s3-to-qdrant \
     "$S3_TO_QDRANT" \

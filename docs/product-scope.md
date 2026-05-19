@@ -69,7 +69,8 @@ Supported sinks:
 - local CSV or JSONL `file`,
 - `mock-vector`,
 - Qdrant vector upserts,
-- pgvector JDBC batch upserts into pre-created PostgreSQL tables.
+- pgvector JDBC batch upserts into pre-created PostgreSQL tables,
+- Milvus REST batch upserts into pre-created collections.
 
 Supported runtime behavior:
 

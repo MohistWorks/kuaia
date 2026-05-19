@@ -8,6 +8,8 @@ All notable public changes to Kuaia are tracked here.
 
 - Added `sink.type: pgvector` for JDBC batch upserts into pre-created
   PostgreSQL pgvector tables, plus a Postgres-to-pgvector example and e2e case.
+- Added `sink.type: milvus` for Milvus REST batch upserts into pre-created
+  collections, plus a local file-to-Milvus example and e2e case.
 
 ### Changed
 

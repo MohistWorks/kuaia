@@ -35,9 +35,10 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 - fatal malformed CSV diagnostics with a stable `Source stage failed:` prefix.
 
 After that, run individual examples below when you want to inspect one pipeline
-at a time. Qdrant, pgvector, Postgres, MySQL, document-directory-to-Qdrant,
-DuckDB-to-Qdrant, S3-to-Qdrant, and OpenAI-compatible examples require external
-services or credentials and are not part of the default smoke.
+at a time. Qdrant, pgvector, Milvus, Postgres, MySQL,
+document-directory-to-Qdrant, DuckDB-to-Qdrant, S3-to-Qdrant, and
+OpenAI-compatible examples require external services or credentials and are not
+part of the default smoke.
 
 ## Common RAG Flows
 
@@ -77,6 +78,14 @@ run:
 
 ```bash
 bin/kuaia run -f examples/postgres-to-pgvector.yaml
+```
+
+For a Milvus vector-store path, start Milvus, create the target collection, and
+run:
+
+```bash
+export KUAIA_MILVUS_TOKEN=root:Milvus
+bin/kuaia run -f examples/local-file-to-milvus.yaml
 ```
 
 ## Local File To Console
@@ -412,6 +421,24 @@ embeddings, and upserts rows into the pre-created `document_vectors` table with
 `payloadFields: [content]`. Kuaia does not create pgvector tables
 automatically. For an automated local proof, run
 `make e2e CASE=postgres-pgvector`.
+
+## Local File To Milvus
+
+Start Milvus and create the target collection with an `id` primary key and
+`embedding` float-vector field. Kuaia does not create Milvus collections
+automatically.
+
+Run the local file-to-Milvus pipeline:
+
+```bash
+export KUAIA_MILVUS_TOKEN=root:Milvus
+bin/kuaia run -f examples/local-file-to-milvus.yaml
+```
+
+The example reads `examples/data/documents.csv`, creates deterministic mock
+embeddings, and upserts rows into Milvus collection `kuaia_docs` with
+`payloadFields: [content]`. For an automated local proof, run
+`make e2e CASE=file-milvus`; the e2e case starts Milvus with Docker.
 
 ## MySQL To Qdrant
 

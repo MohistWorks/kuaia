@@ -635,8 +635,8 @@ Rules:
 
 Implementation note: `mock-vector` is backed by Kuaia's local mock vector sink
 factory. The sink factory registry is an internal extension point for vector
-database integrations. Use `qdrant` or `pgvector` for current real vector
-database sinks.
+database integrations. Use `qdrant`, `pgvector`, or `milvus` for current real
+vector database sinks.
 
 ### qdrant
 
@@ -752,6 +752,66 @@ The id field and vector field cannot be included in `payloadFields`, since they
 are already written as dedicated columns. Missing credential environment
 variables, missing id/vector/payload fields, unsupported payload field types, and
 JDBC write failures are fatal sink errors.
+
+### milvus
+
+```yaml
+sink:
+  type: milvus
+  url: http://localhost:19530
+  collection: kuaia_docs
+  apiKeyEnv: KUAIA_MILVUS_TOKEN
+  idField: id
+  vectorField: embedding
+  payloadFields: [content]
+  timeoutMs: 30000
+```
+
+`sink.type: milvus` writes vectors to a pre-created Milvus collection using the
+Milvus REST v2 `POST /v2/vectordb/entities/upsert` endpoint. Kuaia sends rows in
+batches when an upstream embedding transform has `batchSize` configured.
+
+Fields:
+
+- `type`: must be `milvus`
+- `url`: Milvus REST base URL, for example `http://localhost:19530`
+- `collection`: target collection name
+- `apiKeyEnv`: optional environment variable containing the Milvus bearer token,
+  such as `root:Milvus` for a local authenticated standalone deployment
+- `idField`: `LONG` field used as the collection primary key field
+- `vectorField`: `VECTOR` field used as the Milvus vector field
+- `payloadFields`: optional list of `LONG` or `STRING` fields to include as
+  scalar or dynamic fields; when omitted, all non-id and non-vector fields are
+  included
+- `timeoutMs`: optional HTTP connect/read timeout in milliseconds. Defaults to
+  `30000` and must be a positive integer when configured.
+
+Kuaia does not create Milvus collections automatically. Create the example
+collection before running `examples/local-file-to-milvus.yaml`:
+
+```bash
+export KUAIA_MILVUS_TOKEN=root:Milvus
+
+curl -X POST http://localhost:19530/v2/vectordb/collections/create \
+  -H "Authorization: Bearer $KUAIA_MILVUS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data '{
+    "collectionName": "kuaia_docs",
+    "schema": {
+      "autoID": false,
+      "enableDynamicField": true,
+      "fields": [
+        {"fieldName": "id", "dataType": "Int64", "isPrimary": true, "autoID": false},
+        {"fieldName": "embedding", "dataType": "FloatVector", "elementTypeParams": {"dim": 4}}
+      ]
+    }
+  }'
+```
+
+The id field and vector field cannot be included in `payloadFields`, since they
+are always sent as dedicated entity fields. Missing token environment variables,
+missing id/vector/payload fields, unsupported payload field types, non-2xx Milvus
+responses, and 2xx responses whose JSON `code` is not `0` are fatal sink errors.
 
 ## Error Policy
 
@@ -1072,8 +1132,9 @@ Common examples:
 - `source.url for source.type mysql must start with jdbc:mysql:`
 - `source.url for source.type duckdb must start with jdbc:duckdb:`
 - `Invalid source.fetchSize: <value>`
-- `sink.timeoutMs is only supported for sink.type: qdrant or pgvector`
-- `sink.payloadFields is only supported for sink.type: qdrant or pgvector`
+- `sink.timeoutMs is only supported for sink.type: qdrant, pgvector, or milvus`
+- `sink.payloadFields is only supported for sink.type: qdrant, pgvector, or
+  milvus`
 - `sink.payloadFields must not include sink.vectorField: <field>`
 - `Duplicate value in sink.payloadFields: <field>`
 - `Invalid sink.timeoutMs: <value>`
@@ -1143,7 +1204,7 @@ The current YAML contract does not support:
 - CDC or streaming external connectors,
 - additional production-certified external connectors beyond batch PostgreSQL
   and MySQL,
-- additional real vector databases beyond Qdrant,
+- additional real vector databases beyond Qdrant, pgvector, and Milvus,
 - provider-specific SDK integrations,
 - production deployment settings,
 - exactly-once guarantees.

@@ -54,7 +54,7 @@ public class PipelineConfigLoader {
         String sinkType = require(sink, "sink.type");
 
         requireSupported("source.type", sourceType, "file", "document-directory", "postgres", "mysql", "duckdb", "s3");
-        requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant", "pgvector");
+        requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant", "pgvector", "milvus");
 
         PipelineConfig.SourceConfig sourceConfig = loadSource(path, sourceType, source);
         PipelineConfig.SinkConfig sinkConfig = loadSink(path, sinkType, sink);
@@ -477,8 +477,12 @@ public class PipelineConfigLoader {
         if ("pgvector".equals(sinkType)) {
             return loadPgvectorSink(sink);
         }
+        if ("milvus".equals(sinkType)) {
+            return loadMilvusSink(sink);
+        }
         if (hasText(sink.get("timeoutMs"))) {
-            throw new PipelineConfigException("sink.timeoutMs is only supported for sink.type: qdrant or pgvector");
+            throw new PipelineConfigException(
+                    "sink.timeoutMs is only supported for sink.type: qdrant, pgvector, or milvus");
         }
         if (hasText(sink.get("chunkIndexField"))) {
             throw new PipelineConfigException("sink.chunkIndexField is only supported for sink.type: qdrant");
@@ -487,7 +491,8 @@ public class PipelineConfigLoader {
             throw new PipelineConfigException("sink.chunkIdMultiplier is only supported for sink.type: qdrant");
         }
         if (hasText(sink.get("payloadFields"))) {
-            throw new PipelineConfigException("sink.payloadFields is only supported for sink.type: qdrant or pgvector");
+            throw new PipelineConfigException(
+                    "sink.payloadFields is only supported for sink.type: qdrant, pgvector, or milvus");
         }
         if (!"file".equals(sinkType)) {
             return new PipelineConfig.SinkConfig(sinkType);
@@ -562,6 +567,27 @@ public class PipelineConfigLoader {
                 require(sink, "sink.table"),
                 require(sink, "sink.userEnv"),
                 require(sink, "sink.passwordEnv"));
+    }
+
+    private PipelineConfig.SinkConfig loadMilvusSink(Map<String, String> sink) throws PipelineConfigException {
+        String idField = require(sink, "sink.idField");
+        String vectorField = require(sink, "sink.vectorField");
+        List<String> payloadFields = parsePayloadFields(sink.get("payloadFields"), vectorField);
+        return new PipelineConfig.SinkConfig(
+                "milvus",
+                null,
+                null,
+                null,
+                require(sink, "sink.url"),
+                require(sink, "sink.collection"),
+                sink.get("apiKeyEnv"),
+                idField,
+                vectorField,
+                true,
+                parseSinkTimeoutMs(sink.get("timeoutMs"), DEFAULT_QDRANT_TIMEOUT_MS),
+                null,
+                0L,
+                payloadFields);
     }
 
     private PipelineConfig.ErrorPolicyConfig loadErrorPolicy(Map<String, String> errorPolicy)

@@ -1500,7 +1500,8 @@ class PipelineConfigLoaderTest {
                 PipelineConfigException.class,
                 () -> new PipelineConfigLoader().load(configPath));
 
-        assertEquals("sink.payloadFields is only supported for sink.type: qdrant or pgvector", error.getMessage());
+        assertEquals("sink.payloadFields is only supported for sink.type: qdrant, pgvector, or milvus",
+                error.getMessage());
     }
 
     @Test
@@ -1546,7 +1547,8 @@ class PipelineConfigLoaderTest {
                 PipelineConfigException.class,
                 () -> new PipelineConfigLoader().load(configPath));
 
-        assertEquals("sink.timeoutMs is only supported for sink.type: qdrant or pgvector", error.getMessage());
+        assertEquals("sink.timeoutMs is only supported for sink.type: qdrant, pgvector, or milvus",
+                error.getMessage());
     }
 
     @Test
@@ -1603,6 +1605,42 @@ class PipelineConfigLoaderTest {
         assertEquals("document_vectors", config.getSink().getTable());
         assertEquals("KUAIA_POSTGRES_USER", config.getSink().getUserEnv());
         assertEquals("KUAIA_POSTGRES_PASSWORD", config.getSink().getPasswordEnv());
+        assertEquals("id", config.getSink().getIdField());
+        assertEquals("embedding", config.getSink().getVectorField());
+        assertEquals(java.util.Collections.singletonList("content"), config.getSink().getPayloadFields());
+        assertEquals(12000, config.getSink().getTimeoutMs());
+    }
+
+    @Test
+    void loadsMilvusSinkConfig() throws Exception {
+        Path configPath = tempDir.resolve("milvus-sink.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: milvus-sink",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "transforms:",
+                "  - type: mock-embedding",
+                "    input: content",
+                "    output: embedding",
+                "    dimensions: 4",
+                "sink:",
+                "  type: milvus",
+                "  url: http://localhost:19530",
+                "  collection: kuaia_docs",
+                "  apiKeyEnv: KUAIA_MILVUS_TOKEN",
+                "  idField: id",
+                "  vectorField: embedding",
+                "  payloadFields: [content]",
+                "  timeoutMs: 12000").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("milvus", config.getSink().getType());
+        assertEquals("http://localhost:19530", config.getSink().getUrl());
+        assertEquals("kuaia_docs", config.getSink().getCollection());
+        assertEquals("KUAIA_MILVUS_TOKEN", config.getSink().getApiKeyEnv());
         assertEquals("id", config.getSink().getIdField());
         assertEquals("embedding", config.getSink().getVectorField());
         assertEquals(java.util.Collections.singletonList("content"), config.getSink().getPayloadFields());

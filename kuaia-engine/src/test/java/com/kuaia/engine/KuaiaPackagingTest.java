@@ -99,11 +99,13 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=mysql-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=document-directory-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=s3-qdrant"));
+        assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=file-milvus"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=postgres-pgvector"));
         assertTrue(read(root.resolve("README.md")).contains("DuckDB"));
         assertTrue(read(root.resolve("README.md")).contains("S3-compatible object storage"));
         assertTrue(read(root.resolve("README.md")).contains("document directory"));
         assertTrue(read(root.resolve("README.md")).contains("pgvector"));
+        assertTrue(read(root.resolve("README.md")).contains("milvus"));
         assertTrue(read(root.resolve("README.md")).contains(".kuaia/output/local-file-to-file.csv"));
         assertTrue(read(root.resolve("README.md")).contains("SECURITY.md"));
         assertTrue(Files.exists(root.resolve("SECURITY.md")), "SECURITY.md should exist");
@@ -114,6 +116,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.qdrant.yml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("postgres-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("postgres-to-pgvector.yaml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("local-file-to-milvus.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.postgres.yml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("mysql-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.mysql.yml"));
@@ -122,6 +125,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/examples.md")).contains("s3-docs-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: pgvector"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: milvus"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: postgres"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: mysql"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: duckdb"));
@@ -166,6 +170,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("final `0.2.x` release"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("at least five public changes"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("sink.type: pgvector"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("sink.type: milvus"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.2 - 2026-05-18"));
         assertFalse(read(root.resolve("CHANGELOG.md")).contains("0.2.2-SNAPSHOT"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.1 - 2026-05-18"));
@@ -194,6 +199,7 @@ class KuaiaPackagingTest {
         assertTrue(e2eScript.contains("file-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("document-directory-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("s3-qdrant"), e2eScript);
+        assertTrue(e2eScript.contains("file-milvus"), e2eScript);
         assertTrue(e2eScript.contains("postgres-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("postgres-pgvector"), e2eScript);
         assertTrue(e2eScript.contains("mysql-qdrant"), e2eScript);
@@ -214,6 +220,8 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("examples/postgres-to-qdrant.yaml")), "Postgres to Qdrant example should exist");
         assertTrue(Files.exists(root.resolve("examples/postgres-to-pgvector.yaml")),
                 "Postgres to pgvector example should exist");
+        assertTrue(Files.exists(root.resolve("examples/local-file-to-milvus.yaml")),
+                "Local file to Milvus example should exist");
         assertTrue(Files.exists(root.resolve("docker-compose.postgres.yml")), "Postgres compose file should exist");
         assertTrue(Files.exists(root.resolve("examples/postgres/init/01-documents.sql")), "Postgres init SQL should exist");
         assertTrue(read(root.resolve("examples/postgres/init/01-documents.sql")).contains("create extension if not exists vector"));
@@ -232,6 +240,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("duckdb-qdrant"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("document-directory-qdrant"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("s3-qdrant"));
+        assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("file-milvus"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("postgres-pgvector"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml"));
@@ -239,6 +248,8 @@ class KuaiaPackagingTest {
                 .contains("bin/kuaia validate -f examples/document-directory-to-qdrant.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml"));
+        assertTrue(read(root.resolve("scripts/release-gate.sh"))
+                .contains("bin/kuaia validate -f examples/local-file-to-milvus.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/postgres-to-pgvector.yaml"));
 
