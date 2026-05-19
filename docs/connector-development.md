@@ -70,7 +70,8 @@ Current built-in sinks are:
 - local CSV `file`,
 - `mock-vector`,
 - `qdrant`,
-- `pgvector`.
+- `pgvector`,
+- `milvus`.
 
 Sinks implement `SinkWriter`:
 

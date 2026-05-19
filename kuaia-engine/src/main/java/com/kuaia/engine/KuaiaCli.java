@@ -336,6 +336,7 @@ public class KuaiaCli {
         out.println("  FAQ import: kuaia run -f examples/local-faq-jsonl-to-vector.yaml");
         out.println("  DuckDB to Qdrant: kuaia run -f examples/duckdb-csv-to-qdrant.yaml");
         out.println("  S3 to Qdrant: kuaia run -f examples/s3-docs-to-qdrant.yaml");
+        out.println("  Local file to Milvus: kuaia run -f examples/local-file-to-milvus.yaml");
         out.println("  Postgres to Qdrant: kuaia run -f examples/postgres-to-qdrant.yaml");
         out.println("  Postgres to pgvector: kuaia run -f examples/postgres-to-pgvector.yaml");
         out.println("  MySQL to Qdrant: kuaia run -f examples/mysql-to-qdrant.yaml");
@@ -347,6 +348,7 @@ public class KuaiaCli {
         out.println("  kuaia run -f examples/document-directory-to-qdrant.yaml");
         out.println("  kuaia run -f examples/duckdb-csv-to-qdrant.yaml");
         out.println("  kuaia run -f examples/s3-docs-to-qdrant.yaml");
+        out.println("  kuaia run -f examples/local-file-to-milvus.yaml");
         out.println("  kuaia run -f examples/postgres-to-qdrant.yaml");
         out.println("  kuaia run -f examples/postgres-to-pgvector.yaml");
         out.println("  kuaia run -f examples/mysql-to-qdrant.yaml");

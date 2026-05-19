@@ -99,8 +99,8 @@ make e2e
 
 This starts local Postgres, MySQL, and Qdrant services with Docker Compose,
 runs file-to-Qdrant, document-directory-to-Qdrant, DuckDB-to-Qdrant,
-S3-to-Qdrant, Postgres-to-Qdrant, Postgres-to-pgvector, and MySQL-to-Qdrant
-pipelines, checks run summaries, and tears the services down.
+S3-to-Qdrant, file-to-Milvus, Postgres-to-Qdrant, Postgres-to-pgvector, and
+MySQL-to-Qdrant pipelines, checks run summaries, and tears the services down.
 
 To iterate on one connector path, pass a case name:
 
@@ -109,6 +109,7 @@ make e2e CASE=file-qdrant
 make e2e CASE=document-directory-qdrant
 make e2e CASE=duckdb-qdrant
 make e2e CASE=s3-qdrant
+make e2e CASE=file-milvus
 make e2e CASE=postgres-qdrant
 make e2e CASE=postgres-pgvector
 make e2e CASE=mysql-qdrant
@@ -296,6 +297,17 @@ The pgvector example writes into the pre-created `document_vectors` table from
 `examples/postgres/init/01-documents.sql`; Kuaia does not create target tables
 automatically.
 
+Local file-to-Milvus example:
+
+```bash
+export KUAIA_MILVUS_TOKEN=root:Milvus
+bin/kuaia run -f examples/local-file-to-milvus.yaml
+```
+
+The Milvus example writes into a pre-created collection named `kuaia_docs`.
+Kuaia does not create target collections automatically. For an automated local
+proof that starts Milvus with Docker, run `make e2e CASE=file-milvus`.
+
 DuckDB-to-Qdrant example:
 
 ```bash
@@ -340,7 +352,7 @@ service requirements.
 | --- | --- |
 | Sources | `file` CSV and JSONL, `document-directory`, `s3`, batch `duckdb`, `postgres`, and `mysql` queries |
 | Transforms | `select`, `rename`, `trim`, `lowercase`, `replace`, `filter` (`not-empty`, `min-length`, `contains`, `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`, `greater-than-or-equal`, `less-than`, `less-than-or-equal`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
-| Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant`, `pgvector` |
+| Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant`, `pgvector`, `milvus` |
 | Runtime | Linear batch pipeline, preflight validation, checkpoint resume, bad-record skip mode |
 | State | Local checkpoint state, in-memory and RocksDB state stores |
 | Extension points | Source, transform, sink, split reader, and batch writer boundaries |

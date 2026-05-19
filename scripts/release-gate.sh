@@ -15,6 +15,7 @@ bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
 bin/kuaia validate -f examples/document-directory-to-qdrant.yaml
 bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml
 bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml
+bin/kuaia validate -f examples/local-file-to-milvus.yaml
 bin/kuaia validate -f examples/postgres-to-qdrant.yaml
 bin/kuaia validate -f examples/postgres-to-pgvector.yaml
 bin/kuaia validate -f examples/mysql-to-qdrant.yaml

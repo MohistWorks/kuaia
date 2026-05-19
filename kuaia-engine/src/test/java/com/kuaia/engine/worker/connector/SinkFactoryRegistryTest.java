@@ -108,4 +108,34 @@ class SinkFactoryRegistryTest {
 
         assertTrue(sink instanceof PgvectorVectorSink);
     }
+
+    @Test
+    void defaultRegistryCreatesMilvusSink() throws Exception {
+        KuaiaRowType rowType = new KuaiaRowType(
+                new String[]{"id", "content", "embedding"},
+                new DataType[]{DataType.LONG, DataType.STRING, DataType.VECTOR});
+        PipelineConfig.SinkConfig config = new PipelineConfig.SinkConfig(
+                "milvus",
+                null,
+                null,
+                null,
+                "http://localhost:19530",
+                "docs",
+                null,
+                "id",
+                "embedding",
+                true,
+                0,
+                null,
+                0L,
+                java.util.Collections.singletonList("content"));
+
+        SinkWriter sink = SinkFactoryRegistry.defaultRegistry().create(
+                "milvus",
+                rowType,
+                System.out,
+                config);
+
+        assertTrue(sink instanceof MilvusVectorSink);
+    }
 }

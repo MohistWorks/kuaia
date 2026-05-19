@@ -1,0 +1,21 @@
+name: local-file-to-milvus
+source:
+  type: file
+  path: data/documents.csv
+  format: csv
+transforms:
+  - type: mock-embedding
+    input: content
+    output: embedding
+    dimensions: 4
+sink:
+  type: milvus
+  url: http://localhost:19530
+  collection: kuaia_docs
+  apiKeyEnv: KUAIA_MILVUS_TOKEN
+  idField: id
+  vectorField: embedding
+  payloadFields: [content]
+  timeoutMs: 30000
+checkpoint:
+  stateDir: .kuaia/state/local-file-to-milvus

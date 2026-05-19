@@ -22,6 +22,7 @@ public class SinkFactoryRegistry {
         factories.put("mock-vector", new MockVectorSinkFactory());
         factories.put("qdrant", new QdrantVectorSinkFactory());
         factories.put("pgvector", new PgvectorVectorSinkFactory());
+        factories.put("milvus", new MilvusVectorSinkFactory());
         return new SinkFactoryRegistry(factories);
     }
 

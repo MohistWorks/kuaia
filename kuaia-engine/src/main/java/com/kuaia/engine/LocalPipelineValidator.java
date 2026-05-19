@@ -110,6 +110,10 @@ public class LocalPipelineValidator {
             validatePgvectorSink(config, rowType);
             return;
         }
+        if ("milvus".equals(sinkType)) {
+            validateMilvusSink(config, rowType);
+            return;
+        }
         throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
     }
 
@@ -182,6 +186,45 @@ public class LocalPipelineValidator {
         if (type != DataType.LONG && type != DataType.STRING) {
             throw new PipelineExecutionException(
                     "Pgvector sink does not support payload field type: " + type.name());
+        }
+    }
+
+    private void validateMilvusSink(PipelineConfig config, KuaiaRowType rowType) throws PipelineExecutionException {
+        int vectorOrdinal = requireField(
+                rowType,
+                config.getSink().getVectorField(),
+                DataType.VECTOR,
+                "Milvus sink");
+        int idOrdinal = requireField(rowType, config.getSink().getIdField(), DataType.LONG, "Milvus sink");
+        if (config.getSink().getPayloadFields().isEmpty()) {
+            for (int i = 0; i < rowType.getFieldNames().length; i++) {
+                if (i != idOrdinal && i != vectorOrdinal) {
+                    validateMilvusPayloadField(rowType, i);
+                }
+            }
+            return;
+        }
+        for (String payloadField : config.getSink().getPayloadFields()) {
+            int ordinal = rowType.getIndex(payloadField);
+            if (ordinal < 0) {
+                throw new PipelineExecutionException("Milvus sink requires payload field: " + payloadField);
+            }
+            if (ordinal == idOrdinal) {
+                throw new PipelineExecutionException("Milvus payload field must not be the id field: " + payloadField);
+            }
+            if (ordinal == vectorOrdinal) {
+                throw new PipelineExecutionException(
+                        "Milvus payload field must not be the vector field: " + payloadField);
+            }
+            validateMilvusPayloadField(rowType, ordinal);
+        }
+    }
+
+    private void validateMilvusPayloadField(KuaiaRowType rowType, int ordinal) throws PipelineExecutionException {
+        DataType type = rowType.getFieldTypes()[ordinal];
+        if (type != DataType.LONG && type != DataType.STRING) {
+            throw new PipelineExecutionException(
+                    "Milvus sink does not support payload field type: " + type.name());
         }
     }
 
