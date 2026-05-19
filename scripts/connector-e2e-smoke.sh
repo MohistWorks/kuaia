@@ -11,6 +11,8 @@ E2E_COMPOSE="$WORK_DIR/docker-compose.e2e.yml"
 QDRANT_URL=""
 MILVUS_URL=""
 MILVUS_TOKEN="root:Milvus"
+EMBEDDING_BASE_URL=""
+EMBEDDING_TOKEN="test-openai-compatible-key"
 
 list_cases() {
   echo "Available e2e cases:"
@@ -19,6 +21,7 @@ list_cases() {
   echo "  document-directory-qdrant"
   echo "  duckdb-qdrant"
   echo "  s3-qdrant"
+  echo "  file-openai-compatible-vector"
   echo "  file-milvus"
   echo "  postgres-qdrant"
   echo "  postgres-pgvector"
@@ -26,7 +29,7 @@ list_cases() {
 }
 
 usage() {
-  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant|--list|--help]"
+  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|file-openai-compatible-vector|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant|--list|--help]"
   echo
   list_cases
 }
@@ -45,7 +48,7 @@ case "${1:-${CASE:-all}}" in
     list_cases
     exit 0
     ;;
-  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant)
+  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|file-openai-compatible-vector|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant)
     SELECTED_CASE=${1:-${CASE:-all}}
     ;;
   *)
@@ -86,6 +89,10 @@ needs_qdrant() {
 
 needs_milvus() {
   case_selected file-milvus
+}
+
+needs_embedding_server() {
+  case_selected file-openai-compatible-vector
 }
 
 needs_mysql() {
@@ -139,6 +146,87 @@ wait_for_milvus() {
   echo "Milvus did not become ready." >&2
   compose logs milvus >&2 || true
   return 1
+}
+
+wait_for_embedding_server() {
+  attempts=0
+  while [ "$attempts" -lt 60 ]; do
+    if curl -fsS --max-time 3 "$EMBEDDING_BASE_URL/healthz" >/dev/null 2>&1; then
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    sleep 1
+  done
+
+  echo "OpenAI-compatible embedding fake server did not become ready." >&2
+  compose logs embedding >&2 || true
+  return 1
+}
+
+write_fake_embedding_server() {
+  cat > "$WORK_DIR/fake-openai-compatible-embedding-server.py" <<'PY'
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/healthz":
+            body = b"ok"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def do_POST(self):
+        if self.path != "/v1/embeddings":
+            self.send_response(404)
+            self.end_headers()
+            return
+        if self.headers.get("Authorization") != "Bearer test-openai-compatible-key":
+            self.respond({"error": {"message": "unauthorized"}}, 401)
+            return
+
+        length = int(self.headers.get("Content-Length", "0"))
+        payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        values = payload.get("input")
+        if not isinstance(values, list):
+            values = [values]
+        dimensions = int(payload.get("dimensions") or 4)
+        data = []
+        for index, value in enumerate(values):
+            text = "" if value is None else str(value)
+            seed = float(len(text))
+            embedding = [seed + float(i) for i in range(dimensions)]
+            data.append({
+                "object": "embedding",
+                "index": index,
+                "embedding": embedding,
+            })
+        self.respond({
+            "object": "list",
+            "data": data,
+            "model": payload.get("model", "fake-openai-compatible"),
+        })
+
+    def respond(self, payload, status=200):
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):
+        return
+
+
+HTTPServer(("0.0.0.0", 8000), Handler).serve_forever()
+PY
 }
 
 setup_minio() {
@@ -410,6 +498,19 @@ EOF
 EOF
   fi
 
+  if needs_embedding_server; then
+    cat >> "$E2E_COMPOSE" <<EOF
+  embedding:
+    image: python:3.12-alpine
+    command: ["python", "/srv/fake-openai-compatible-embedding-server.py"]
+    ports:
+      - "127.0.0.1::8000"
+    volumes:
+      - "$WORK_DIR/fake-openai-compatible-embedding-server.py:/srv/fake-openai-compatible-embedding-server.py:ro"
+
+EOF
+  fi
+
   if needs_milvus; then
     cat >> "$E2E_COMPOSE" <<EOF
   etcd:
@@ -462,33 +563,35 @@ EOF
 EOF
   fi
 
-  cat >> "$E2E_COMPOSE" <<EOF
+  if needs_postgres || needs_minio || needs_milvus || needs_qdrant; then
+    cat >> "$E2E_COMPOSE" <<EOF
 volumes:
 EOF
 
-  if needs_postgres; then
-    cat >> "$E2E_COMPOSE" <<EOF
+    if needs_postgres; then
+      cat >> "$E2E_COMPOSE" <<EOF
   postgres-data:
 EOF
-  fi
+    fi
 
-  if needs_minio; then
-    cat >> "$E2E_COMPOSE" <<EOF
+    if needs_minio; then
+      cat >> "$E2E_COMPOSE" <<EOF
   minio-data:
 EOF
-  fi
+    fi
 
-  if needs_milvus; then
-    cat >> "$E2E_COMPOSE" <<EOF
+    if needs_milvus; then
+      cat >> "$E2E_COMPOSE" <<EOF
   etcd-data:
   milvus-data:
 EOF
-  fi
+    fi
 
-  if needs_qdrant; then
-    cat >> "$E2E_COMPOSE" <<EOF
+    if needs_qdrant; then
+      cat >> "$E2E_COMPOSE" <<EOF
   qdrant-data:
 EOF
+    fi
   fi
 }
 
@@ -501,12 +604,17 @@ cp -R "$ROOT_DIR/examples/data/docs" "$WORK_DIR/data/docs"
 
 FILE_TO_QDRANT="$WORK_DIR/local-jsonl-chunk-to-qdrant.yaml"
 FILE_TO_MILVUS="$WORK_DIR/local-file-to-milvus.yaml"
+FILE_TO_OPENAI_COMPATIBLE_VECTOR="$WORK_DIR/local-file-to-openai-compatible-vector.yaml"
 DOCUMENT_DIRECTORY_TO_QDRANT="$WORK_DIR/document-directory-to-qdrant.yaml"
 DUCKDB_TO_QDRANT="$WORK_DIR/duckdb-csv-to-qdrant.yaml"
 S3_TO_QDRANT="$WORK_DIR/s3-docs-to-qdrant.yaml"
 POSTGRES_TO_QDRANT="$WORK_DIR/postgres-to-qdrant.yaml"
 POSTGRES_TO_PGVECTOR="$WORK_DIR/postgres-to-pgvector.yaml"
 MYSQL_TO_QDRANT="$WORK_DIR/mysql-to-qdrant.yaml"
+
+if needs_embedding_server; then
+  write_fake_embedding_server
+fi
 
 write_compose_file
 
@@ -518,6 +626,7 @@ MYSQL_PORT=""
 MINIO_PORT=""
 MILVUS_PORT=""
 MILVUS_HEALTH_PORT=""
+EMBEDDING_PORT=""
 if needs_postgres; then
   POSTGRES_PORT=$(service_port postgres 5432)
 fi
@@ -531,6 +640,10 @@ if needs_milvus; then
   MILVUS_PORT=$(service_port milvus 19530)
   MILVUS_HEALTH_PORT=$(service_port milvus 9091)
   MILVUS_URL="http://127.0.0.1:$MILVUS_PORT"
+fi
+if needs_embedding_server; then
+  EMBEDDING_PORT=$(service_port embedding 8000)
+  EMBEDDING_BASE_URL="http://127.0.0.1:$EMBEDDING_PORT"
 fi
 if needs_qdrant; then
   QDRANT_PORT=$(service_port qdrant 6333)
@@ -602,6 +715,30 @@ sink:
   timeoutMs: 30000
 checkpoint:
   stateDir: $WORK_DIR/state/file-to-milvus
+EOF
+
+cat > "$FILE_TO_OPENAI_COMPATIBLE_VECTOR" <<EOF
+name: connector-e2e-file-to-openai-compatible-vector
+source:
+  type: file
+  path: data/documents.csv
+  format: csv
+transforms:
+  - type: select
+    fields: [id, content]
+  - type: embedding
+    provider: openai-compatible
+    input: content
+    output: embedding
+    model: text-embedding-3-small
+    apiKeyEnv: KUAIA_OPENAI_COMPATIBLE_API_KEY
+    baseUrl: $EMBEDDING_BASE_URL/v1
+    timeoutMs: 30000
+    batchSize: 32
+sink:
+  type: mock-vector
+checkpoint:
+  stateDir: $WORK_DIR/state/file-to-openai-compatible-vector
 EOF
 
 cat > "$DOCUMENT_DIRECTORY_TO_QDRANT" <<EOF
@@ -785,6 +922,9 @@ fi
 if needs_milvus; then
   wait_for_milvus
 fi
+if needs_embedding_server; then
+  wait_for_embedding_server
+fi
 
 if case_selected file-qdrant; then
   create_qdrant_collection kuaia_e2e_article_chunks
@@ -842,6 +982,16 @@ if case_selected file-milvus; then
     2 \
     2
   require_milvus_count kuaia_e2e_milvus_docs 2
+fi
+
+if case_selected file-openai-compatible-vector; then
+  KUAIA_OPENAI_COMPATIBLE_API_KEY=$EMBEDDING_TOKEN \
+  run_pipeline_with_summary \
+    connector-e2e-file-to-openai-compatible-vector \
+    "$FILE_TO_OPENAI_COMPATIBLE_VECTOR" \
+    "$WORK_DIR/summaries/file-to-openai-compatible-vector.json" \
+    2 \
+    2
 fi
 
 if case_selected duckdb-qdrant; then

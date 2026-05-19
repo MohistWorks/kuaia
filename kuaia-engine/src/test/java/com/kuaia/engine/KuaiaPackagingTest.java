@@ -99,6 +99,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=mysql-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=document-directory-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=s3-qdrant"));
+        assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=file-openai-compatible-vector"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=file-milvus"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=postgres-pgvector"));
         assertTrue(read(root.resolve("README.md")).contains("DuckDB"));
@@ -199,6 +200,7 @@ class KuaiaPackagingTest {
         assertTrue(e2eScript.contains("file-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("document-directory-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("s3-qdrant"), e2eScript);
+        assertTrue(e2eScript.contains("file-openai-compatible-vector"), e2eScript);
         assertTrue(e2eScript.contains("file-milvus"), e2eScript);
         assertTrue(e2eScript.contains("postgres-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("postgres-pgvector"), e2eScript);
@@ -240,6 +242,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("duckdb-qdrant"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("document-directory-qdrant"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("s3-qdrant"));
+        assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("file-openai-compatible-vector"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("file-milvus"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("postgres-pgvector"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
@@ -248,6 +251,8 @@ class KuaiaPackagingTest {
                 .contains("bin/kuaia validate -f examples/document-directory-to-qdrant.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml"));
+        assertTrue(read(root.resolve("scripts/release-gate.sh"))
+                .contains("bin/kuaia validate -f examples/local-file-to-openai-compatible-vector.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/local-file-to-milvus.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))

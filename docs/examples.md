@@ -38,7 +38,8 @@ After that, run individual examples below when you want to inspect one pipeline
 at a time. Qdrant, pgvector, Milvus, Postgres, MySQL,
 document-directory-to-Qdrant, DuckDB-to-Qdrant, S3-to-Qdrant, and
 OpenAI-compatible examples require external services or credentials and are not
-part of the default smoke.
+part of the default smoke. The connector e2e gate provides Docker-backed local
+proof for these paths, including a fake OpenAI-compatible embedding service.
 
 ## Common RAG Flows
 
@@ -230,8 +231,9 @@ bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
 
 Reads `examples/data/documents.csv`, calls an OpenAI-compatible embeddings API,
 and writes the resulting vectors to the mock vector sink. The example requires a
-real API key in `OPENAI_API_KEY`; it is not part of the default automated smoke
-tests.
+real API key in `OPENAI_API_KEY` for normal use; for automated validation, run
+`make e2e CASE=file-openai-compatible-vector`, which starts a local fake
+OpenAI-compatible embedding service with Docker.
 
 ## Qdrant Vector Sink
 
