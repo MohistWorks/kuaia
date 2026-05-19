@@ -4,8 +4,6 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
-## 0.2.3 - 2026-05-18
-
 ### Added
 
 - Added `sink.type: pgvector` for JDBC batch upserts into pre-created
@@ -13,7 +11,10 @@ All notable public changes to Kuaia are tracked here.
 
 ### Changed
 
-- The public roadmap now tracks `0.2.3` as the active pgvector sink scope.
+- The public roadmap now keeps `0.2.3` open as the final `0.2.x` release,
+  consolidating the remaining Milvus, OpenAI-compatible embedding e2e, and
+  connector contract test work into that version.
+- Future versions require at least five public changes before a release is cut.
 
 ## 0.2.2 - 2026-05-18
 

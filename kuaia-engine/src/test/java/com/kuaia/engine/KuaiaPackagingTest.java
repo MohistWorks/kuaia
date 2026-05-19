@@ -136,15 +136,20 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.2.x Roadmap"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.1` shipped scope"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.2` shipped scope"));
-        assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.3` release-ready scope"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.3` final `0.2.x` development scope"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("the `0.2.2`"));
-        assertTrue(read(root.resolve("docs/roadmap.md")).contains("the `0.2.3` scope is release-ready"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("planned `0.2.x` release"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("The `0.2.1` scope shipped"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("DuckDB batch source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("document-directory source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("S3-compatible object-storage source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("pgvector sink"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("Milvus vector sink"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("OpenAI-compatible embedding provider e2e"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("Connector contract tests"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("at least five public changes"));
+        assertFalse(read(root.resolve("docs/roadmap.md")).contains("`0.2.4`"));
+        assertFalse(read(root.resolve("docs/roadmap.md")).contains("`0.2.5`"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("Connector e2e gate"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("Connector-ready runtime"));
@@ -157,9 +162,9 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/README.md")).contains("../CHANGELOG.md"));
         assertTrue(Files.exists(root.resolve("CHANGELOG.md")), "CHANGELOG.md should exist");
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## Unreleased"));
-        assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.3 - 2026-05-18"));
         assertFalse(read(root.resolve("CHANGELOG.md")).contains("0.2.3-SNAPSHOT"));
-        assertTrue(read(root.resolve("CHANGELOG.md")).contains("active pgvector sink scope"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("final `0.2.x` release"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("at least five public changes"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("sink.type: pgvector"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.2 - 2026-05-18"));
         assertFalse(read(root.resolve("CHANGELOG.md")).contains("0.2.2-SNAPSHOT"));
@@ -177,6 +182,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/release-checklist.md")).contains("CHANGELOG.md"));
         assertTrue(read(root.resolve("docs/release-checklist.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("docs/release-checklist.md")).contains("make e2e"));
+        assertTrue(read(root.resolve("docs/release-checklist.md")).contains("at least five public changes"));
         assertTrue(read(root.resolve("docs/release-checklist.md")).contains("requires GitHub Actions `CI` to pass"));
         assertTrue(Files.exists(root.resolve("scripts/connector-e2e-smoke.sh")),
                 "scripts/connector-e2e-smoke.sh should exist");
@@ -237,9 +243,9 @@ class KuaiaPackagingTest {
                 .contains("bin/kuaia validate -f examples/postgres-to-pgvector.yaml"));
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
-        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.3</version>"));
-        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.3</version>"));
-        assertTrue(enginePom.contains("<version>0.2.3</version>"), enginePom);
+        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.3-SNAPSHOT</version>"));
+        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.3-SNAPSHOT</version>"));
+        assertTrue(enginePom.contains("<version>0.2.3-SNAPSHOT</version>"), enginePom);
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);
         assertTrue(enginePom.contains("mysql-connector-j"), enginePom);
         assertTrue(enginePom.contains("postgresql"), enginePom);
