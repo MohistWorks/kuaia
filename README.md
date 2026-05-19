@@ -97,10 +97,12 @@ Run the Docker-backed connector e2e gate when changing connector behavior:
 make e2e
 ```
 
-This starts local Postgres, MySQL, and Qdrant services with Docker Compose,
-runs file-to-Qdrant, document-directory-to-Qdrant, DuckDB-to-Qdrant,
-S3-to-Qdrant, file-to-Milvus, Postgres-to-Qdrant, Postgres-to-pgvector, and
-MySQL-to-Qdrant pipelines, checks run summaries, and tears the services down.
+This starts local Postgres, MySQL, Qdrant, Milvus, MinIO, and fake
+OpenAI-compatible embedding services with Docker Compose, runs file-to-Qdrant,
+document-directory-to-Qdrant, DuckDB-to-Qdrant, S3-to-Qdrant,
+file-to-OpenAI-compatible-embedding, file-to-Milvus, Postgres-to-Qdrant,
+Postgres-to-pgvector, and MySQL-to-Qdrant pipelines, checks run summaries, and
+tears the services down.
 
 To iterate on one connector path, pass a case name:
 
@@ -109,6 +111,7 @@ make e2e CASE=file-qdrant
 make e2e CASE=document-directory-qdrant
 make e2e CASE=duckdb-qdrant
 make e2e CASE=s3-qdrant
+make e2e CASE=file-openai-compatible-vector
 make e2e CASE=file-milvus
 make e2e CASE=postgres-qdrant
 make e2e CASE=postgres-pgvector
@@ -253,6 +256,9 @@ bin/kuaia run -f examples/local-file-to-openai-compatible-vector.yaml
 The OpenAI-compatible embedding transform supports `batchSize` for batched
 array input requests, `timeoutMs` for HTTP connect/read timeout control, and
 stable validation of batch response counts and embedding indexes.
+For a no-credential e2e proof, run `make e2e CASE=file-openai-compatible-vector`;
+the e2e case starts a local fake OpenAI-compatible embedding service with
+Docker.
 
 Qdrant example:
 

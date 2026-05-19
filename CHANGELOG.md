@@ -10,6 +10,8 @@ All notable public changes to Kuaia are tracked here.
   PostgreSQL pgvector tables, plus a Postgres-to-pgvector example and e2e case.
 - Added `sink.type: milvus` for Milvus REST batch upserts into pre-created
   collections, plus a local file-to-Milvus example and e2e case.
+- Added OpenAI-compatible embedding provider e2e coverage with a local fake
+  `/v1/embeddings` service, plus release-gate validation for the public example.
 
 ### Changed
 
