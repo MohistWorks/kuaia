@@ -172,6 +172,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("at least five public changes"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("sink.type: pgvector"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("sink.type: milvus"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("connector contract tests"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.2 - 2026-05-18"));
         assertFalse(read(root.resolve("CHANGELOG.md")).contains("0.2.2-SNAPSHOT"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.1 - 2026-05-18"));
@@ -213,6 +214,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("Makefile")).contains("release-gate:"));
         assertTrue(Files.exists(root.resolve("docs/connector-development.md")),
                 "docs/connector-development.md should exist");
+        assertTrue(read(root.resolve("docs/connector-development.md")).contains("BuiltInSourceContractTest"));
+        assertTrue(read(root.resolve("docs/connector-development.md")).contains("BuiltInSinkContractTest"));
         assertTrue(Files.exists(root.resolve("docs/release-checklist.md")),
                 "docs/release-checklist.md should exist");
         assertTrue(read(root.resolve("docs/product-scope.md")).contains("connector-development.md"));

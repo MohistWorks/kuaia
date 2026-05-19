@@ -12,6 +12,8 @@ All notable public changes to Kuaia are tracked here.
   collections, plus a local file-to-Milvus example and e2e case.
 - Added OpenAI-compatible embedding provider e2e coverage with a local fake
   `/v1/embeddings` service, plus release-gate validation for the public example.
+- Added connector contract tests for built-in source and sink implementations,
+  covering shared row-type, checkpoint-resume, and batch-write behavior.
 
 ### Changed
 

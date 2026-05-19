@@ -123,10 +123,20 @@ For a transform:
 
 ## Validation
 
+Built-in connectors are also covered by contract tests:
+
+- `BuiltInSourceContractTest` checks that current sources expose an `id` field,
+  report a row type after `open()`, emit stable 1-based sequence ids, honor
+  `readFrom(lastCheckpointSeq, ...)`, and close cleanly.
+- `BuiltInSinkContractTest` checks that current sinks support the common
+  `open()`, `writeBatch(...)`, and `close()` lifecycle without requiring real
+  external services in unit tests.
+
 Run focused tests for the touched connector first, then the public MVP smoke:
 
 ```bash
 mvn -q -pl kuaia-engine -am -Dtest=KuaiaExamplesTest test
+mvn -q -pl kuaia-engine -am -Dtest=BuiltInSourceContractTest,BuiltInSinkContractTest test
 make public-mvp-smoke
 ```
 
