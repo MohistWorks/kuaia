@@ -141,9 +141,9 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("## 0.2.x Roadmap"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.1` shipped scope"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.2` shipped scope"));
-        assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.3` final `0.2.x` development scope"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("`0.2.3` final `0.2.x` shipped scope"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("the `0.2.2`"));
-        assertTrue(read(root.resolve("docs/roadmap.md")).contains("planned `0.2.x` release"));
+        assertTrue(read(root.resolve("docs/roadmap.md")).contains("the final planned `0.2.x` release"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("The `0.2.1` scope shipped"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("DuckDB batch source"));
         assertTrue(read(root.resolve("docs/roadmap.md")).contains("document-directory source"));
@@ -168,6 +168,7 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("CHANGELOG.md")), "CHANGELOG.md should exist");
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("## Unreleased"));
         assertFalse(read(root.resolve("CHANGELOG.md")).contains("0.2.3-SNAPSHOT"));
+        assertTrue(read(root.resolve("CHANGELOG.md")).contains("## 0.2.3 - 2026-05-19"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("final `0.2.x` release"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("at least five public changes"));
         assertTrue(read(root.resolve("CHANGELOG.md")).contains("sink.type: pgvector"));
@@ -262,9 +263,9 @@ class KuaiaPackagingTest {
                 .contains("bin/kuaia validate -f examples/postgres-to-pgvector.yaml"));
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
-        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.3-SNAPSHOT</version>"));
-        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.3-SNAPSHOT</version>"));
-        assertTrue(enginePom.contains("<version>0.2.3-SNAPSHOT</version>"), enginePom);
+        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.3</version>"));
+        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.3</version>"));
+        assertTrue(enginePom.contains("<version>0.2.3</version>"), enginePom);
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);
         assertTrue(enginePom.contains("mysql-connector-j"), enginePom);
         assertTrue(enginePom.contains("postgresql"), enginePom);
