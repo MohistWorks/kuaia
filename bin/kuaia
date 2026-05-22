@@ -17,7 +17,7 @@ if [ -n "$JAR_PATH" ] && [ -f "$JAR_PATH" ]; then
 fi
 
 "$MAVEN_BIN" -q -N -DskipTests install
-"$MAVEN_BIN" -q -pl kuaia-common -DskipTests install
+"$MAVEN_BIN" -q -pl kuaia-common,kuaia-connectors -DskipTests install
 exec "$MAVEN_BIN" -q -pl kuaia-engine exec:java \
   -Dexec.mainClass=com.kuaia.engine.KuaiaCli \
   -Dexec.args="$*"

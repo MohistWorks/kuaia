@@ -6,6 +6,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>kuaia-common</module>
+        <module>kuaia-connectors</module>
         <module>kuaia-engine</module>
     </modules>
     <properties>
