@@ -2,7 +2,7 @@ package com.kuaia.engine.worker.connector;
 
 import com.kuaia.common.data.BinaryRow;
 import com.kuaia.common.type.KuaiaRowType;
-import com.kuaia.engine.pipeline.PipelineExecutionException;
+import com.kuaia.common.pipeline.PipelineExecutionException;
 
 public interface LocalSource extends AutoCloseable {
     interface RecordConsumer {

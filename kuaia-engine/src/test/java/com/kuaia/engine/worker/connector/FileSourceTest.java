@@ -1,8 +1,8 @@
 package com.kuaia.engine.worker.connector;
 
 import com.kuaia.common.data.BinaryRow;
+import com.kuaia.common.pipeline.PipelineExecutionException;
 import com.kuaia.common.type.DataType;
-import com.kuaia.engine.pipeline.PipelineExecutionException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
