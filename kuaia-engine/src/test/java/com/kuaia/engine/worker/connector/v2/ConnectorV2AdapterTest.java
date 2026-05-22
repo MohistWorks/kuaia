@@ -2,9 +2,9 @@ package com.kuaia.engine.worker.connector.v2;
 
 import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.data.BinaryRow;
+import com.kuaia.common.pipeline.PipelineExecutionException;
 import com.kuaia.common.type.DataType;
 import com.kuaia.common.type.KuaiaRowType;
-import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.worker.connector.LocalSource;
 import org.junit.jupiter.api.Test;
 

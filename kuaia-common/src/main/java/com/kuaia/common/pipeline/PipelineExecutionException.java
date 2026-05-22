@@ -1,7 +1,6 @@
-package com.kuaia.engine.pipeline;
+package com.kuaia.common.pipeline;
 
-@Deprecated
-public class PipelineExecutionException extends com.kuaia.common.pipeline.PipelineExecutionException {
+public class PipelineExecutionException extends Exception {
     public PipelineExecutionException(String message) {
         super(message);
     }
@@ -10,3 +9,4 @@ public class PipelineExecutionException extends com.kuaia.common.pipeline.Pipeli
         super(message, cause);
     }
 }
+

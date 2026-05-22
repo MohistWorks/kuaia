@@ -1,7 +1,7 @@
 package com.kuaia.engine.worker.connector.v2;
 
 import com.kuaia.common.type.KuaiaRowType;
-import com.kuaia.engine.pipeline.PipelineExecutionException;
+import com.kuaia.common.pipeline.PipelineExecutionException;
 import com.kuaia.engine.worker.connector.FileSource;
 
 import java.util.Collections;

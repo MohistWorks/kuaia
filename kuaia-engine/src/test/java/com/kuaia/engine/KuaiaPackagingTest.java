@@ -48,7 +48,7 @@ class KuaiaPackagingTest {
         assertTrue(read(script).contains("kuaia-engine/target/kuaia-engine-$PROJECT_VERSION-cli.jar"));
         assertTrue(read(script).contains("exec java -jar"));
         assertTrue(read(script).contains("-N -DskipTests install"));
-        assertTrue(read(script).contains("-pl kuaia-common -DskipTests install"));
+        assertTrue(read(script).contains("-pl kuaia-common,kuaia-connectors -DskipTests install"));
 
         assertTrue(read(root.resolve("Makefile")).contains("run-vector"));
         assertTrue(read(root.resolve("Makefile")).contains("benchmark"));

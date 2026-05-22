@@ -51,6 +51,11 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.kuaia</groupId>
+            <artifactId>kuaia-connectors</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.ratis</groupId>
             <artifactId>ratis-server</artifactId>
             <version>${ratis.version}</version>

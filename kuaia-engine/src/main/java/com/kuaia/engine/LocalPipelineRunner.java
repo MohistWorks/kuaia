@@ -332,7 +332,7 @@ public class LocalPipelineRunner {
             PrintStream out,
             PipelineCounters counters,
             long seqId,
-            PipelineExecutionException error) {
+            com.kuaia.common.pipeline.PipelineExecutionException error) {
         if (!config.getErrorPolicy().shouldSkipBadRecords()) {
             return false;
         }

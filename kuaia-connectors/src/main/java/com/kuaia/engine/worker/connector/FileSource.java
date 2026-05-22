@@ -7,7 +7,7 @@ import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.data.BinaryRow;
 import com.kuaia.common.type.DataType;
 import com.kuaia.common.type.KuaiaRowType;
-import com.kuaia.engine.pipeline.PipelineExecutionException;
+import com.kuaia.common.pipeline.PipelineExecutionException;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
