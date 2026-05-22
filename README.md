@@ -44,7 +44,7 @@ For the detailed product boundary, read
 
 Requirements:
 
-- JDK 8 or newer
+- JDK 21 or newer
 - Maven 3.8+
 - Docker with Compose support, optional
 
