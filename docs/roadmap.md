@@ -79,6 +79,19 @@ the final planned `0.2.x` release.
 - Documentation and release-gate alignment for the final `0.2.x` connector
   coverage.
 
+## 0.3.0 planning
+
+`0.3.0` starts from the finalized 0.2.x feature set and focuses on execution
+and architectural hardening.
+
+- Extract connector runtime interfaces and implementations from `kuaia-engine` into a
+  dedicated connector module to remove in-process coupling.
+- Introduce cleaner module boundaries for connector contracts before a future dynamic
+  plugin surface is added.
+- Reduce per-row overhead for connector execution and improve batch-path performance
+  for high-volume ingestion.
+- Finalize connector execution docs for contributor onboarding.
+
 The intended AI connector coverage is:
 
 - batch sources: file, Postgres, MySQL, DuckDB, document directory, and

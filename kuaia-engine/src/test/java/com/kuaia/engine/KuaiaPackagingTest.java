@@ -263,9 +263,9 @@ class KuaiaPackagingTest {
                 .contains("bin/kuaia validate -f examples/postgres-to-pgvector.yaml"));
 
         String enginePom = read(root.resolve("kuaia-engine/pom.xml"));
-        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.2.3</version>"));
-        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.2.3</version>"));
-        assertTrue(enginePom.contains("<version>0.2.3</version>"), enginePom);
+        assertTrue(read(root.resolve("pom.xml")).contains("<version>0.3.0-SNAPSHOT</version>"));
+        assertTrue(read(root.resolve("kuaia-common/pom.xml")).contains("<version>0.3.0-SNAPSHOT</version>"));
+        assertTrue(enginePom.contains("<version>0.3.0-SNAPSHOT</version>"), enginePom);
         assertTrue(enginePom.contains("maven-shade-plugin"), enginePom);
         assertTrue(enginePom.contains("mysql-connector-j"), enginePom);
         assertTrue(enginePom.contains("postgresql"), enginePom);
