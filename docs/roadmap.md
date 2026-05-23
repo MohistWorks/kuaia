@@ -84,6 +84,8 @@ the final planned `0.2.x` release.
 `0.3.0` starts from the finalized 0.2.x feature set and focuses on execution
 and architectural hardening.
 
+- Move the project baseline to Java 21 across Maven, CI, Docker, and
+  contributor setup.
 - Extract connector runtime interfaces and implementations from `kuaia-engine` into a
   dedicated connector module to remove in-process coupling.
 - Introduce cleaner module boundaries for connector contracts before a future dynamic

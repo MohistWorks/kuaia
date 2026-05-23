@@ -8,7 +8,7 @@ testable, and aligned with the current public product scope in
 
 Requirements:
 
-- JDK 8 or newer
+- JDK 21 or newer
 - Maven 3.8+
 - Docker with Compose support for connector e2e and release-gate checks
 
