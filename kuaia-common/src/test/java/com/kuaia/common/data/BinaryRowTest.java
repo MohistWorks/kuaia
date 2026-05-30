@@ -83,6 +83,24 @@ public class BinaryRowTest {
     }
 
     @Test
+    public void vectorPayloadUsesRawFloat32Blocks() {
+        BinaryRow row = new BinaryRow(1);
+        row.setVector(0, new float[]{1.5f, -2.25f});
+
+        byte[] bytes = row.toBytes();
+        ByteBuffer view = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        long slot = view.getLong(BinaryRow.calculateNullBitsSizeInBytes(1));
+        int offset = (int) (slot >>> 32);
+        int size = (int) slot;
+
+        assertEquals(row.getFixedSizeInBytes(), offset);
+        assertEquals(2 * Float.BYTES, size);
+        assertEquals(row.getFixedSizeInBytes() + 2 * Float.BYTES, row.getSizeInBytes());
+        assertEquals(1.5f, view.getFloat(offset), 0.000001f);
+        assertEquals(-2.25f, view.getFloat(offset + Float.BYTES), 0.000001f);
+    }
+
+    @Test
     public void supportsExplicitNulls() {
         BinaryRow row = new BinaryRow(3);
 
@@ -152,6 +170,22 @@ public class BinaryRowTest {
         BinaryRow corrupted = BinaryRow.fromBytes(1, bytes);
 
         assertThrows(IllegalStateException.class, () -> corrupted.getString(0));
+    }
+
+    @Test
+    public void rejectsCorruptedVectorPayloadLength() {
+        BinaryRow row = new BinaryRow(1);
+        row.setVector(0, new float[]{1.0f, 2.0f});
+        byte[] bytes = row.toBytes();
+        ByteBuffer view = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        int slotOffset = BinaryRow.calculateNullBitsSizeInBytes(1);
+        long slot = view.getLong(slotOffset);
+        int offset = (int) (slot >>> 32);
+        view.putLong(slotOffset, ((long) offset << 32) | 5L);
+
+        BinaryRow corrupted = BinaryRow.fromBytes(1, bytes);
+
+        assertThrows(IllegalStateException.class, () -> corrupted.getVector(0));
     }
 
     @Test

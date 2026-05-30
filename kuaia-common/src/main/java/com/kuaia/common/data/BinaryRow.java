@@ -7,7 +7,8 @@ import java.util.Arrays;
 
 public class BinaryRow {
     static final ByteOrder BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
-    static final int HEADER_SIZE_IN_BITS = 8;
+    // Reserved for internal row flags such as row kind. It is not a public CDC contract.
+    static final int RESERVED_HEADER_BITS = 8;
     static final int SLOT_SIZE_IN_BYTES = Long.BYTES;
     private static final int DEFAULT_VARIABLE_CAPACITY = 1024;
 
@@ -55,7 +56,7 @@ public class BinaryRow {
         if (fieldCount < 0) {
             throw new IllegalArgumentException("fieldCount must be non-negative");
         }
-        return ((fieldCount + 63 + HEADER_SIZE_IN_BITS) / 64) * Long.BYTES;
+        return ((fieldCount + 63 + RESERVED_HEADER_BITS) / 64) * Long.BYTES;
     }
 
     public static int calculateFixedSizeInBytes(int fieldCount) {
@@ -83,7 +84,7 @@ public class BinaryRow {
 
     public boolean isNullAt(int ordinal) {
         checkOrdinal(ordinal);
-        int bitIndex = HEADER_SIZE_IN_BITS + ordinal;
+        int bitIndex = RESERVED_HEADER_BITS + ordinal;
         int byteIndex = bitIndex >>> 3;
         int bitInByte = bitIndex & 7;
         return (buffer[byteIndex] & (1 << bitInByte)) != 0;
@@ -179,10 +180,9 @@ public class BinaryRow {
             setNullAt(ordinal);
             return;
         }
-        int bytesLength = Integer.BYTES + values.length * Float.BYTES;
+        int bytesLength = values.length * Float.BYTES;
         byte[] bytes = new byte[bytesLength];
         ByteBuffer view = ByteBuffer.wrap(bytes).order(BYTE_ORDER);
-        view.putInt(values.length);
         for (float value : values) {
             view.putFloat(value);
         }
@@ -194,15 +194,11 @@ public class BinaryRow {
         if (bytes == null) {
             return null;
         }
-        if (bytes.length < Integer.BYTES) {
+        if (bytes.length % Float.BYTES != 0) {
             throw new IllegalStateException("Invalid vector payload length: " + bytes.length);
         }
         ByteBuffer view = ByteBuffer.wrap(bytes).order(BYTE_ORDER);
-        int elementCount = view.getInt();
-        int expectedLength = Integer.BYTES + elementCount * Float.BYTES;
-        if (elementCount < 0 || bytes.length != expectedLength) {
-            throw new IllegalStateException("Invalid vector payload length: " + bytes.length);
-        }
+        int elementCount = bytes.length / Float.BYTES;
         float[] result = new float[elementCount];
         for (int i = 0; i < elementCount; i++) {
             result[i] = view.getFloat();
@@ -273,12 +269,12 @@ public class BinaryRow {
     }
 
     private void setNullBit(int ordinal) {
-        int bitIndex = HEADER_SIZE_IN_BITS + ordinal;
+        int bitIndex = RESERVED_HEADER_BITS + ordinal;
         buffer[bitIndex >>> 3] = (byte) (buffer[bitIndex >>> 3] | (1 << (bitIndex & 7)));
     }
 
     private void clearNullBit(int ordinal) {
-        int bitIndex = HEADER_SIZE_IN_BITS + ordinal;
+        int bitIndex = RESERVED_HEADER_BITS + ordinal;
         buffer[bitIndex >>> 3] = (byte) (buffer[bitIndex >>> 3] & ~(1 << (bitIndex & 7)));
     }
 
