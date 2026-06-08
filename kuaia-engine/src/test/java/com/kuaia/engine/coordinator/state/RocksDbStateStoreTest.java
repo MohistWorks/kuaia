@@ -1,5 +1,6 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.common.model.WorkerRecord;
@@ -92,6 +93,65 @@ class RocksDbStateStoreTest {
 
             assertEquals(1, registered.size());
             assertEquals("worker-1", registered.get(0).getWorkerId());
+        }
+    }
+
+    @Test
+    void recoversJobInstanceAfterRestart() throws Exception {
+        JobInstance job = new JobInstance();
+        job.setJobId("job-1");
+        job.setTaskIds(List.of("task-1", "task-2"));
+
+        try (RocksDbStateStore store = new RocksDbStateStore(tempDir)) {
+            store.submitJob(job);
+        }
+
+        try (RocksDbStateStore reopened = new RocksDbStateStore(tempDir)) {
+            JobInstance recovered = reopened.getJob("job-1");
+            assertEquals("job-1", recovered.getJobId());
+            assertEquals(TaskState.CREATED, recovered.getState());
+            assertEquals(List.of("task-1", "task-2"), recovered.getTaskIds());
+        }
+    }
+
+    @Test
+    void cascadesJobToCompletedWhenAllTasksComplete() throws Exception {
+        try (RocksDbStateStore store = new RocksDbStateStore(tempDir)) {
+            JobInstance job = new JobInstance();
+            job.setJobId("job-1");
+            job.setTaskIds(List.of("task-1", "task-2"));
+            store.submitJob(job);
+
+            TaskRecord r1 = TaskRecord.created("job-1", "task-1").dispatching("w", "a1", 10_000L).running();
+            TaskRecord r2 = TaskRecord.created("job-1", "task-2").dispatching("w", "a2", 10_000L).running();
+            store.saveTask(r1);
+            store.saveTask(r2);
+
+            assertTrue(store.compareAndSetTask(r1, r1.complete("a1")));
+            assertEquals(TaskState.CREATED, store.getJob("job-1").getState());
+
+            assertTrue(store.compareAndSetTask(r2, r2.complete("a2")));
+            assertEquals(TaskState.COMPLETED, store.getJob("job-1").getState());
+        }
+    }
+
+    @Test
+    void cascadesJobToFinishedWithErrorsOnPartialFailure() throws Exception {
+        try (RocksDbStateStore store = new RocksDbStateStore(tempDir)) {
+            JobInstance job = new JobInstance();
+            job.setJobId("job-2");
+            job.setTaskIds(List.of("task-1", "task-2"));
+            store.submitJob(job);
+
+            TaskRecord r1 = TaskRecord.created("job-2", "task-1").dispatching("w", "a1", 10_000L).running();
+            TaskRecord r2 = TaskRecord.created("job-2", "task-2").dispatching("w", "a2", 10_000L).running();
+            store.saveTask(r1);
+            store.saveTask(r2);
+
+            store.compareAndSetTask(r1, r1.complete("a1"));
+            store.compareAndSetTask(r2, r2.fail("a2", "ERR", "boom"));
+
+            assertEquals(TaskState.FINISHED_WITH_ERRORS, store.getJob("job-2").getState());
         }
     }
 }

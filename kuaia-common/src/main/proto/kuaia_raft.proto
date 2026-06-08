@@ -8,6 +8,8 @@ enum CommandType {
   SAVE_TASK_RECORD = 2;
   CAS_TASK_RECORD = 3;
   SAVE_WORKER_RECORD = 4;
+  SUBMIT_JOB = 5;
+  UPDATE_JOB_STATE = 6;
 }
 
 message RaftCommand {
@@ -17,6 +19,8 @@ message RaftCommand {
     UpdateStatePayload update_state = 3;
     TaskRecordPayload task_record = 4;
     WorkerRecordPayload worker_record = 5;
+    SubmitJobPayload submit_job = 6;
+    UpdateJobStatePayload update_job_state = 7;
   }
 }
 
@@ -39,4 +43,14 @@ message TaskRecordPayload {
 message WorkerRecordPayload {
   string worker_id = 1;
   bytes record = 2;
+}
+
+message SubmitJobPayload {
+  string job_id = 1;
+  bytes definition = 2; // Serialized JobInstance
+}
+
+message UpdateJobStatePayload {
+  string job_id = 1;
+  int32 state_code = 2;
 }

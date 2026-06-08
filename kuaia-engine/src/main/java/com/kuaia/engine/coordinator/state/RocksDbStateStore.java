@@ -1,5 +1,7 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.JobInstance;
+import com.kuaia.common.model.JobStateEvaluator;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.common.model.WorkerRecord;
@@ -22,6 +24,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class RocksDbStateStore implements StateStore, Closeable {
@@ -31,6 +34,7 @@ public class RocksDbStateStore implements StateStore, Closeable {
     private static final String TASK_WORKER_PREFIX = "task_worker/";
     private static final String WORKER_PREFIX = "worker/";
     private static final String WORKER_STATE_PREFIX = "worker_state/";
+    private static final String JOB_PREFIX = "job/";
 
     private final Object lock = new Object();
     private final Options options;
@@ -53,6 +57,7 @@ public class RocksDbStateStore implements StateStore, Closeable {
                 deleteTaskIndexes(batch, previous);
                 putTask(batch, record);
                 db.write(writeOptions, batch);
+                cascadeJobIfTerminal(record);
             } catch (RocksDBException e) {
                 throw new IllegalStateException("Failed to save task " + record.getTaskId(), e);
             }
@@ -84,6 +89,7 @@ public class RocksDbStateStore implements StateStore, Closeable {
                 deleteTaskIndexes(batch, current);
                 putTask(batch, updated);
                 db.write(writeOptions, batch);
+                cascadeJobIfTerminal(updated);
                 return true;
             } catch (RocksDBException e) {
                 throw new IllegalStateException("Failed to update task " + expected.getTaskId(), e);
@@ -149,6 +155,68 @@ public class RocksDbStateStore implements StateStore, Closeable {
                     .filter(record -> record != null)
                     .sorted(Comparator.comparing(WorkerRecord::getWorkerId))
                     .collect(Collectors.toList());
+        }
+    }
+
+    @Override
+    public void submitJob(JobInstance job) {
+        synchronized (lock) {
+            try {
+                db.put(bytes(jobKey(job.getJobId())), serialize(job));
+            } catch (RocksDBException e) {
+                throw new IllegalStateException("Failed to submit job " + job.getJobId(), e);
+            }
+        }
+    }
+
+    @Override
+    public JobInstance getJob(String jobId) {
+        synchronized (lock) {
+            try {
+                return deserialize(db.get(bytes(jobKey(jobId))), JobInstance.class);
+            } catch (RocksDBException e) {
+                throw new IllegalStateException("Failed to read job " + jobId, e);
+            }
+        }
+    }
+
+    @Override
+    public void updateJobState(String jobId, TaskState state) {
+        synchronized (lock) {
+            try {
+                JobInstance job = deserialize(db.get(bytes(jobKey(jobId))), JobInstance.class);
+                if (job == null) {
+                    return;
+                }
+                job.setState(state);
+                db.put(bytes(jobKey(jobId)), serialize(job));
+            } catch (RocksDBException e) {
+                throw new IllegalStateException("Failed to update job state " + jobId, e);
+            }
+        }
+    }
+
+    /**
+     * When a task reaches a terminal state, re-evaluate its parent job. Caller holds {@link #lock} and
+     * handles {@link RocksDBException}. Mirrors the Raft state machine's cascade.
+     */
+    private void cascadeJobIfTerminal(TaskRecord record) throws RocksDBException {
+        if (record == null || record.getJobId() == null || JobStateEvaluator.isActive(record.getState())) {
+            return;
+        }
+        JobInstance job = deserialize(db.get(bytes(jobKey(record.getJobId()))), JobInstance.class);
+        if (job == null || job.getTaskIds() == null) {
+            return;
+        }
+        List<TaskState> childStates = new ArrayList<>();
+        for (String childTaskId : job.getTaskIds()) {
+            TaskRecord child = getTaskInternal(childTaskId);
+            childStates.add(child == null ? null : child.getState());
+        }
+        Optional<TaskState> decided = JobStateEvaluator.evaluate(childStates);
+        if (decided.isPresent() && decided.get() != job.getState()) {
+            job.setState(decided.get());
+            db.put(bytes(jobKey(record.getJobId())), serialize(job));
         }
     }
 
@@ -229,6 +297,10 @@ public class RocksDbStateStore implements StateStore, Closeable {
 
     private String taskWorkerPrefix(String workerId) {
         return TASK_WORKER_PREFIX + workerId + "/";
+    }
+
+    private String jobKey(String jobId) {
+        return JOB_PREFIX + jobId;
     }
 
     private String workerKey(String workerId) {
