@@ -60,4 +60,41 @@ class JobStateEvaluatorTest {
         assertEquals(Optional.of(TaskState.FINISHED_WITH_ERRORS),
                 JobStateEvaluator.evaluate(List.of(TaskState.COMPLETED, TaskState.CANCELLED)));
     }
+
+    // ---- counts-based overload ----
+
+    @Test
+    void countsEmptyWhileTasksStillNonTerminal() {
+        // terminal < total -> not decided yet.
+        assertTrue(JobStateEvaluator.evaluate(3, 1, 0, 0).isEmpty());
+        assertTrue(JobStateEvaluator.evaluate(3, 1, 1, 0).isEmpty());
+        // No tasks at all.
+        assertTrue(JobStateEvaluator.evaluate(0, 0, 0, 0).isEmpty());
+    }
+
+    @Test
+    void countsCompletedWhenAllCompleted() {
+        assertEquals(Optional.of(TaskState.COMPLETED), JobStateEvaluator.evaluate(3, 3, 0, 0));
+    }
+
+    @Test
+    void countsFailedWhenNoneCompleted() {
+        assertEquals(Optional.of(TaskState.FAILED), JobStateEvaluator.evaluate(2, 0, 2, 0));
+        // All cancelled also counts as FAILED (no completed survived).
+        assertEquals(Optional.of(TaskState.FAILED), JobStateEvaluator.evaluate(2, 0, 0, 2));
+    }
+
+    @Test
+    void countsFinishedWithErrorsWhenMixed() {
+        assertEquals(Optional.of(TaskState.FINISHED_WITH_ERRORS), JobStateEvaluator.evaluate(3, 2, 1, 0));
+        assertEquals(Optional.of(TaskState.FINISHED_WITH_ERRORS), JobStateEvaluator.evaluate(2, 1, 0, 1));
+    }
+
+    @Test
+    void countsAndCollectionOverloadsAgree() {
+        // The collection overload must delegate to the same rule.
+        assertEquals(
+                JobStateEvaluator.evaluate(3, 2, 1, 0),
+                JobStateEvaluator.evaluate(List.of(TaskState.COMPLETED, TaskState.COMPLETED, TaskState.FAILED)));
+    }
 }

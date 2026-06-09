@@ -24,7 +24,11 @@ import java.util.Map;
  */
 public class JobSubmissionService {
 
-    /** Config key under which a task definition carries its bundle's source splits. */
+    /**
+     * Config key under which a task definition carries its bundle's source splits. The split objects
+     * must be {@link java.io.Serializable} — they are persisted with the {@link TaskRecord} via
+     * RocksDB / Raft (Java serialization).
+     */
     public static final String SPLITS_CONFIG_KEY = "splits";
 
     private final StateStore stateStore;

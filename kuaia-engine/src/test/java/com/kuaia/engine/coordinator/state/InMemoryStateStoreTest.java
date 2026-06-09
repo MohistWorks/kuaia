@@ -170,4 +170,45 @@ class InMemoryStateStoreTest {
 
         assertEquals(TaskState.FINISHED_WITH_ERRORS, store.getJob("job-2").getState());
     }
+
+    @Test
+    void savingSameTerminalRecordTwiceDoesNotDoubleCount() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        JobInstance job = new JobInstance();
+        job.setJobId("job-1");
+        job.setTaskIds(List.of("task-1", "task-2"));
+        store.submitJob(job);
+
+        TaskRecord done1 = TaskRecord.created("job-1", "task-1")
+                .dispatching("w", "a1", 10_000L).running().complete("a1");
+        store.saveTask(done1);
+        store.saveTask(done1); // idempotent re-save
+        assertEquals(1, store.getJob("job-1").getCompletedTasks());
+        assertEquals(TaskState.CREATED, store.getJob("job-1").getState());
+    }
+
+    @Test
+    void rerunningFailedTaskRecountsJobToCompleted() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        JobInstance job = new JobInstance();
+        job.setJobId("job-1");
+        job.setTaskIds(List.of("task-1", "task-2"));
+        store.submitJob(job);
+
+        TaskRecord r1 = TaskRecord.created("job-1", "task-1").dispatching("w", "a1", 10_000L).running();
+        TaskRecord r2 = TaskRecord.created("job-1", "task-2").dispatching("w", "a2", 10_000L).running();
+        store.saveTask(r1);
+        store.saveTask(r2);
+        store.compareAndSetTask(r1, r1.complete("a1"));
+        store.compareAndSetTask(r2, r2.fail("a2", "ERR", "boom"));
+        assertEquals(TaskState.FINISHED_WITH_ERRORS, store.getJob("job-1").getState());
+
+        // Re-run task-2 to success via a fresh attempt; counters recount to COMPLETED.
+        TaskRecord recovered2 = TaskRecord.created("job-1", "task-2")
+                .dispatching("w", "a3", 10_000L).running().complete("a3");
+        store.saveTask(recovered2);
+        assertEquals(0, store.getJob("job-1").getFailedTasks());
+        assertEquals(2, store.getJob("job-1").getCompletedTasks());
+        assertEquals(TaskState.COMPLETED, store.getJob("job-1").getState());
+    }
 }

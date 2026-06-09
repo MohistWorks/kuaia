@@ -13,6 +13,8 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
+import org.rocksdb.WriteBatch;
+import org.rocksdb.WriteOptions;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -23,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -39,10 +40,12 @@ public class RocksDBStateMachine extends BaseStateMachine {
     private static final String WORKER_STATE_SCAN_PREFIX = "scan/worker_state/";
 
     private RocksDB db;
+    private WriteOptions writeOptions;
 
     public void initialize(String path) throws IOException {
         RocksDB.loadLibrary();
         Options options = new Options().setCreateIfMissing(true);
+        this.writeOptions = new WriteOptions();
         try {
             this.db = RocksDB.open(options, path);
         } catch (org.rocksdb.RocksDBException e) {
@@ -127,15 +130,74 @@ public class RocksDBStateMachine extends BaseStateMachine {
             if (cas && (current == null || current.getVersion() != expectedVersion)) {
                 return false;
             }
-            db.put(bytes(taskKey(record.getTaskId())), serialize(record));
-            // Production task-completion path: when a task reaches a terminal state, atomically
-            // re-evaluate the parent job (design §4 — runs inside a serial Raft apply).
-            if (!JobStateEvaluator.isActive(record.getState())) {
-                evaluateJobState(record.getTaskId());
+            // Production task path: maintain the parent job's terminal-task counters incrementally
+            // (O(1)) instead of re-scanning every sibling. The task write and the job-counter write go
+            // into one WriteBatch so a crash can't desync them; on Raft replay an unchanged state is a
+            // no-op (see computeJobCounterDelta), keeping the apply idempotent. Runs on the serial
+            // apply thread (design §4).
+            TaskState oldState = current == null ? null : current.getState();
+            JobInstance updatedJob = computeJobCounterDelta(oldState, record);
+            try (WriteBatch batch = new WriteBatch()) {
+                batch.put(bytes(taskKey(record.getTaskId())), serialize(record));
+                if (updatedJob != null) {
+                    batch.put(bytes(jobKey(updatedJob.getJobId())), serialize(updatedJob));
+                }
+                db.write(writeOptions, batch);
             }
             return true;
         } catch (RocksDBException e) {
             throw new IOException("Failed to apply task record " + record.getTaskId(), e);
+        }
+    }
+
+    /**
+     * Compute the parent job's updated state after a task transitions from {@code oldState} to
+     * {@code newRecord.getState()}, adjusting only the affected terminal-task counter. Returns the
+     * mutated {@link JobInstance} to persist, or {@code null} when nothing changes (no job, no
+     * cross-terminal transition, or an identical state on replay).
+     */
+    private JobInstance computeJobCounterDelta(TaskState oldState, TaskRecord newRecord) throws IOException {
+        if (newRecord.getJobId() == null) {
+            return null;
+        }
+        TaskState newState = newRecord.getState();
+        if (oldState == newState) {
+            return null;
+        }
+        boolean oldTerminal = isTerminal(oldState);
+        boolean newTerminal = isTerminal(newState);
+        if (!oldTerminal && !newTerminal) {
+            return null;
+        }
+        JobInstance job = getJobInstance(newRecord.getJobId());
+        if (job == null || job.getTaskIds() == null) {
+            return null;
+        }
+        if (oldTerminal) {
+            adjustBucket(job, oldState, -1);
+        }
+        if (newTerminal) {
+            adjustBucket(job, newState, 1);
+        }
+        JobStateEvaluator.evaluate(
+                job.getTaskIds().size(),
+                job.getCompletedTasks(),
+                job.getFailedTasks(),
+                job.getCancelledTasks()).ifPresent(job::setState);
+        return job;
+    }
+
+    /** Terminal task states are those a task rests in: COMPLETED, FAILED, CANCELLED. */
+    private boolean isTerminal(TaskState state) {
+        return state != null && !JobStateEvaluator.isActive(state);
+    }
+
+    private void adjustBucket(JobInstance job, TaskState state, int delta) {
+        switch (state) {
+            case COMPLETED -> job.setCompletedTasks(job.getCompletedTasks() + delta);
+            case FAILED -> job.setFailedTasks(job.getFailedTasks() + delta);
+            case CANCELLED -> job.setCancelledTasks(job.getCancelledTasks() + delta);
+            default -> { /* non-terminal states have no bucket */ }
         }
     }
 
@@ -307,6 +369,11 @@ public class RocksDBStateMachine extends BaseStateMachine {
         }
     }
 
+    /**
+     * Full-scan recompute of a job's counters and aggregate state from the authoritative task records.
+     * This stateless recompute is idempotent and is used by the deprecated {@code UPDATE_STATE} path
+     * (the fast {@link #applyTaskRecord} path maintains the same counters incrementally instead).
+     */
     void evaluateJobState(String taskId) throws IOException {
         TaskRecord taskRecord = getTaskRecord(taskId);
         if (taskRecord == null) {
@@ -323,17 +390,31 @@ public class RocksDBStateMachine extends BaseStateMachine {
                 return;
             }
 
-            List<TaskState> childStates = new ArrayList<>();
+            int completed = 0;
+            int failed = 0;
+            int cancelled = 0;
+            boolean anyUnresolved = false;
             for (String childTaskId : job.getTaskIds()) {
                 TaskRecord child = getTaskRecord(childTaskId);
-                childStates.add(child == null ? null : child.getState());
+                if (child == null || JobStateEvaluator.isActive(child.getState())) {
+                    anyUnresolved = true;
+                    continue;
+                }
+                switch (child.getState()) {
+                    case COMPLETED -> completed++;
+                    case FAILED -> failed++;
+                    case CANCELLED -> cancelled++;
+                    default -> { /* non-terminal */ }
+                }
             }
 
-            Optional<TaskState> decided = JobStateEvaluator.evaluate(childStates);
-            if (decided.isEmpty() || decided.get() == job.getState()) {
-                return;
+            job.setCompletedTasks(completed);
+            job.setFailedTasks(failed);
+            job.setCancelledTasks(cancelled);
+            if (!anyUnresolved) {
+                JobStateEvaluator.evaluate(job.getTaskIds().size(), completed, failed, cancelled)
+                        .ifPresent(job::setState);
             }
-            job.setState(decided.get());
             db.put(bytes(jobKey(job.getJobId())), serialize(job));
         } catch (RocksDBException e) {
             throw new IOException("Failed to evaluate job state for task " + taskId, e);
@@ -348,5 +429,6 @@ public class RocksDBStateMachine extends BaseStateMachine {
     public void close() throws IOException {
         super.close();
         if (db != null) db.close();
+        if (writeOptions != null) writeOptions.close();
     }
 }

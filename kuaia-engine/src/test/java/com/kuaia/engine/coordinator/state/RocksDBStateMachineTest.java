@@ -259,8 +259,84 @@ class RocksDBStateMachineTest {
 
         stateMachine.applyTaskRecord(done1, false, -1L);
         assertEquals(TaskState.CREATED, stateMachine.getJobInstance(jobId).getState());
+        assertEquals(1, stateMachine.getJobInstance(jobId).getCompletedTasks());
 
         stateMachine.applyTaskRecord(done2, false, -1L);
+        assertEquals(TaskState.COMPLETED, stateMachine.getJobInstance(jobId).getState());
+        assertEquals(2, stateMachine.getJobInstance(jobId).getCompletedTasks());
+
+        stateMachine.close();
+    }
+
+    @Test
+    void replayingSameTerminalRecordDoesNotDoubleCount() throws Exception {
+        RocksDBStateMachine stateMachine = new RocksDBStateMachine();
+        stateMachine.initialize(tempDir.toString());
+
+        String jobId = "job-replay";
+        JobInstance job = new JobInstance();
+        job.setJobId(jobId);
+        job.setTaskIds(Arrays.asList("task-1", "task-2"));
+        stateMachine.applySubmitJob(SubmitJobPayload.newBuilder()
+                .setJobId(jobId)
+                .setDefinition(com.google.protobuf.ByteString.copyFrom(serialize(job)))
+                .build());
+
+        TaskRecord done1 = TaskRecord.created(jobId, "task-1")
+                .dispatching("w", "a1", 10_000L).running().complete("a1");
+
+        // Apply the same terminal record three times (simulating Raft log replay). The counter must
+        // stay at 1 and the job must not be wrongly finalized.
+        stateMachine.applyTaskRecord(done1, false, -1L);
+        stateMachine.applyTaskRecord(done1, false, -1L);
+        stateMachine.applyTaskRecord(done1, false, -1L);
+        assertEquals(1, stateMachine.getJobInstance(jobId).getCompletedTasks());
+        assertEquals(TaskState.CREATED, stateMachine.getJobInstance(jobId).getState());
+
+        TaskRecord done2 = TaskRecord.created(jobId, "task-2")
+                .dispatching("w", "a2", 10_000L).running().complete("a2");
+        stateMachine.applyTaskRecord(done2, false, -1L);
+        assertEquals(2, stateMachine.getJobInstance(jobId).getCompletedTasks());
+        assertEquals(TaskState.COMPLETED, stateMachine.getJobInstance(jobId).getState());
+
+        // A late replay of an already-terminal task is a no-op (state unchanged).
+        stateMachine.applyTaskRecord(done1, false, -1L);
+        assertEquals(2, stateMachine.getJobInstance(jobId).getCompletedTasks());
+        assertEquals(TaskState.COMPLETED, stateMachine.getJobInstance(jobId).getState());
+
+        stateMachine.close();
+    }
+
+    @Test
+    void rerunningAFailedTaskRecountsJobFromErrorsToCompleted() throws Exception {
+        RocksDBStateMachine stateMachine = new RocksDBStateMachine();
+        stateMachine.initialize(tempDir.toString());
+
+        String jobId = "job-recount";
+        JobInstance job = new JobInstance();
+        job.setJobId(jobId);
+        job.setTaskIds(Arrays.asList("task-1", "task-2"));
+        stateMachine.applySubmitJob(SubmitJobPayload.newBuilder()
+                .setJobId(jobId)
+                .setDefinition(com.google.protobuf.ByteString.copyFrom(serialize(job)))
+                .build());
+
+        TaskRecord done1 = TaskRecord.created(jobId, "task-1")
+                .dispatching("w", "a1", 10_000L).running().complete("a1");
+        TaskRecord failed2 = TaskRecord.created(jobId, "task-2")
+                .dispatching("w", "a2", 10_000L).running().fail("a2", "ERR", "boom");
+        stateMachine.applyTaskRecord(done1, false, -1L);
+        stateMachine.applyTaskRecord(failed2, false, -1L);
+        assertEquals(TaskState.FINISHED_WITH_ERRORS, stateMachine.getJobInstance(jobId).getState());
+        assertEquals(1, stateMachine.getJobInstance(jobId).getFailedTasks());
+
+        // Operator re-runs the failed task and it now succeeds; the failed bucket is decremented and
+        // the completed bucket incremented, recounting the job to COMPLETED.
+        TaskRecord recovered2 = TaskRecord.created(jobId, "task-2")
+                .dispatching("w", "a3", 10_000L).running().complete("a3");
+        stateMachine.applyTaskRecord(recovered2, false, -1L);
+        assertEquals(0, stateMachine.getJobInstance(jobId).getFailedTasks());
+        assertEquals(2, stateMachine.getJobInstance(jobId).getCompletedTasks());
         assertEquals(TaskState.COMPLETED, stateMachine.getJobInstance(jobId).getState());
 
         stateMachine.close();

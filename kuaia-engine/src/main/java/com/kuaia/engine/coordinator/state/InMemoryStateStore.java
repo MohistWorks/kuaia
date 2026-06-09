@@ -20,8 +20,8 @@ public class InMemoryStateStore implements StateStore {
 
     @Override
     public void saveTask(TaskRecord record) {
-        tasks.put(record.getTaskId(), record);
-        cascadeJobIfTerminal(record);
+        TaskRecord previous = tasks.put(record.getTaskId(), record);
+        applyJobCounterDelta(previous == null ? null : previous.getState(), record);
     }
 
     @Override
@@ -34,14 +34,16 @@ public class InMemoryStateStore implements StateStore {
         if (!expected.getTaskId().equals(updated.getTaskId())) {
             return false;
         }
+        TaskState[] oldState = new TaskState[1];
         boolean applied = tasks.compute(expected.getTaskId(), (taskId, current) -> {
             if (current == null || current.getVersion() != expected.getVersion()) {
                 return current;
             }
+            oldState[0] = current.getState();
             return updated;
         }) == updated;
         if (applied) {
-            cascadeJobIfTerminal(updated);
+            applyJobCounterDelta(oldState[0], updated);
         }
         return applied;
     }
@@ -103,25 +105,55 @@ public class InMemoryStateStore implements StateStore {
     }
 
     /**
-     * When a task reaches a terminal state, re-evaluate its parent job's aggregate state. Mirrors
-     * the Raft state machine's cascade so this in-memory store stays a faithful test double.
+     * Maintain the parent job's terminal-task counters incrementally for a task transitioning from
+     * {@code oldState} to {@code newRecord.getState()}. Mirrors the Raft state machine's cascade so
+     * this in-memory store stays a faithful test double. No-op when the state is unchanged or there is
+     * no terminal cross, keeping it idempotent.
      */
-    private void cascadeJobIfTerminal(TaskRecord record) {
-        if (record == null || record.getJobId() == null || JobStateEvaluator.isActive(record.getState())) {
+    private void applyJobCounterDelta(TaskState oldState, TaskRecord newRecord) {
+        if (newRecord.getJobId() == null) {
             return;
         }
-        jobs.computeIfPresent(record.getJobId(), (id, job) -> {
+        TaskState newState = newRecord.getState();
+        if (oldState == newState) {
+            return;
+        }
+        boolean oldTerminal = isTerminal(oldState);
+        boolean newTerminal = isTerminal(newState);
+        if (!oldTerminal && !newTerminal) {
+            return;
+        }
+        jobs.computeIfPresent(newRecord.getJobId(), (id, job) -> {
             if (job.getTaskIds() == null) {
                 return job;
             }
-            List<TaskState> childStates = new ArrayList<>();
-            for (String childTaskId : job.getTaskIds()) {
-                TaskRecord child = tasks.get(childTaskId);
-                childStates.add(child == null ? null : child.getState());
+            if (oldTerminal) {
+                adjustBucket(job, oldState, -1);
             }
-            JobStateEvaluator.evaluate(childStates).ifPresent(job::setState);
+            if (newTerminal) {
+                adjustBucket(job, newState, 1);
+            }
+            JobStateEvaluator.evaluate(
+                    job.getTaskIds().size(),
+                    job.getCompletedTasks(),
+                    job.getFailedTasks(),
+                    job.getCancelledTasks()).ifPresent(job::setState);
             return job;
         });
+    }
+
+    /** Terminal task states are those a task rests in: COMPLETED, FAILED, CANCELLED. */
+    private boolean isTerminal(TaskState state) {
+        return state != null && !JobStateEvaluator.isActive(state);
+    }
+
+    private void adjustBucket(JobInstance job, TaskState state, int delta) {
+        switch (state) {
+            case COMPLETED -> job.setCompletedTasks(job.getCompletedTasks() + delta);
+            case FAILED -> job.setFailedTasks(job.getFailedTasks() + delta);
+            case CANCELLED -> job.setCancelledTasks(job.getCancelledTasks() + delta);
+            default -> { /* non-terminal states have no bucket */ }
+        }
     }
 
     private boolean isActive(TaskState state) {

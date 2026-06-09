@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class RocksDbStateStore implements StateStore, Closeable {
@@ -56,8 +55,8 @@ public class RocksDbStateStore implements StateStore, Closeable {
                 TaskRecord previous = getTaskInternal(record.getTaskId());
                 deleteTaskIndexes(batch, previous);
                 putTask(batch, record);
+                appendJobCounterDelta(batch, previous == null ? null : previous.getState(), record);
                 db.write(writeOptions, batch);
-                cascadeJobIfTerminal(record);
             } catch (RocksDBException e) {
                 throw new IllegalStateException("Failed to save task " + record.getTaskId(), e);
             }
@@ -88,8 +87,8 @@ public class RocksDbStateStore implements StateStore, Closeable {
                 }
                 deleteTaskIndexes(batch, current);
                 putTask(batch, updated);
+                appendJobCounterDelta(batch, current.getState(), updated);
                 db.write(writeOptions, batch);
-                cascadeJobIfTerminal(updated);
                 return true;
             } catch (RocksDBException e) {
                 throw new IllegalStateException("Failed to update task " + expected.getTaskId(), e);
@@ -197,26 +196,54 @@ public class RocksDbStateStore implements StateStore, Closeable {
     }
 
     /**
-     * When a task reaches a terminal state, re-evaluate its parent job. Caller holds {@link #lock} and
-     * handles {@link RocksDBException}. Mirrors the Raft state machine's cascade.
+     * Maintain the parent job's terminal-task counters incrementally (O(1)) for a task transitioning
+     * from {@code oldState} to {@code newRecord.getState()}, appending the updated job to {@code batch}
+     * so it is written atomically with the task. Caller holds {@link #lock}. Mirrors the Raft state
+     * machine's cascade. No-op (no double counting) when the state is unchanged or no terminal cross.
      */
-    private void cascadeJobIfTerminal(TaskRecord record) throws RocksDBException {
-        if (record == null || record.getJobId() == null || JobStateEvaluator.isActive(record.getState())) {
+    private void appendJobCounterDelta(WriteBatch batch, TaskState oldState, TaskRecord newRecord)
+            throws RocksDBException {
+        if (newRecord.getJobId() == null) {
             return;
         }
-        JobInstance job = deserialize(db.get(bytes(jobKey(record.getJobId()))), JobInstance.class);
+        TaskState newState = newRecord.getState();
+        if (oldState == newState) {
+            return;
+        }
+        boolean oldTerminal = isTerminal(oldState);
+        boolean newTerminal = isTerminal(newState);
+        if (!oldTerminal && !newTerminal) {
+            return;
+        }
+        JobInstance job = deserialize(db.get(bytes(jobKey(newRecord.getJobId()))), JobInstance.class);
         if (job == null || job.getTaskIds() == null) {
             return;
         }
-        List<TaskState> childStates = new ArrayList<>();
-        for (String childTaskId : job.getTaskIds()) {
-            TaskRecord child = getTaskInternal(childTaskId);
-            childStates.add(child == null ? null : child.getState());
+        if (oldTerminal) {
+            adjustBucket(job, oldState, -1);
         }
-        Optional<TaskState> decided = JobStateEvaluator.evaluate(childStates);
-        if (decided.isPresent() && decided.get() != job.getState()) {
-            job.setState(decided.get());
-            db.put(bytes(jobKey(record.getJobId())), serialize(job));
+        if (newTerminal) {
+            adjustBucket(job, newState, 1);
+        }
+        JobStateEvaluator.evaluate(
+                job.getTaskIds().size(),
+                job.getCompletedTasks(),
+                job.getFailedTasks(),
+                job.getCancelledTasks()).ifPresent(job::setState);
+        batch.put(bytes(jobKey(newRecord.getJobId())), serialize(job));
+    }
+
+    /** Terminal task states are those a task rests in: COMPLETED, FAILED, CANCELLED. */
+    private boolean isTerminal(TaskState state) {
+        return state != null && !JobStateEvaluator.isActive(state);
+    }
+
+    private void adjustBucket(JobInstance job, TaskState state, int delta) {
+        switch (state) {
+            case COMPLETED -> job.setCompletedTasks(job.getCompletedTasks() + delta);
+            case FAILED -> job.setFailedTasks(job.getFailedTasks() + delta);
+            case CANCELLED -> job.setCancelledTasks(job.getCancelledTasks() + delta);
+            default -> { /* non-terminal states have no bucket */ }
         }
     }
 
