@@ -7,5 +7,6 @@ public enum TaskState {
     COMPLETED,
     RETRYING,
     FAILED,
-    CANCELLED
+    CANCELLED,
+    FINISHED_WITH_ERRORS
 }

@@ -1,5 +1,6 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
@@ -13,6 +14,7 @@ import java.util.*;
 
 public class RatisStateStore implements StateStore {
     private static final String TASK_PREFIX = "task/";
+    private static final String JOB_PREFIX = "job/";
     private static final String WORKER_PREFIX = "worker/";
     private static final String TASK_STATE_SCAN_PREFIX = "scan/task_state/";
     private static final String TASK_WORKER_SCAN_PREFIX = "scan/task_worker/";
@@ -124,6 +126,55 @@ public class RatisStateStore implements StateStore {
     @Override
     public List<WorkerRecord> scanWorkersByState(WorkerRecord.WorkerState state) {
         return readList(WORKER_STATE_SCAN_PREFIX + state.name(), WorkerRecord.class);
+    }
+
+    @Override
+    public void submitJob(JobInstance job) {
+        try {
+            RaftCommand cmd = RaftCommand.newBuilder()
+                    .setType(CommandType.SUBMIT_JOB)
+                    .setSubmitJob(SubmitJobPayload.newBuilder()
+                            .setJobId(job.getJobId())
+                            .setDefinition(com.google.protobuf.ByteString.copyFrom(serialize(job)))
+                            .build())
+                    .build();
+            sendWrite(cmd, "submit job " + job.getJobId());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to submit job via Raft", e);
+        }
+    }
+
+    @Override
+    public JobInstance getJob(String jobId) {
+        try {
+            RaftClientReply reply = raftClient.io().sendReadOnly(Message.valueOf(JOB_PREFIX + jobId));
+            if (!reply.isSuccess()) {
+                throw new IOException("Raft read failed: " + reply.getException());
+            }
+            byte[] data = reply.getMessage().getContent().toByteArray();
+            if (data.length == 0) {
+                return null;
+            }
+            return deserialize(data, JobInstance.class);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to get job via Raft", e);
+        }
+    }
+
+    @Override
+    public void updateJobState(String jobId, TaskState state) {
+        try {
+            RaftCommand cmd = RaftCommand.newBuilder()
+                    .setType(CommandType.UPDATE_JOB_STATE)
+                    .setUpdateJobState(UpdateJobStatePayload.newBuilder()
+                            .setJobId(jobId)
+                            .setStateCode(state.ordinal())
+                            .build())
+                    .build();
+            sendWrite(cmd, "update job state " + jobId);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to update job state via Raft", e);
+        }
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
@@ -24,6 +25,15 @@ public interface StateStore {
     WorkerRecord getWorker(String workerId);
 
     List<WorkerRecord> scanWorkersByState(WorkerRecord.WorkerState state);
+
+    /** Persist a newly planned job (with its {@code taskIds}) so per-task state can cascade up to it. */
+    void submitJob(JobInstance job);
+
+    /** @return the stored job instance, or {@code null} if none. */
+    JobInstance getJob(String jobId);
+
+    /** Force the job's aggregate state (e.g. for explicit cancellation); cascade normally maintains it. */
+    void updateJobState(String jobId, TaskState state);
 
     @Deprecated
     default void saveTask(TaskDefinition task, TaskState state) {

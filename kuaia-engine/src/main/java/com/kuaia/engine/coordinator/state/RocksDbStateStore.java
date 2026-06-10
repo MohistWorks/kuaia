@@ -1,5 +1,7 @@
 package com.kuaia.engine.coordinator.state;
 
+import com.kuaia.common.model.JobInstance;
+import com.kuaia.common.model.JobStateEvaluator;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.common.model.WorkerRecord;
@@ -31,6 +33,7 @@ public class RocksDbStateStore implements StateStore, Closeable {
     private static final String TASK_WORKER_PREFIX = "task_worker/";
     private static final String WORKER_PREFIX = "worker/";
     private static final String WORKER_STATE_PREFIX = "worker_state/";
+    private static final String JOB_PREFIX = "job/";
 
     private final Object lock = new Object();
     private final Options options;
@@ -52,6 +55,7 @@ public class RocksDbStateStore implements StateStore, Closeable {
                 TaskRecord previous = getTaskInternal(record.getTaskId());
                 deleteTaskIndexes(batch, previous);
                 putTask(batch, record);
+                appendJobCounterDelta(batch, previous == null ? null : previous.getState(), record);
                 db.write(writeOptions, batch);
             } catch (RocksDBException e) {
                 throw new IllegalStateException("Failed to save task " + record.getTaskId(), e);
@@ -83,6 +87,7 @@ public class RocksDbStateStore implements StateStore, Closeable {
                 }
                 deleteTaskIndexes(batch, current);
                 putTask(batch, updated);
+                appendJobCounterDelta(batch, current.getState(), updated);
                 db.write(writeOptions, batch);
                 return true;
             } catch (RocksDBException e) {
@@ -149,6 +154,96 @@ public class RocksDbStateStore implements StateStore, Closeable {
                     .filter(record -> record != null)
                     .sorted(Comparator.comparing(WorkerRecord::getWorkerId))
                     .collect(Collectors.toList());
+        }
+    }
+
+    @Override
+    public void submitJob(JobInstance job) {
+        synchronized (lock) {
+            try {
+                db.put(bytes(jobKey(job.getJobId())), serialize(job));
+            } catch (RocksDBException e) {
+                throw new IllegalStateException("Failed to submit job " + job.getJobId(), e);
+            }
+        }
+    }
+
+    @Override
+    public JobInstance getJob(String jobId) {
+        synchronized (lock) {
+            try {
+                return deserialize(db.get(bytes(jobKey(jobId))), JobInstance.class);
+            } catch (RocksDBException e) {
+                throw new IllegalStateException("Failed to read job " + jobId, e);
+            }
+        }
+    }
+
+    @Override
+    public void updateJobState(String jobId, TaskState state) {
+        synchronized (lock) {
+            try {
+                JobInstance job = deserialize(db.get(bytes(jobKey(jobId))), JobInstance.class);
+                if (job == null) {
+                    return;
+                }
+                job.setState(state);
+                db.put(bytes(jobKey(jobId)), serialize(job));
+            } catch (RocksDBException e) {
+                throw new IllegalStateException("Failed to update job state " + jobId, e);
+            }
+        }
+    }
+
+    /**
+     * Maintain the parent job's terminal-task counters incrementally (O(1)) for a task transitioning
+     * from {@code oldState} to {@code newRecord.getState()}, appending the updated job to {@code batch}
+     * so it is written atomically with the task. Caller holds {@link #lock}. Mirrors the Raft state
+     * machine's cascade. No-op (no double counting) when the state is unchanged or no terminal cross.
+     */
+    private void appendJobCounterDelta(WriteBatch batch, TaskState oldState, TaskRecord newRecord)
+            throws RocksDBException {
+        if (newRecord.getJobId() == null) {
+            return;
+        }
+        TaskState newState = newRecord.getState();
+        if (oldState == newState) {
+            return;
+        }
+        boolean oldTerminal = isTerminal(oldState);
+        boolean newTerminal = isTerminal(newState);
+        if (!oldTerminal && !newTerminal) {
+            return;
+        }
+        JobInstance job = deserialize(db.get(bytes(jobKey(newRecord.getJobId()))), JobInstance.class);
+        if (job == null || job.getTaskIds() == null) {
+            return;
+        }
+        if (oldTerminal) {
+            adjustBucket(job, oldState, -1);
+        }
+        if (newTerminal) {
+            adjustBucket(job, newState, 1);
+        }
+        JobStateEvaluator.evaluate(
+                job.getTaskIds().size(),
+                job.getCompletedTasks(),
+                job.getFailedTasks(),
+                job.getCancelledTasks()).ifPresent(job::setState);
+        batch.put(bytes(jobKey(newRecord.getJobId())), serialize(job));
+    }
+
+    /** Terminal task states are those a task rests in: COMPLETED, FAILED, CANCELLED. */
+    private boolean isTerminal(TaskState state) {
+        return state != null && !JobStateEvaluator.isActive(state);
+    }
+
+    private void adjustBucket(JobInstance job, TaskState state, int delta) {
+        switch (state) {
+            case COMPLETED -> job.setCompletedTasks(job.getCompletedTasks() + delta);
+            case FAILED -> job.setFailedTasks(job.getFailedTasks() + delta);
+            case CANCELLED -> job.setCancelledTasks(job.getCancelledTasks() + delta);
+            default -> { /* non-terminal states have no bucket */ }
         }
     }
 
@@ -229,6 +324,10 @@ public class RocksDbStateStore implements StateStore, Closeable {
 
     private String taskWorkerPrefix(String workerId) {
         return TASK_WORKER_PREFIX + workerId + "/";
+    }
+
+    private String jobKey(String jobId) {
+        return JOB_PREFIX + jobId;
     }
 
     private String workerKey(String workerId) {
