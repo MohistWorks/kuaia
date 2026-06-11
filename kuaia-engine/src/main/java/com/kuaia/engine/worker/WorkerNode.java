@@ -3,7 +3,10 @@ package com.kuaia.engine.worker;
 import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.rpc.*;
 import com.kuaia.common.utils.PendingSet;
+import com.kuaia.engine.pipeline.ConnectorFactory;
+import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.worker.buffer.RocksDBBuffer;
+import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import com.kuaia.engine.worker.executor.TaskExecutor;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -13,6 +16,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,11 +32,21 @@ public class WorkerNode {
     private final AtomicInteger memoryQueueSize = new AtomicInteger(0);
     private static final int THRESHOLD = 1000;
 
+    private final ExecutorService taskExecutorPool = Executors.newSingleThreadExecutor();
+    private final WorkerTaskExecutor taskRunner;
+
     private ManagedChannel channel;
     private StreamObserver<WorkerMessage> requestObserver;
     private volatile boolean stopping;
 
-    public WorkerNode(String id) { this.id = id; }
+    public WorkerNode(String id) {
+        this.id = id;
+        this.taskRunner = new WorkerTaskExecutor(
+                id,
+                new ConnectorFactory(SinkFactoryRegistry.defaultRegistry()),
+                EmbeddingProviderRegistry.defaultRegistry(),
+                this::sendMessage);
+    }
 
     public void start(String host, int port) {
         stopping = false;
@@ -70,7 +85,7 @@ public class WorkerNode {
                     }
                 }
                 if (value.hasAssignment()) {
-                    completeAssignment(value.getAssignment());
+                    WorkerNode.this.completeAssignment(value.getAssignment());
                 }
             }
 
@@ -101,46 +116,6 @@ public class WorkerNode {
             private void tryToPullFromDisk() {
                 // Simplified "pull back" logic for MVP
                 // In a real scenario, we'd need to track which seqIds are on disk
-            }
-
-            private void completeAssignment(TaskAssignment assignment) {
-                TaskAttemptResult.Builder result = TaskAttemptResult.newBuilder()
-                                .setTaskId(assignment.getTaskId())
-                                .setAttemptId(assignment.getAttemptId())
-                                .setWorkerId(id);
-                if (isInvalidAssignment(assignment)) {
-                    result.setStatus(AttemptStatus.ATTEMPT_FAILED)
-                            .setErrorCode("INVALID_ASSIGNMENT")
-                            .setErrorMessage("Task assignment requires taskId, attemptId, definition, and active lease");
-                } else {
-                    result.setStatus(AttemptStatus.ATTEMPT_SUCCESS);
-                }
-                WorkerMessage message = WorkerMessage.newBuilder()
-                        .setWorkerId(id)
-                        .setTaskResult(result.build())
-                        .build();
-                sendMessage(message);
-            }
-
-            private boolean isInvalidAssignment(TaskAssignment assignment) {
-                return assignment.getTaskId().isEmpty()
-                        || assignment.getAttemptId().isEmpty()
-                        || assignment.getLeaseUntilMillis() <= System.currentTimeMillis()
-                        || !hasMatchingDefinition(assignment);
-            }
-
-            private boolean hasMatchingDefinition(TaskAssignment assignment) {
-                if (assignment.getDefinition().isEmpty()) {
-                    return false;
-                }
-                try (ObjectInputStream objectStream = new ObjectInputStream(
-                        new ByteArrayInputStream(assignment.getDefinition().toByteArray()))) {
-                    Object value = objectStream.readObject();
-                    return value instanceof TaskDefinition
-                            && assignment.getTaskId().equals(((TaskDefinition) value).getTaskId());
-                } catch (IOException | ClassNotFoundException e) {
-                    return false;
-                }
             }
 
             @Override public void onError(Throwable t) {
@@ -180,7 +155,47 @@ public class WorkerNode {
             }
             channel = null;
         }
+        taskExecutorPool.shutdownNow();
         dbBuffer.close();
+    }
+
+    private void completeAssignment(TaskAssignment assignment) {
+        if (isInvalidAssignment(assignment)) {
+            sendMessage(WorkerMessage.newBuilder()
+                    .setWorkerId(id)
+                    .setTaskResult(TaskAttemptResult.newBuilder()
+                            .setTaskId(assignment.getTaskId())
+                            .setAttemptId(assignment.getAttemptId())
+                            .setWorkerId(id)
+                            .setStatus(AttemptStatus.ATTEMPT_FAILED)
+                            .setErrorCode("INVALID_ASSIGNMENT")
+                            .setErrorMessage("Task assignment requires taskId, attemptId, definition, and active lease")
+                            .build())
+                    .build());
+            return;
+        }
+        taskExecutorPool.submit(() -> taskRunner.execute(assignment));
+    }
+
+    private boolean isInvalidAssignment(TaskAssignment assignment) {
+        return assignment.getTaskId().isEmpty()
+                || assignment.getAttemptId().isEmpty()
+                || assignment.getLeaseUntilMillis() <= System.currentTimeMillis()
+                || !hasMatchingDefinition(assignment);
+    }
+
+    private boolean hasMatchingDefinition(TaskAssignment assignment) {
+        if (assignment.getDefinition().isEmpty()) {
+            return false;
+        }
+        try (ObjectInputStream objectStream = new ObjectInputStream(
+                new ByteArrayInputStream(assignment.getDefinition().toByteArray()))) {
+            Object value = objectStream.readObject();
+            return value instanceof TaskDefinition
+                    && assignment.getTaskId().equals(((TaskDefinition) value).getTaskId());
+        } catch (IOException | ClassNotFoundException e) {
+            return false;
+        }
     }
 
     private void sendSignal(String type) {
