@@ -1,6 +1,10 @@
 package com.kuaia.engine.worker.connector.v2;
 
-public final class SourceSplit {
+import java.io.Serializable;
+
+public final class SourceSplit implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private final String splitId;
     private final long startSeqInclusive;
     private final long endSeqInclusive;
