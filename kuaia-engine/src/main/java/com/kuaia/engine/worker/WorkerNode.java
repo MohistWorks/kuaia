@@ -14,11 +14,11 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class WorkerNode {
-    private static final Logger LOG = Logger.getLogger(WorkerNode.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(WorkerNode.class);
 
     private final String id;
     private final TaskExecutor executor = new TaskExecutor();
@@ -59,11 +59,11 @@ public class WorkerNode {
                     if (currentSize > THRESHOLD) {
                         try {
                             dbBuffer.put(task.getSeqId(), task.toByteArray());
-                            LOG.log(Level.INFO, "Spilling to disk: seqId={0}", task.getSeqId());
+                            LOG.info("Spilling to disk: seqId={}", task.getSeqId());
                             // Since it's spilled, it's no longer in the "memory queue"
                             memoryQueueSize.decrementAndGet();
                         } catch (Exception e) {
-                            LOG.log(Level.WARNING, "Failed to spill task to disk: seqId=" + task.getSeqId(), e);
+                            LOG.warn("Failed to spill task to disk: seqId={}", task.getSeqId(), e);
                         }
                     } else {
                         executeTask(task);
@@ -145,7 +145,7 @@ public class WorkerNode {
 
             @Override public void onError(Throwable t) {
                 if (!stopping) {
-                    LOG.log(Level.WARNING, "Worker stream failed", t);
+                    LOG.warn("Worker stream failed", t);
                 }
             }
 
