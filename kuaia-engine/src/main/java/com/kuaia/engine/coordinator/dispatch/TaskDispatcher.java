@@ -12,8 +12,8 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Coordinator dispatch loop: the driver that turns planned {@code CREATED}/{@code RETRYING} tasks
@@ -30,7 +30,7 @@ import java.util.logging.Logger;
  * relies on heartbeat/backpressure feedback across ticks.
  */
 public class TaskDispatcher implements AutoCloseable {
-    private static final Logger LOG = Logger.getLogger(TaskDispatcher.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(TaskDispatcher.class);
     private static final long DEFAULT_LEASE_MILLIS = 30_000L;
     private static final long DEFAULT_INTERVAL_MILLIS = 1_000L;
 
@@ -68,7 +68,7 @@ public class TaskDispatcher implements AutoCloseable {
             try {
                 dispatchOnce(System.currentTimeMillis());
             } catch (Exception e) {
-                LOG.log(Level.WARNING, "Dispatch tick failed", e);
+                LOG.warn("Dispatch tick failed", e);
             }
         }, DEFAULT_INTERVAL_MILLIS, DEFAULT_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
     }
