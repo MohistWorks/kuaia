@@ -1,33 +1,21 @@
 package com.kuaia.engine;
 
-import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.data.BinaryRow;
-import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
+import com.kuaia.engine.pipeline.ConnectorFactory;
 import com.kuaia.engine.pipeline.LocalPipelineCheckpointStore;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.pipeline.PipelineRunSummary;
 import com.kuaia.engine.worker.connector.ConsoleSink;
-import com.kuaia.engine.worker.connector.DocumentDirectorySource;
 import com.kuaia.engine.worker.connector.FakeSource;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
-import com.kuaia.engine.worker.connector.FileSource;
-import com.kuaia.engine.worker.connector.FileSink;
-import com.kuaia.engine.worker.connector.DuckDBSource;
-import com.kuaia.engine.worker.connector.LocalSource;
-import com.kuaia.engine.worker.connector.MySQLSource;
-import com.kuaia.engine.worker.connector.PostgresSource;
-import com.kuaia.engine.worker.connector.S3ObjectSource;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import com.kuaia.engine.worker.connector.v2.BatchCommit;
 import com.kuaia.engine.worker.connector.v2.BatchSinkWriter;
 import com.kuaia.engine.worker.connector.v2.BatchSourceReader;
-import com.kuaia.engine.worker.connector.v2.FileSourceAdapter;
-import com.kuaia.engine.worker.connector.v2.LocalSourceAdapter;
-import com.kuaia.engine.worker.connector.v2.SinkWriterBatchAdapter;
 import com.kuaia.engine.worker.connector.v2.SourceEnumerator;
 import com.kuaia.engine.worker.connector.v2.SourceSplit;
 
@@ -43,9 +31,8 @@ public class LocalPipelineRunner {
     private static final String SINK_STAGE = "Sink";
     private static final String CHECKPOINT_STAGE = "Checkpoint";
 
-    private final SinkFactoryRegistry sinkFactories;
     private final EmbeddingProviderRegistry embeddingProviders;
-    private final int fileRowsPerSplit;
+    private final ConnectorFactory connectorFactory;
 
     public LocalPipelineRunner() {
         this(SinkFactoryRegistry.defaultRegistry());
@@ -63,12 +50,8 @@ public class LocalPipelineRunner {
             SinkFactoryRegistry sinkFactories,
             EmbeddingProviderRegistry embeddingProviders,
             int fileRowsPerSplit) {
-        if (fileRowsPerSplit <= 0) {
-            throw new IllegalArgumentException("fileRowsPerSplit must be greater than zero");
-        }
-        this.sinkFactories = sinkFactories;
         this.embeddingProviders = embeddingProviders;
-        this.fileRowsPerSplit = fileRowsPerSplit;
+        this.connectorFactory = new ConnectorFactory(sinkFactories, fileRowsPerSplit);
     }
 
     public int run(PrintStream out) throws Exception {
@@ -105,7 +88,7 @@ public class LocalPipelineRunner {
     }
 
     private PipelineRunSummary runWithoutCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
-        SourceEnumerator source = runStage(SOURCE_STAGE, () -> createSource(config));
+        SourceEnumerator source = runStage(SOURCE_STAGE, () -> connectorFactory.createSource(config));
         BatchSinkWriter sink = null;
         try {
             runStage(SOURCE_STAGE, () -> {
@@ -116,7 +99,7 @@ public class LocalPipelineRunner {
                     source.getRowType(),
                     config.getTransforms(),
                     embeddingProviders));
-            sink = runStage(SINK_STAGE, () -> createSink(config, transforms.getOutputType(), out));
+            sink = runStage(SINK_STAGE, () -> connectorFactory.createSink(config, transforms.getOutputType(), out));
             BatchSinkWriter openedSink = sink;
             runStage(SINK_STAGE, () -> {
                 openedSink.open();
@@ -156,7 +139,7 @@ public class LocalPipelineRunner {
     }
 
     private PipelineRunSummary runWithCheckpoint(PipelineConfig config, PrintStream out) throws Exception {
-        SourceEnumerator source = runStage(SOURCE_STAGE, () -> createSource(config));
+        SourceEnumerator source = runStage(SOURCE_STAGE, () -> connectorFactory.createSource(config));
         BatchSinkWriter sink = null;
         try {
             runStage(SOURCE_STAGE, () -> {
@@ -189,7 +172,7 @@ public class LocalPipelineRunner {
                             0L);
                 }
 
-                sink = runStage(SINK_STAGE, () -> createSink(config, transforms.getOutputType(), out));
+                sink = runStage(SINK_STAGE, () -> connectorFactory.createSink(config, transforms.getOutputType(), out));
                 BatchSinkWriter openedSink = sink;
                 runStage(SINK_STAGE, () -> {
                     openedSink.open();
@@ -266,65 +249,9 @@ public class LocalPipelineRunner {
         }
     }
 
-    private SourceEnumerator createSource(PipelineConfig config) throws PipelineExecutionException {
-        String sourceType = config.getSource().getType();
-        if ("file".equals(sourceType)) {
-            return new FileSourceAdapter(
-                    new FileSource(Paths.get(config.getSource().getPath()), config.getSource().getFormat()),
-                    "file-0",
-                    fileRowsPerSplit(config));
-        }
-        if ("postgres".equals(sourceType)) {
-            return new LocalSourceAdapter(new PostgresSource(config.getSource()), "postgres-0");
-        }
-        if ("mysql".equals(sourceType)) {
-            return new LocalSourceAdapter(new MySQLSource(config.getSource()), "mysql-0");
-        }
-        if ("duckdb".equals(sourceType)) {
-            return new LocalSourceAdapter(new DuckDBSource(config.getSource()), "duckdb-0");
-        }
-        if ("document-directory".equals(sourceType)) {
-            return new LocalSourceAdapter(
-                    new DocumentDirectorySource(Paths.get(config.getSource().getPath())),
-                    "document-directory-0");
-        }
-        if ("s3".equals(sourceType)) {
-            return new LocalSourceAdapter(new S3ObjectSource(config.getSource()), "s3-0");
-        }
-        throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
-    }
-
-    private int fileRowsPerSplit(PipelineConfig config) {
-        int configured = config.getSource().getMaxRowsPerSplit();
-        return configured > 0 ? configured : fileRowsPerSplit;
-    }
-
     private boolean hasCheckpointStateDir(PipelineConfig config) {
         String stateDir = config.getCheckpoint().getStateDir();
         return stateDir != null && !stateDir.trim().isEmpty();
-    }
-
-    private BatchSinkWriter createSink(PipelineConfig config, KuaiaRowType rowType, PrintStream out)
-            throws PipelineExecutionException {
-        String sinkType = config.getSink().getType();
-        SinkWriter sink;
-        if ("console".equals(sinkType)) {
-            sink = new ConsoleSink(rowType, out);
-        } else if ("mock-vector".equals(sinkType)
-                || "qdrant".equals(sinkType)
-                || "pgvector".equals(sinkType)
-                || "milvus".equals(sinkType)) {
-            sink = sinkFactories.create(sinkType, rowType, out, config.getSink());
-        } else if ("file".equals(sinkType)) {
-            sink = new FileSink(
-                    rowType,
-                    Paths.get(config.getSink().getPath()),
-                    config.getSink().getFormat(),
-                    config.getSink().getMode());
-        } else {
-            throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
-        }
-        return new SinkWriterBatchAdapter(sink);
     }
 
     private boolean handleRecordError(
