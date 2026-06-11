@@ -209,4 +209,34 @@ class TaskAckHandlerTest {
                 .build()));
         assertEquals(TaskState.RUNNING, store.getTask("task-1").getState());
     }
+
+    @Test
+    void firstCheckpointPromotesDispatchingToRunning() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        store.saveTask(TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "a1", System.currentTimeMillis() + 10_000L)); // DISPATCHING
+        TaskAckHandler handler = new TaskAckHandler(store);
+
+        boolean ok = handler.handleCheckpointAck(CheckpointAck.newBuilder()
+                .setTaskId("task-1").setAttemptId("a1").setWorkerId("worker-1").setProcessedSeq(5L).build());
+
+        assertTrue(ok);
+        assertEquals(TaskState.RUNNING, store.getTask("task-1").getState());
+        assertEquals(5L, store.getTask("task-1").getLastCheckpointSeq());
+    }
+
+    @Test
+    void resultOnDispatchingPromotesThenCompletes() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        store.saveTask(TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "a1", System.currentTimeMillis() + 10_000L));
+        TaskAckHandler handler = new TaskAckHandler(store);
+
+        boolean ok = handler.handleTaskAttemptResult(TaskAttemptResult.newBuilder()
+                .setTaskId("task-1").setAttemptId("a1").setWorkerId("worker-1")
+                .setStatus(AttemptStatus.ATTEMPT_SUCCESS).build());
+
+        assertTrue(ok);
+        assertEquals(TaskState.COMPLETED, store.getTask("task-1").getState());
+    }
 }
