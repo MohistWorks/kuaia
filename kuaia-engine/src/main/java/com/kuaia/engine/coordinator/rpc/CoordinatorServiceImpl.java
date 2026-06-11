@@ -15,7 +15,7 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
     private final BatchStateFlusher flusher;
     private final TaskAckHandler ackHandler;
     private final StateStore stateStore;
-    private final StreamManager streamManager = new StreamManager();
+    private final StreamManager streamManager;
 
     public CoordinatorServiceImpl(WorkerRegistry registry, BatchStateFlusher flusher) {
         this(registry, flusher, null);
@@ -30,13 +30,32 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
             BatchStateFlusher flusher,
             TaskAckHandler ackHandler,
             StateStore stateStore) {
+        this(registry, flusher, ackHandler, stateStore, new StreamManager());
+    }
+
+    /**
+     * @param streamManager shared so a {@link com.kuaia.engine.coordinator.dispatch.TaskDispatcher}
+     *                      can push assignments to the same live worker streams this service manages.
+     */
+    public CoordinatorServiceImpl(
+            WorkerRegistry registry,
+            BatchStateFlusher flusher,
+            TaskAckHandler ackHandler,
+            StateStore stateStore,
+            StreamManager streamManager) {
         this.registry = registry;
         this.flusher = flusher;
         this.ackHandler = ackHandler;
         this.stateStore = stateStore;
+        this.streamManager = streamManager;
         if (this.flusher != null) {
             this.flusher.start();
         }
+    }
+
+    /** The shared stream manager — pass this to a {@code TaskDispatcher} so both push to the same streams. */
+    public StreamManager getStreamManager() {
+        return streamManager;
     }
 
     StreamManager getStreamManagerForTesting() {
