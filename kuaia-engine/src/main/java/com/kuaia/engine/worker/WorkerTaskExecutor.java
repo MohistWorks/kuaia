@@ -41,8 +41,11 @@ import org.slf4j.LoggerFactory;
 public class WorkerTaskExecutor {
     private static final Logger LOG = LoggerFactory.getLogger(WorkerTaskExecutor.class);
 
-    /** Config key under which a task definition carries its serialized {@link PipelineConfig}. */
-    public static final String PIPELINE_CONFIG_KEY = "pipeline";
+    /**
+     * Config key under which a task definition carries its serialized {@link PipelineConfig}. Delegates
+     * to {@link JobSubmissionService#PIPELINE_CONFIG_KEY} — the single source of truth for the literal.
+     */
+    public static final String PIPELINE_CONFIG_KEY = JobSubmissionService.PIPELINE_CONFIG_KEY;
 
     /** Permanent failure: the assignment could not be assembled into a runnable pipeline. */
     private static final String ERROR_CODE_ASSEMBLY = "ASSEMBLY";

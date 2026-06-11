@@ -4,8 +4,14 @@ import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.engine.coordinator.state.InMemoryStateStore;
+import com.kuaia.engine.pipeline.ConnectorFactory;
+import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -63,6 +69,31 @@ class JobSubmissionServiceTest {
         assertEquals(TaskState.FINISHED_WITH_ERRORS, store.getJob("job-1").getState());
         assertEquals(1, service.getFailedTasks("job-1").size());
         assertEquals(List.of("s2"), service.getFailedShards("job-1"));
+    }
+
+    @Test
+    void submitPipelineEnumeratesSplitsAndEmbedsConfig(@TempDir Path tmp) throws Exception {
+        Path in = tmp.resolve("in.csv");
+        Files.writeString(in, "id\n1\n2\n3\n");
+        PipelineConfig cfg = new PipelineConfig(
+                "job-1",
+                new PipelineConfig.SourceConfig("file", in.toString(), "csv"),
+                new PipelineConfig.SinkConfig("file", tmp.resolve("out.csv").toString(), "csv", "overwrite"),
+                new PipelineConfig.CheckpointConfig(null));
+
+        InMemoryStateStore store = new InMemoryStateStore();
+        JobInstance job = new JobSubmissionService(
+                store, new TaskPlanner(),
+                new ConnectorFactory(SinkFactoryRegistry.defaultRegistry())).submit("job-1", cfg, 4);
+
+        // 3 data rows fit in a single 10 000-row split, so the planner produces exactly 1 task.
+        assertEquals(1, job.getTaskIds().size());
+        for (String taskId : job.getTaskIds()) {
+            TaskRecord r = store.getTask(taskId);
+            assertEquals(TaskState.CREATED, r.getState());
+            assertNotNull(r.getDefinition().getConfig().get(JobSubmissionService.PIPELINE_CONFIG_KEY));
+            assertTrue(r.getDefinition().getConfig().get(JobSubmissionService.SPLITS_CONFIG_KEY) instanceof List);
+        }
     }
 
     private void completeTask(String taskId) {
