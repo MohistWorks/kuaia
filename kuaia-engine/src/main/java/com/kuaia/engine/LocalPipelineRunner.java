@@ -7,6 +7,7 @@ import com.kuaia.engine.pipeline.ConnectorFactory;
 import com.kuaia.engine.pipeline.LocalPipelineCheckpointStore;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.pipeline.PipelineRunSummary;
+import com.kuaia.engine.pipeline.SplitExecutor;
 import com.kuaia.engine.worker.connector.ConsoleSink;
 import com.kuaia.engine.worker.connector.FakeSource;
 import com.kuaia.engine.pipeline.PipelineConfig;
@@ -33,6 +34,7 @@ public class LocalPipelineRunner {
 
     private final EmbeddingProviderRegistry embeddingProviders;
     private final ConnectorFactory connectorFactory;
+    private final SplitExecutor splitExecutor = new SplitExecutor();
 
     public LocalPipelineRunner() {
         this(SinkFactoryRegistry.defaultRegistry());
@@ -107,26 +109,18 @@ public class LocalPipelineRunner {
             });
             out.println("Starting pipeline: " + config.getName());
             PipelineCounters counters = new PipelineCounters();
-            BatchBuffer batch = new BatchBuffer(transforms.getBatchSize());
             for (SourceSplit split : runStage(SOURCE_STAGE, source::enumerateSplits)) {
                 counters.recordSourceSplit();
-                BatchSourceReader reader = runStage(SOURCE_STAGE, () -> source.createReader(split));
-                runStage(SOURCE_STAGE, () -> {
-                    reader.readFrom(
-                            0L,
-                            (seqId, row) -> {
-                                batch.add(seqId, row);
-                                if (batch.isFull()) {
-                                    flushBatch(split, batch, transforms, openedSink, counters, null);
-                                }
-                            },
-                            (seqId, error) -> {
-                                flushBatch(split, batch, transforms, openedSink, counters, null);
-                                return handleRecordError(config, out, counters, seqId, error);
-                            });
-                    return null;
-                });
-                flushBatch(split, batch, transforms, openedSink, counters, null);
+                SplitExecutor.SplitResult splitResult = splitExecutor.execute(
+                        source,
+                        transforms,
+                        openedSink,
+                        split,
+                        0L,
+                        config.getErrorPolicy(),
+                        out,
+                        null);
+                counters.recordSplitResult(splitResult);
             }
             out.println("Pipeline Finished. rows=" + counters.rowsWritten);
             return counters.toSummary(TaskState.COMPLETED);
@@ -401,6 +395,14 @@ public class LocalPipelineRunner {
 
         private void recordSinkBatch() {
             sinkBatches++;
+        }
+
+        private void recordSplitResult(SplitExecutor.SplitResult result) {
+            rowsRead += result.getRowsRead();
+            rowsWritten += result.getRowsWritten();
+            rowsFailed += result.getRowsFailed();
+            sinkBatches += result.getSinkBatches();
+            checkpointSeq = result.getMaxSeqId();
         }
 
         private void recordWrittenBatch(int sourceRows, int outputRows, long maxSeqId) {
