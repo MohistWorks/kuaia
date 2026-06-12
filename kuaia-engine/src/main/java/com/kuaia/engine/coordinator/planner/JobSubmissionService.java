@@ -6,6 +6,13 @@ import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.engine.coordinator.state.StateStore;
+import com.kuaia.engine.pipeline.ConnectorFactory;
+import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
+import com.kuaia.engine.worker.connector.v2.SourceEnumerator;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +31,8 @@ import java.util.Map;
  */
 public class JobSubmissionService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JobSubmissionService.class);
+
     /**
      * Config key under which a task definition carries its bundle's source splits. The split objects
      * must be {@link java.io.Serializable} — they are persisted with the {@link TaskRecord} via
@@ -31,12 +40,26 @@ public class JobSubmissionService {
      */
     public static final String SPLITS_CONFIG_KEY = "splits";
 
+    /**
+     * Config key under which a task definition carries its serialized {@link PipelineConfig}, so the
+     * worker can assemble the read/transform/write pipeline. Single source of truth shared with
+     * {@code WorkerTaskExecutor}.
+     */
+    public static final String PIPELINE_CONFIG_KEY = "pipeline";
+
     private final StateStore stateStore;
     private final TaskPlanner taskPlanner;
+    private final ConnectorFactory connectorFactory;
 
     public JobSubmissionService(StateStore stateStore, TaskPlanner taskPlanner) {
+        this(stateStore, taskPlanner, new ConnectorFactory(SinkFactoryRegistry.defaultRegistry()));
+    }
+
+    public JobSubmissionService(
+            StateStore stateStore, TaskPlanner taskPlanner, ConnectorFactory connectorFactory) {
         this.stateStore = stateStore;
         this.taskPlanner = taskPlanner;
+        this.connectorFactory = connectorFactory;
     }
 
     /**
@@ -46,6 +69,32 @@ public class JobSubmissionService {
      * @return the persisted {@link JobInstance} (state {@code CREATED}, with the planned task ids).
      */
     public JobInstance submit(String jobId, List<Object> sourceSplits, int maxParallelism) {
+        return submit(jobId, sourceSplits, maxParallelism, null);
+    }
+
+    /**
+     * Enumerate the real source splits from {@code pipeline} and submit them, embedding BOTH the
+     * splits and the {@link PipelineConfig} into each task definition so the worker can assemble and
+     * execute the read/transform/write pipeline.
+     *
+     * @return the persisted {@link JobInstance} (state {@code CREATED}, with the planned task ids).
+     */
+    public JobInstance submit(String jobId, PipelineConfig pipeline, int maxParallelism) {
+        List<Object> sourceSplits;
+        try (SourceEnumerator source = connectorFactory.createSource(pipeline)) {
+            source.open();
+            sourceSplits = new ArrayList<>(source.enumerateSplits());
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to enumerate splits for job " + jobId, e);
+        }
+        if (sourceSplits.isEmpty()) {
+            LOG.warn("Job {} enumerated zero source splits; submitting with no tasks", jobId);
+        }
+        return submit(jobId, sourceSplits, maxParallelism, pipeline);
+    }
+
+    private JobInstance submit(
+            String jobId, List<Object> sourceSplits, int maxParallelism, PipelineConfig pipelineOrNull) {
         JobInstance job = new JobInstance();
         job.setJobId(jobId);
         job.setState(TaskState.CREATED);
@@ -60,6 +109,10 @@ public class JobSubmissionService {
             definition.setJobName(jobId);
             Map<String, Object> config = new HashMap<>();
             config.put(SPLITS_CONFIG_KEY, bundle.getSplits());
+            if (pipelineOrNull != null) {
+                // Same immutable PipelineConfig instance is shared across all task configs (value object with final fields).
+                config.put(PIPELINE_CONFIG_KEY, pipelineOrNull);
+            }
             definition.setConfig(config);
 
             records.add(TaskRecord.created(definition));

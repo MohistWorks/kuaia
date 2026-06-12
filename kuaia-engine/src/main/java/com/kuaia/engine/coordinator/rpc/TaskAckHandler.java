@@ -17,16 +17,17 @@ public class TaskAckHandler {
 
     public boolean handleRecordAck(RecordAck ack) {
         TaskRecord record = stateStore.getTask(ack.getTaskId());
-        return ack.getSuccess() && isCurrentRunningAttempt(record, ack.getAttemptId(), ack.getWorkerId());
+        // RecordAck is read-only and never changes task state; DISPATCHING->RUNNING promotion is deferred to the first checkpoint or result.
+        return ack.getSuccess() && isCurrentAttempt(record, ack.getAttemptId(), ack.getWorkerId());
     }
 
     public boolean handleCheckpointAck(CheckpointAck ack) {
         TaskRecord record = stateStore.getTask(ack.getTaskId());
-        if (!isCurrentRunningAttempt(record, ack.getAttemptId(), ack.getWorkerId())) {
+        if (!isCurrentAttempt(record, ack.getAttemptId(), ack.getWorkerId())) {
             return false;
         }
         try {
-            TaskRecord updated = record.checkpoint(ack.getAttemptId(), ack.getProcessedSeq());
+            TaskRecord updated = ensureRunning(record).checkpoint(ack.getAttemptId(), ack.getProcessedSeq());
             return stateStore.compareAndSetTask(record, updated);
         } catch (IllegalArgumentException | IllegalStateException e) {
             return false;
@@ -35,11 +36,11 @@ public class TaskAckHandler {
 
     public boolean handleTaskAttemptResult(TaskAttemptResult result) {
         TaskRecord record = stateStore.getTask(result.getTaskId());
-        if (!isCurrentRunningAttempt(record, result.getAttemptId(), result.getWorkerId())) {
+        if (!isCurrentAttempt(record, result.getAttemptId(), result.getWorkerId())) {
             return false;
         }
         try {
-            TaskRecord updated = transitionForResult(record, result);
+            TaskRecord updated = transitionForResult(ensureRunning(record), result);
             return updated != null && stateStore.compareAndSetTask(record, updated);
         } catch (IllegalArgumentException | IllegalStateException e) {
             return false;
@@ -68,12 +69,17 @@ public class TaskAckHandler {
         return null;
     }
 
-    private boolean isCurrentRunningAttempt(TaskRecord record, String attemptId, String workerId) {
+    private boolean isCurrentAttempt(TaskRecord record, String attemptId, String workerId) {
         return record != null
-                && record.getState() == TaskState.RUNNING
+                && (record.getState() == TaskState.RUNNING || record.getState() == TaskState.DISPATCHING)
                 && record.getLeaseUntilMillis() > System.currentTimeMillis()
                 && attemptId.equals(record.getAttemptId())
                 && workerId.equals(record.getAssignedWorkerId());
+    }
+
+    /** Promote DISPATCHING -> RUNNING; pass through if already RUNNING. */
+    private TaskRecord ensureRunning(TaskRecord record) {
+        return record.getState() == TaskState.DISPATCHING ? record.running() : record;
     }
 
     private String nullIfEmpty(String value) {

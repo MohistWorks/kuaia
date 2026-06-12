@@ -7,10 +7,17 @@ import com.kuaia.common.rpc.CoordinatorServiceGrpc;
 import com.kuaia.common.rpc.TaskAssignment;
 import com.kuaia.common.rpc.WorkerMessage;
 import com.google.protobuf.ByteString;
+import com.kuaia.engine.coordinator.planner.JobSubmissionService;
+import com.kuaia.engine.pipeline.ConnectorFactory;
+import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
+import com.kuaia.engine.worker.connector.v2.SourceEnumerator;
+import com.kuaia.engine.worker.connector.v2.SourceSplit;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -19,6 +26,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkerNodeTest {
+    @TempDir
+    Path tmp;
+
     @Test
     void workerNodeDoesNotWriteDirectlyToConsole() throws Exception {
         String source = new String(
@@ -87,6 +101,34 @@ class WorkerNodeTest {
 
     @Test
     void workerCompletesTypedTaskAssignment() throws Exception {
+        // Build a real file -> identity -> file pipeline so the worker actually executes it
+        // through the gRPC stream wiring and reports ATTEMPT_SUCCESS on completion.
+        Path input = tmp.resolve("input.csv");
+        Files.write(input, String.join("\n",
+                "id",
+                "1",
+                "2",
+                "3").getBytes(StandardCharsets.UTF_8));
+        Path output = tmp.resolve("output.csv");
+
+        PipelineConfig cfg = new PipelineConfig(
+                "file-to-file",
+                new PipelineConfig.SourceConfig("file", input.toString(), "csv"),
+                new PipelineConfig.SinkConfig("file", output.toString(), "csv", "overwrite"),
+                new PipelineConfig.CheckpointConfig(null));
+
+        ConnectorFactory factory = new ConnectorFactory(SinkFactoryRegistry.defaultRegistry());
+        List<SourceSplit> splits;
+        SourceEnumerator src = factory.createSource(cfg);
+        src.open();
+        try {
+            splits = src.enumerateSplits();
+        } finally {
+            src.close();
+        }
+        long firstSeq = splits.get(0).getStartSeqInclusive();
+        ByteString definition = serializedPipelineDefinition("task-1", cfg, splits);
+
         CountDownLatch completed = new CountDownLatch(1);
         AtomicReference<WorkerMessage> resultMessage = new AtomicReference<>();
         Server server = ServerBuilder.forPort(0)
@@ -102,8 +144,8 @@ class WorkerNodeTest {
                                             .setAssignment(TaskAssignment.newBuilder()
                                                     .setTaskId("task-1")
                                                     .setAttemptId("attempt-1")
-                                                    .setDefinition(serializedDefinition("task-1"))
-                                                    .setStartSeq(1L)
+                                                    .setDefinition(definition)
+                                                    .setStartSeq(firstSeq)
                                                     .setLeaseUntilMillis(System.currentTimeMillis() + 10_000L)
                                                     .build())
                                             .build());
@@ -132,7 +174,7 @@ class WorkerNodeTest {
         try {
             worker.start("127.0.0.1", server.getPort());
 
-            assertTrue(completed.await(3, TimeUnit.SECONDS), "worker should complete typed assignment");
+            assertTrue(completed.await(5, TimeUnit.SECONDS), "worker should complete typed assignment");
             WorkerMessage message = resultMessage.get();
             assertEquals(workerId, message.getWorkerId());
             assertTrue(message.hasTaskResult());
@@ -140,6 +182,11 @@ class WorkerNodeTest {
             assertEquals("attempt-1", message.getTaskResult().getAttemptId());
             assertEquals(workerId, message.getTaskResult().getWorkerId());
             assertEquals(AttemptStatus.ATTEMPT_SUCCESS, message.getTaskResult().getStatus());
+
+            assertTrue(Files.exists(output), "output file should exist");
+            List<String> lines = Files.readAllLines(output, StandardCharsets.UTF_8);
+            // CSV output = header line + one line per data row (3 rows).
+            assertEquals(4, lines.size());
         } finally {
             worker.stop();
             server.shutdownNow();
@@ -470,6 +517,24 @@ class WorkerNodeTest {
         TaskDefinition definition = new TaskDefinition();
         definition.setTaskId(taskId);
         definition.setJobName("job-1");
+        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+             ObjectOutputStream objectStream = new ObjectOutputStream(bytes)) {
+            objectStream.writeObject(definition);
+            return ByteString.copyFrom(bytes.toByteArray());
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to serialize test definition", e);
+        }
+    }
+
+    private ByteString serializedPipelineDefinition(
+            String taskId, PipelineConfig cfg, List<SourceSplit> splits) {
+        TaskDefinition definition = new TaskDefinition();
+        definition.setTaskId(taskId);
+        definition.setJobName("job-1");
+        Map<String, Object> config = new HashMap<>();
+        config.put(JobSubmissionService.SPLITS_CONFIG_KEY, new ArrayList<Object>(splits));
+        config.put(WorkerTaskExecutor.PIPELINE_CONFIG_KEY, cfg);
+        definition.setConfig(config);
         try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
              ObjectOutputStream objectStream = new ObjectOutputStream(bytes)) {
             objectStream.writeObject(definition);

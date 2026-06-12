@@ -1,10 +1,12 @@
 package com.kuaia.engine.pipeline;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class PipelineConfig {
+public class PipelineConfig implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final String name;
     private final SourceConfig source;
     private final List<TransformConfig> transforms;
@@ -64,7 +66,8 @@ public class PipelineConfig {
         return errorPolicy;
     }
 
-    public static class SourceConfig {
+    public static class SourceConfig implements Serializable {
+        private static final long serialVersionUID = 1L;
         private final String type;
         private final String path;
         private final String format;
@@ -246,7 +249,8 @@ public class PipelineConfig {
         }
     }
 
-    public static class TransformConfig {
+    public static class TransformConfig implements Serializable {
+        private static final long serialVersionUID = 1L;
         private final String type;
         private final List<String> fields;
         private final String from;
@@ -545,7 +549,8 @@ public class PipelineConfig {
         }
     }
 
-    public static class SinkConfig {
+    public static class SinkConfig implements Serializable {
+        private static final long serialVersionUID = 1L;
         private final String type;
         private final String path;
         private final String format;
@@ -753,7 +758,8 @@ public class PipelineConfig {
         }
     }
 
-    public static class CheckpointConfig {
+    public static class CheckpointConfig implements Serializable {
+        private static final long serialVersionUID = 1L;
         private final String stateDir;
 
         public CheckpointConfig(String stateDir) {
@@ -765,7 +771,8 @@ public class PipelineConfig {
         }
     }
 
-    public static class ErrorPolicyConfig {
+    public static class ErrorPolicyConfig implements Serializable {
+        private static final long serialVersionUID = 1L;
         private final String mode;
 
         public ErrorPolicyConfig(String mode) {
