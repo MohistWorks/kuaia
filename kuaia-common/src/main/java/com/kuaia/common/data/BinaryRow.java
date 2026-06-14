@@ -1,12 +1,23 @@
 package com.kuaia.common.data;
 
-import java.nio.ByteBuffer;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 public class BinaryRow {
     static final ByteOrder BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
+    // Allocation-free views over the backing byte[]. These replace the per-call
+    // ByteBuffer.wrap allocation on the per-field hot path (every slot read/write,
+    // and every string/vector offset slot, routes through these). The JDK enforces
+    // BYTE_ORDER, so the byte layout is identical to the previous ByteBuffer path.
+    private static final VarHandle LONG_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(long[].class, BYTE_ORDER);
+    private static final VarHandle FLOAT_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(float[].class, BYTE_ORDER);
+    private static final VarHandle DOUBLE_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(double[].class, BYTE_ORDER);
     // Reserved for internal row flags such as row kind. It is not a public CDC contract.
     static final int RESERVED_HEADER_BITS = 8;
     static final int SLOT_SIZE_IN_BYTES = Long.BYTES;
@@ -124,25 +135,25 @@ public class BinaryRow {
         checkOrdinal(ordinal);
         clearNullBit(ordinal);
         putLong(fieldOffset(ordinal), 0L);
-        wrap(fieldOffset(ordinal), Float.BYTES).putFloat(value);
+        FLOAT_HANDLE.set(buffer, fieldOffset(ordinal), value);
     }
 
     public float getFloat(int ordinal) {
         checkOrdinal(ordinal);
         checkNotNull(ordinal);
-        return wrap(fieldOffset(ordinal), Float.BYTES).getFloat();
+        return (float) FLOAT_HANDLE.get(buffer, fieldOffset(ordinal));
     }
 
     public void setDouble(int ordinal, double value) {
         checkOrdinal(ordinal);
         clearNullBit(ordinal);
-        wrap(fieldOffset(ordinal), Double.BYTES).putDouble(value);
+        DOUBLE_HANDLE.set(buffer, fieldOffset(ordinal), value);
     }
 
     public double getDouble(int ordinal) {
         checkOrdinal(ordinal);
         checkNotNull(ordinal);
-        return wrap(fieldOffset(ordinal), Double.BYTES).getDouble();
+        return (double) DOUBLE_HANDLE.get(buffer, fieldOffset(ordinal));
     }
 
     public void setString(int ordinal, String value) {
@@ -182,9 +193,8 @@ public class BinaryRow {
         }
         int bytesLength = values.length * Float.BYTES;
         byte[] bytes = new byte[bytesLength];
-        ByteBuffer view = ByteBuffer.wrap(bytes).order(BYTE_ORDER);
-        for (float value : values) {
-            view.putFloat(value);
+        for (int i = 0; i < values.length; i++) {
+            FLOAT_HANDLE.set(bytes, i * Float.BYTES, values[i]);
         }
         writeVariableBytes(ordinal, bytes);
     }
@@ -197,11 +207,10 @@ public class BinaryRow {
         if (bytes.length % Float.BYTES != 0) {
             throw new IllegalStateException("Invalid vector payload length: " + bytes.length);
         }
-        ByteBuffer view = ByteBuffer.wrap(bytes).order(BYTE_ORDER);
         int elementCount = bytes.length / Float.BYTES;
         float[] result = new float[elementCount];
         for (int i = 0; i < elementCount; i++) {
-            result[i] = view.getFloat();
+            result[i] = (float) FLOAT_HANDLE.get(bytes, i * Float.BYTES);
         }
         return result;
     }
@@ -309,16 +318,12 @@ public class BinaryRow {
         buffer = Arrays.copyOf(buffer, newLength);
     }
 
-    private ByteBuffer wrap(int offset, int length) {
-        return ByteBuffer.wrap(buffer, offset, length).order(BYTE_ORDER);
-    }
-
     private void putLong(int offset, long value) {
-        wrap(offset, Long.BYTES).putLong(value);
+        LONG_HANDLE.set(buffer, offset, value);
     }
 
     private long readLong(int offset) {
-        return wrap(offset, Long.BYTES).getLong();
+        return (long) LONG_HANDLE.get(buffer, offset);
     }
 
     private static final class OffsetAndSize {

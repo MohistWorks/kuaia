@@ -85,9 +85,9 @@ public final class SplitExecutor {
         if (batch.isEmpty()) {
             return;
         }
-        List<Long> seqIds = batch.seqIds();
+        int sourceRows = batch.size();
+        long maxSeqId = batch.maxSeqId();
         List<BinaryRow> outputs = runStage(TRANSFORM_STAGE, () -> transforms.applyBatch(batch.rows()));
-        long maxSeqId = maxSeqId(seqIds);
         if (!outputs.isEmpty()) {
             runStage(SINK_STAGE, () -> {
                 sink.writeBatch(outputs);
@@ -102,18 +102,8 @@ public final class SplitExecutor {
                 return null;
             });
         }
-        counters.recordWrittenBatch(seqIds.size(), outputs.size(), maxSeqId);
+        counters.recordWrittenBatch(sourceRows, outputs.size(), maxSeqId);
         batch.clear();
-    }
-
-    private long maxSeqId(List<Long> seqIds) {
-        long max = 0L;
-        for (Long seqId : seqIds) {
-            if (seqId > max) {
-                max = seqId;
-            }
-        }
-        return max;
     }
 
     private <T> T runStage(String stage, StageOperation<T> operation) throws Exception {
@@ -219,16 +209,21 @@ public final class SplitExecutor {
 
     private static final class BatchBuffer {
         private final int batchSize;
-        private final List<Long> seqIds = new ArrayList<>();
         private final List<BinaryRow> rows = new ArrayList<>();
+        // Track the batch's row count and high-water seqId as primitives so the per-row
+        // hot path avoids boxing every seqId into a List<Long> and the per-flush copy/scan
+        // it required. Reset on clear() so each batch's maxSeqId covers only its own rows.
+        private long maxSeqId;
 
         private BatchBuffer(int batchSize) {
             this.batchSize = Math.max(1, batchSize);
         }
 
         private void add(long seqId, BinaryRow row) {
-            seqIds.add(seqId);
             rows.add(row);
+            if (seqId > maxSeqId) {
+                maxSeqId = seqId;
+            }
         }
 
         private boolean isFull() {
@@ -239,8 +234,12 @@ public final class SplitExecutor {
             return rows.isEmpty();
         }
 
-        private List<Long> seqIds() {
-            return new ArrayList<>(seqIds);
+        private int size() {
+            return rows.size();
+        }
+
+        private long maxSeqId() {
+            return maxSeqId;
         }
 
         private List<BinaryRow> rows() {
@@ -248,8 +247,8 @@ public final class SplitExecutor {
         }
 
         private void clear() {
-            seqIds.clear();
             rows.clear();
+            maxSeqId = 0L;
         }
     }
 }
