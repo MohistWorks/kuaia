@@ -13,7 +13,7 @@ public interface PipelineTransform {
     BinaryRow apply(BinaryRow input) throws PipelineExecutionException;
 
     default List<BinaryRow> applyBatch(List<BinaryRow> inputs) throws PipelineExecutionException {
-        List<BinaryRow> outputs = new ArrayList<>();
+        List<BinaryRow> outputs = new ArrayList<>(inputs.size());
         for (BinaryRow input : inputs) {
             outputs.add(apply(input));
         }

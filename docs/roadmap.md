@@ -91,7 +91,9 @@ and architectural hardening.
 - Introduce cleaner module boundaries for connector contracts before a future dynamic
   plugin surface is added.
 - Reduce per-row overhead for connector execution and improve batch-path performance
-  for high-volume ingestion.
+  for high-volume ingestion. In progress: `BinaryRow` field access is now
+  allocation-free via `VarHandle`, and the pipeline batch buffers no longer box a
+  per-row `seqId` list, with the row byte layout unchanged.
 - Finalize connector execution docs for contributor onboarding.
 
 The intended AI connector coverage is:

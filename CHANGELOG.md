@@ -8,6 +8,10 @@ All notable public changes to Kuaia are tracked here.
 
 - Main branch development version is now `0.3.0-SNAPSHOT` after the `v0.2.3` release.
 - The build, CI, Docker image, and contributor setup now require Java 21.
+- Reduced per-row overhead on the batch ingestion path: `BinaryRow` field
+  access now uses allocation-free `VarHandle` reads and writes instead of
+  allocating a `ByteBuffer` per field access, and the pipeline batch buffers no
+  longer box a per-row `seqId` list. The row byte layout is unchanged.
 
 ## 0.2.3 - 2026-05-19
 
