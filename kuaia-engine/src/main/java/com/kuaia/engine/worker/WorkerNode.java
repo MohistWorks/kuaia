@@ -156,6 +156,11 @@ public class WorkerNode {
             channel = null;
         }
         taskExecutorPool.shutdownNow();
+        try {
+            taskExecutorPool.awaitTermination(2, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         dbBuffer.close();
     }
 
@@ -174,7 +179,11 @@ public class WorkerNode {
                     .build());
             return;
         }
-        taskExecutorPool.submit(() -> taskRunner.execute(assignment));
+        try {
+            taskExecutorPool.submit(() -> taskRunner.execute(assignment));
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            LOG.warn("Worker {} rejected task assignment {} during shutdown", id, assignment.getTaskId(), e);
+        }
     }
 
     private boolean isInvalidAssignment(TaskAssignment assignment) {
