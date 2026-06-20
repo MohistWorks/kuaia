@@ -3,6 +3,9 @@ package com.kuaia.engine.coordinator.planner;
 import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.TaskState;
+import com.kuaia.common.rpc.AttemptStatus;
+import com.kuaia.common.rpc.TaskAttemptResult;
+import com.kuaia.engine.coordinator.rpc.TaskAckHandler;
 import com.kuaia.engine.coordinator.state.InMemoryStateStore;
 import com.kuaia.engine.pipeline.ConnectorFactory;
 import com.kuaia.engine.pipeline.PipelineConfig;
@@ -94,6 +97,36 @@ class JobSubmissionServiceTest {
             assertNotNull(r.getDefinition().getConfig().get(JobSubmissionService.PIPELINE_CONFIG_KEY));
             assertTrue(r.getDefinition().getConfig().get(JobSubmissionService.SPLITS_CONFIG_KEY) instanceof List);
         }
+    }
+
+    @Test
+    void taskExhaustingRetriesCascadesJobToFinishedWithErrors() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        JobInstance job = new JobInstance();
+        job.setJobId("job-1");
+        job.setTaskIds(List.of("task-1", "task-2"));
+        store.submitJob(job);
+
+        // task-1 completes
+        TaskRecord t1 = TaskRecord.created("job-1", "task-1")
+                .dispatching("w", "a1", System.currentTimeMillis() + 10_000L).running();
+        store.saveTask(t1);
+        store.compareAndSetTask(t1, t1.complete("a1"));
+
+        // task-2 reaches the cap on a TRANSIENT result -> RETRY_EXHAUSTED -> FAILED
+        TaskRecord r = TaskRecord.created("job-1", "task-2");
+        for (int i = 1; i <= 3; i++) {
+            r = r.dispatching("w", "b" + i, System.currentTimeMillis() + 10_000L).running().retrying("TRANSIENT", "io");
+        }
+        r = r.dispatching("w", "b4", System.currentTimeMillis() + 10_000L).running();  // attemptNo == 4
+        store.saveTask(r);
+        boolean ok = new TaskAckHandler(store, 4).handleTaskAttemptResult(TaskAttemptResult.newBuilder()
+                .setTaskId("task-2").setAttemptId("b4").setWorkerId("w")
+                .setStatus(AttemptStatus.ATTEMPT_FAILED).setErrorCode("TRANSIENT").build());
+
+        assertTrue(ok);
+        assertEquals(TaskState.FAILED, store.getTask("task-2").getState());
+        assertEquals(TaskState.FINISHED_WITH_ERRORS, store.getJob("job-1").getState());
     }
 
     private void completeTask(String taskId) {
