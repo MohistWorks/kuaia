@@ -193,6 +193,26 @@ public class TaskRecord implements Serializable {
                 lastErrorMessage);
     }
 
+    /**
+     * Retry exhausted: terminate to FAILED WITHOUT requiring attempt-id match.
+     * For the lease-expiry recovery path when attemptNo has reached the cap.
+     * Under normal flow a task reaching this is only ever RUNNING or DISPATCHING.
+     */
+    public TaskRecord failExhausted(String errorCode, String errorMessage) {
+        if (state != TaskState.RUNNING && state != TaskState.DISPATCHING) {
+            throw new IllegalStateException("Cannot fail-exhausted task from state " + state);
+        }
+        return copy(
+                TaskState.FAILED,
+                assignedWorkerId,
+                attemptId,
+                attemptNo,
+                leaseUntilMillis,
+                lastCheckpointSeq,
+                errorCode,
+                errorMessage);
+    }
+
     public TaskRecord fail(String attemptId, String errorCode, String errorMessage) {
         requireCurrentAttempt(attemptId);
         if (state != TaskState.RUNNING && state != TaskState.RETRYING) {
