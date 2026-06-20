@@ -113,6 +113,38 @@ class CoordinatorRecoveryPlannerTest {
         }
     }
 
+    @Test
+    void expiredTaskBelowCapBecomesRetrying() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        store.saveTask(TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "a1", 500L)   // lease 500 already expired vs now=1000
+                .running());
+        CoordinatorRecoveryPlanner planner = new CoordinatorRecoveryPlanner(store, 4);
+
+        List<TaskRecord> schedulable = planner.recoverSchedulableTasks(1_000L);
+
+        assertEquals(TaskState.RETRYING, store.getTask("task-1").getState());
+        assertTrue(schedulable.stream().anyMatch(t -> t.getTaskId().equals("task-1")));
+    }
+
+    @Test
+    void expiredTaskAtCapBecomesFailed() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        TaskRecord r = TaskRecord.created("job-1", "task-1");
+        for (int i = 1; i <= 3; i++) {
+            r = r.dispatching("worker-1", "a" + i, 500L).running().retrying("X", "x");
+        }
+        r = r.dispatching("worker-1", "a4", 500L).running();  // attemptNo == 4, lease 500 expired
+        store.saveTask(r);
+        CoordinatorRecoveryPlanner planner = new CoordinatorRecoveryPlanner(store, 4);
+
+        List<TaskRecord> schedulable = planner.recoverSchedulableTasks(1_000L);
+
+        assertEquals(TaskState.FAILED, store.getTask("task-1").getState());
+        assertEquals("RETRY_EXHAUSTED", store.getTask("task-1").getLastErrorCode());
+        assertTrue(schedulable.stream().noneMatch(t -> t.getTaskId().equals("task-1")));
+    }
+
     private String taskIds(List<TaskRecord> records) {
         return records.stream()
                 .map(TaskRecord::getTaskId)
