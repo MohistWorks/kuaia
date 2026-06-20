@@ -239,4 +239,44 @@ class TaskAckHandlerTest {
         assertTrue(ok);
         assertEquals(TaskState.COMPLETED, store.getTask("task-1").getState());
     }
+
+    @Test
+    void transientFailureRetriesBelowCap() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        store.saveTask(TaskRecord.created("job-1", "task-1")
+                .dispatching("worker-1", "a1", System.currentTimeMillis() + 10_000L)
+                .running());  // attemptNo == 1
+        TaskAckHandler handler = new TaskAckHandler(store, 4);
+
+        boolean ok = handler.handleTaskAttemptResult(TaskAttemptResult.newBuilder()
+                .setTaskId("task-1").setAttemptId("a1").setWorkerId("worker-1")
+                .setStatus(AttemptStatus.ATTEMPT_FAILED).setErrorCode("TRANSIENT").setErrorMessage("io")
+                .build());
+
+        assertTrue(ok);
+        assertEquals(TaskState.RETRYING, store.getTask("task-1").getState());
+    }
+
+    @Test
+    void transientFailureAtCapFailsTask() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        TaskRecord r = TaskRecord.created("job-1", "task-1");
+        for (int i = 1; i <= 3; i++) {
+            r = r.dispatching("worker-1", "a" + i, System.currentTimeMillis() + 10_000L)
+                  .running()
+                  .retrying("TRANSIENT", "io");   // back to RETRYING, attemptNo unchanged; next dispatch +1
+        }
+        r = r.dispatching("worker-1", "a4", System.currentTimeMillis() + 10_000L).running(); // attemptNo == 4
+        store.saveTask(r);
+        TaskAckHandler handler = new TaskAckHandler(store, 4);
+
+        boolean ok = handler.handleTaskAttemptResult(TaskAttemptResult.newBuilder()
+                .setTaskId("task-1").setAttemptId("a4").setWorkerId("worker-1")
+                .setStatus(AttemptStatus.ATTEMPT_FAILED).setErrorCode("TRANSIENT").setErrorMessage("io")
+                .build());
+
+        assertTrue(ok);
+        assertEquals(TaskState.FAILED, store.getTask("task-1").getState());
+        assertEquals("RETRY_EXHAUSTED", store.getTask("task-1").getLastErrorCode());
+    }
 }
