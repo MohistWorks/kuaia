@@ -6,13 +6,27 @@ import com.kuaia.common.rpc.AttemptStatus;
 import com.kuaia.common.rpc.CheckpointAck;
 import com.kuaia.common.rpc.RecordAck;
 import com.kuaia.common.rpc.TaskAttemptResult;
+import com.kuaia.engine.coordinator.dispatch.TaskRetryPolicy;
 import com.kuaia.engine.coordinator.state.StateStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TaskAckHandler {
+    private static final Logger LOG = LoggerFactory.getLogger(TaskAckHandler.class);
+
     private final StateStore stateStore;
+    private final int maxAttempts;
 
     public TaskAckHandler(StateStore stateStore) {
+        this(stateStore, TaskRetryPolicy.DEFAULT_MAX_ATTEMPTS);
+    }
+
+    public TaskAckHandler(StateStore stateStore, int maxAttempts) {
+        if (maxAttempts < 1) {
+            throw new IllegalArgumentException("maxAttempts must be >= 1");
+        }
         this.stateStore = stateStore;
+        this.maxAttempts = maxAttempts;
     }
 
     public boolean handleRecordAck(RecordAck ack) {
@@ -54,6 +68,15 @@ public class TaskAckHandler {
         }
         if (status == AttemptStatus.ATTEMPT_FAILED) {
             if ("TRANSIENT".equals(result.getErrorCode())) {
+                if (record.getAttemptNo() >= maxAttempts) {
+                    LOG.warn("Task {} attempt {} exhausted retries (attempts={}, max={}), failing",
+                            result.getTaskId(), result.getAttemptId(), record.getAttemptNo(), maxAttempts);
+                    return record.fail(
+                            result.getAttemptId(),
+                            "RETRY_EXHAUSTED",
+                            "attempts=" + record.getAttemptNo()
+                                    + (result.getErrorMessage().isEmpty() ? "" : "; " + result.getErrorMessage()));
+                }
                 return record.retrying(
                         nullIfEmpty(result.getErrorCode()),
                         nullIfEmpty(result.getErrorMessage()));
