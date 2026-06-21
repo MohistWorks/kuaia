@@ -20,6 +20,7 @@ import io.grpc.ServerBuilder;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,7 +41,7 @@ public class CoordinatorServer implements AutoCloseable {
     private final JobSubmissionService submission;
 
     private Server server;
-    private volatile boolean closed;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public CoordinatorServer(StateStore store, long leaseDurationMillis) {
         this.store = store;
@@ -86,10 +87,9 @@ public class CoordinatorServer implements AutoCloseable {
     /** Stop dispatch, then the gRPC server, then close the state store. Idempotent. */
     @Override
     public void close() {
-        if (closed) {
+        if (!closed.compareAndSet(false, true)) {
             return;
         }
-        closed = true;
         dispatcher.close();
         if (server != null) {
             server.shutdown();
