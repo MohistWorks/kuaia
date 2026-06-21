@@ -3,6 +3,7 @@ package com.kuaia.engine;
 import com.kuaia.engine.worker.WorkerNode;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +16,7 @@ public class WorkerRunner implements AutoCloseable {
 
     private final WorkerNode worker;
     private final CountDownLatch terminated = new CountDownLatch(1);
-    private volatile boolean closed;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public WorkerRunner(String workerId) {
         this.worker = new WorkerNode(workerId);
@@ -32,10 +33,9 @@ public class WorkerRunner implements AutoCloseable {
 
     @Override
     public void close() {
-        if (closed) {
+        if (!closed.compareAndSet(false, true)) {
             return;
         }
-        closed = true;
         worker.stop();
         terminated.countDown();
     }
