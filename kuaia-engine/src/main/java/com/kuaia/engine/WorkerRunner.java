@@ -1,0 +1,42 @@
+package com.kuaia.engine;
+
+import com.kuaia.engine.worker.WorkerNode;
+
+import java.util.concurrent.CountDownLatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Standalone worker process: wraps a {@link WorkerNode}, connects it to a coordinator, and blocks in
+ * {@link #awaitTermination()} until {@link #close()} (driven by a JVM shutdown hook in the CLI).
+ */
+public class WorkerRunner implements AutoCloseable {
+    private static final Logger LOG = LoggerFactory.getLogger(WorkerRunner.class);
+
+    private final WorkerNode worker;
+    private final CountDownLatch terminated = new CountDownLatch(1);
+    private volatile boolean closed;
+
+    public WorkerRunner(String workerId) {
+        this.worker = new WorkerNode(workerId);
+    }
+
+    public void start(String host, int port) {
+        LOG.info("Worker connecting to {}:{}", host, port);
+        worker.start(host, port);
+    }
+
+    public void awaitTermination() throws InterruptedException {
+        terminated.await();
+    }
+
+    @Override
+    public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        worker.stop();
+        terminated.countDown();
+    }
+}
