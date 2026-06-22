@@ -41,7 +41,10 @@ class CoordinatorWorkerE2ETest {
             worker.start("127.0.0.1", server.port());
 
             assertTrue(
-                    await(() -> server.stateStore().getJob(job.getJobId()).getState() == TaskState.COMPLETED, 20_000),
+                    await(() -> {
+                        JobInstance j = server.stateStore().getJob(job.getJobId());
+                        return j != null && j.getState() == TaskState.COMPLETED;
+                    }, 20_000),
                     "job should reach COMPLETED");
 
             assertTrue(Files.exists(output), "output file should exist");
