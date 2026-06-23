@@ -328,6 +328,11 @@ public class KuaiaCli {
                         printUsage(out);
                         return 1;
                     }
+                    if (maxParallelism <= 0) {
+                        out.println("coordinator --max-parallelism must be a positive integer");
+                        printUsage(out);
+                        return 1;
+                    }
                     break;
                 case "--lease-millis":
                     if (i + 1 >= args.length) {
@@ -342,6 +347,11 @@ public class KuaiaCli {
                         printUsage(out);
                         return 1;
                     }
+                    if (leaseMillis <= 0) {
+                        out.println("coordinator --lease-millis must be a positive integer");
+                        printUsage(out);
+                        return 1;
+                    }
                     break;
                 default:
                     out.println("Unknown coordinator option: " + option);
@@ -349,8 +359,13 @@ public class KuaiaCli {
                     return 1;
             }
         }
-        if (port == null || port <= 0) {
+        if (port == null) {
             out.println("coordinator requires --port <P>");
+            printUsage(out);
+            return 1;
+        }
+        if (port <= 0) {
+            out.println("coordinator --port must be a positive integer");
             printUsage(out);
             return 1;
         }

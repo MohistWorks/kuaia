@@ -347,6 +347,32 @@ class KuaiaCliTest {
     }
 
     @Test
+    void coordinatorRejectsNonPositivePort() throws Exception {
+        CliResult result = run("coordinator", "--port", "0", "--state-dir", tempDir.resolve("p1").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator --port must be a positive integer"));
+    }
+
+    @Test
+    void coordinatorRejectsNonPositiveMaxParallelism() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir", tempDir.resolve("p2").toString(),
+                "--max-parallelism", "0");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator --max-parallelism must be a positive integer"));
+    }
+
+    @Test
+    void coordinatorRejectsNonPositiveLeaseMillis() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir", tempDir.resolve("p3").toString(),
+                "--lease-millis", "0");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator --lease-millis must be a positive integer"));
+    }
+
+    @Test
     void coordinatorFailsFastWhenSubmitFileMissing() throws Exception {
         CliResult result = run("coordinator", "--port", "9000",
                 "--state-dir", tempDir.resolve("c4").toString(),
