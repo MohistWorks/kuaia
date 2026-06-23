@@ -3,6 +3,8 @@ package com.kuaia.engine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kuaia.engine.benchmark.LocalPipelineBenchmarkRunner;
+import com.kuaia.engine.coordinator.state.RocksDbStateStore;
+import com.kuaia.engine.coordinator.state.StateStore;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigException;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
@@ -97,6 +99,13 @@ public class KuaiaCli {
                 out.println(e.getMessage());
                 return 1;
             }
+        }
+
+        if ("coordinator".equals(command)) {
+            return runCoordinator(args, out);
+        }
+        if ("worker".equals(command)) {
+            return runWorker(args, out);
         }
 
         out.println("Unknown command: " + command);
@@ -267,6 +276,139 @@ public class KuaiaCli {
         return new RunOptions(configPath, summaryJsonPath);
     }
 
+    private static int runCoordinator(String[] args, PrintStream out) {
+        Integer port = null;
+        Path stateDir = null;
+        Path submitPath = null;
+        int maxParallelism = 4;
+        long leaseMillis = 30_000L;
+        for (int i = 1; i < args.length; i++) {
+            String option = args[i];
+            switch (option) {
+                case "--port":
+                    if (i + 1 >= args.length) {
+                        out.println("coordinator requires --port <P>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    try {
+                        port = Integer.parseInt(args[++i]);
+                    } catch (NumberFormatException e) {
+                        out.println("coordinator --port must be a positive integer");
+                        printUsage(out);
+                        return 1;
+                    }
+                    break;
+                case "--state-dir":
+                    if (i + 1 >= args.length) {
+                        out.println("coordinator requires --state-dir <DIR>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    stateDir = Paths.get(args[++i]);
+                    break;
+                case "--submit":
+                    if (i + 1 >= args.length) {
+                        out.println("coordinator --submit requires <pipeline.yaml>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    submitPath = Paths.get(args[++i]);
+                    break;
+                case "--max-parallelism":
+                    if (i + 1 >= args.length) {
+                        out.println("coordinator --max-parallelism requires <N>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    try {
+                        maxParallelism = Integer.parseInt(args[++i]);
+                    } catch (NumberFormatException e) {
+                        out.println("coordinator --max-parallelism must be a positive integer");
+                        printUsage(out);
+                        return 1;
+                    }
+                    break;
+                case "--lease-millis":
+                    if (i + 1 >= args.length) {
+                        out.println("coordinator --lease-millis requires <M>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    try {
+                        leaseMillis = Long.parseLong(args[++i]);
+                    } catch (NumberFormatException e) {
+                        out.println("coordinator --lease-millis must be a positive integer");
+                        printUsage(out);
+                        return 1;
+                    }
+                    break;
+                default:
+                    out.println("Unknown coordinator option: " + option);
+                    printUsage(out);
+                    return 1;
+            }
+        }
+        if (port == null || port <= 0) {
+            out.println("coordinator requires --port <P>");
+            printUsage(out);
+            return 1;
+        }
+        if (stateDir == null) {
+            out.println("coordinator requires --state-dir <DIR>");
+            printUsage(out);
+            return 1;
+        }
+
+        // Load the pipeline first (pure parse, no side effects) so a bad --submit fails before we
+        // open the store or bind the port — never leave a coordinator listening with nothing to do.
+        PipelineConfig pipeline = null;
+        if (submitPath != null) {
+            try {
+                pipeline = new PipelineConfigLoader().load(submitPath);
+            } catch (PipelineConfigException e) {
+                out.println(e.getMessage());
+                return 1;
+            }
+        }
+
+        StateStore store;
+        try {
+            store = new RocksDbStateStore(stateDir);
+        } catch (Exception e) {
+            out.println("Failed to open state store: " + e.getMessage());
+            return 1;
+        }
+
+        CoordinatorServer server = new CoordinatorServer(store, leaseMillis);
+        try {
+            if (pipeline != null) {
+                server.submit(pipeline, maxParallelism);
+            }
+            server.start(port);
+        } catch (Exception e) {
+            out.println(e.getMessage());
+            server.close();
+            return 1;
+        }
+        out.println("Coordinator listening on port " + server.port());
+        Runtime.getRuntime().addShutdownHook(new Thread(server::close));
+        try {
+            server.awaitTermination();
+            return 0;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            server.close();
+            return 1;
+        }
+    }
+
+    private static int runWorker(String[] args, PrintStream out) {
+        out.println("worker requires --id <ID>");
+        printUsage(out);
+        return 1;
+    }
+
     private static void writeRunSummaryJson(Path outputPath, String pipelineName, PipelineRunSummary summary)
             throws PipelineExecutionException {
         ObjectNode json = JSON_MAPPER.createObjectNode();
@@ -305,6 +447,10 @@ public class KuaiaCli {
         out.println("  examples                     Show runnable public example pipelines");
         out.println("  benchmark [options]          Run local batch benchmark");
         out.println("  recover-demo --state-dir DIR Demonstrate RocksDB task recovery");
+        out.println("  coordinator --port P --state-dir DIR [--submit PIPELINE] [--max-parallelism N] [--lease-millis M]");
+        out.println("                               Start a coordinator (gRPC server + dispatch loop)");
+        out.println("  worker --id ID --coordinator HOST:PORT");
+        out.println("                               Start a worker that executes dispatched tasks");
         out.println();
         out.println("Examples:");
         out.println("  kuaia run -f examples/local-file-to-file.yaml");

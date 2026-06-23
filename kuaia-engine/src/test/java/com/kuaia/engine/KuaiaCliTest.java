@@ -314,6 +314,49 @@ class KuaiaCliTest {
     }
 
     @Test
+    void coordinatorRequiresPort() throws Exception {
+        CliResult result = run("coordinator", "--state-dir", tempDir.resolve("c1").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator requires --port <P>"));
+    }
+
+    @Test
+    void coordinatorRequiresStateDir() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator requires --state-dir <DIR>"));
+    }
+
+    @Test
+    void coordinatorRejectsUnknownOption() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir",
+                tempDir.resolve("c2").toString(), "--bogus", "x");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unknown coordinator option: --bogus"));
+    }
+
+    @Test
+    void coordinatorRejectsNonNumericPort() throws Exception {
+        CliResult result = run("coordinator", "--port", "abc", "--state-dir", tempDir.resolve("c3").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator --port must be a positive integer"));
+    }
+
+    @Test
+    void coordinatorFailsFastWhenSubmitFileMissing() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000",
+                "--state-dir", tempDir.resolve("c4").toString(),
+                "--submit", tempDir.resolve("nope.yaml").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Pipeline config not found:"));
+    }
+
+    @Test
     void unknownCommandReturnsError() throws Exception {
         CliResult result = run("missing");
 
