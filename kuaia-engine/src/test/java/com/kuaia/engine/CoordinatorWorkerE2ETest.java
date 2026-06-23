@@ -57,6 +57,55 @@ class CoordinatorWorkerE2ETest {
         }
     }
 
+    @Test
+    void coordinatorRecoversPersistedTasksOnRestart(@TempDir Path tmp) throws Exception {
+        Path input = tmp.resolve("in.csv");
+        Files.write(input, String.join("\n", "id", "1", "2", "3").getBytes(StandardCharsets.UTF_8));
+        Path output = tmp.resolve("out.csv");
+        PipelineConfig cfg = new PipelineConfig(
+                "e2e-recover",
+                new PipelineConfig.SourceConfig("file", input.toString(), "csv"),
+                new PipelineConfig.SinkConfig("file", output.toString(), "csv", "overwrite"),
+                new PipelineConfig.CheckpointConfig(null));
+        Path stateDir = tmp.resolve("coord-state");
+
+        // First coordinator: submit, start (no worker connects), then shut down — tasks stay CREATED.
+        String jobId;
+        CoordinatorServer server1 = new CoordinatorServer(new RocksDbStateStore(stateDir), 30_000L);
+        try {
+            server1.start(0);
+            JobInstance job = server1.submit(cfg, 4);
+            jobId = job.getJobId();
+            for (String taskId : job.getTaskIds()) {
+                assertEquals(TaskState.CREATED, server1.stateStore().getTask(taskId).getState());
+            }
+        } finally {
+            server1.close();
+        }
+
+        // Second coordinator: same state dir, NO --submit. The dispatch loop recovers the persisted
+        // CREATED tasks and runs them once a worker connects.
+        CoordinatorServer server2 = new CoordinatorServer(new RocksDbStateStore(stateDir), 30_000L);
+        WorkerRunner worker = new WorkerRunner("worker-recover-" + System.nanoTime());
+        try {
+            server2.start(0);
+            worker.start("127.0.0.1", server2.port());
+
+            assertTrue(
+                    await(() -> {
+                        JobInstance j = server2.stateStore().getJob(jobId);
+                        return j != null && j.getState() == TaskState.COMPLETED;
+                    }, 20_000),
+                    "recovered job should reach COMPLETED");
+
+            List<String> lines = Files.readAllLines(output, StandardCharsets.UTF_8);
+            assertEquals(4, lines.size(), "expected header + 3 data rows");
+        } finally {
+            worker.close();
+            server2.close();
+        }
+    }
+
     /** Bounded poll: true as soon as the condition holds, false if it never does before timeout. */
     static boolean await(BooleanSupplier condition, long timeoutMillis) throws InterruptedException {
         long deadline = System.currentTimeMillis() + timeoutMillis;
