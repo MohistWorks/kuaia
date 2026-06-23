@@ -1,0 +1,10 @@
+name: cluster-demo
+source:
+  type: file
+  path: input.csv
+  format: csv
+sink:
+  type: file
+  path: output.csv
+  format: csv
+  mode: overwrite
