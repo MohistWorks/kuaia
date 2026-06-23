@@ -404,9 +404,76 @@ public class KuaiaCli {
     }
 
     private static int runWorker(String[] args, PrintStream out) {
-        out.println("worker requires --id <ID>");
-        printUsage(out);
-        return 1;
+        String id = null;
+        String coordinator = null;
+        for (int i = 1; i < args.length; i++) {
+            String option = args[i];
+            switch (option) {
+                case "--id":
+                    if (i + 1 >= args.length) {
+                        out.println("worker requires --id <ID>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    id = args[++i];
+                    break;
+                case "--coordinator":
+                    if (i + 1 >= args.length) {
+                        out.println("worker requires --coordinator <HOST:PORT>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    coordinator = args[++i];
+                    break;
+                default:
+                    out.println("Unknown worker option: " + option);
+                    printUsage(out);
+                    return 1;
+            }
+        }
+        if (id == null) {
+            out.println("worker requires --id <ID>");
+            printUsage(out);
+            return 1;
+        }
+        if (coordinator == null) {
+            out.println("worker requires --coordinator <HOST:PORT>");
+            printUsage(out);
+            return 1;
+        }
+        int colon = coordinator.lastIndexOf(':');
+        if (colon <= 0 || colon == coordinator.length() - 1) {
+            out.println("worker --coordinator must be HOST:PORT");
+            printUsage(out);
+            return 1;
+        }
+        String host = coordinator.substring(0, colon);
+        int port;
+        try {
+            port = Integer.parseInt(coordinator.substring(colon + 1));
+        } catch (NumberFormatException e) {
+            out.println("worker --coordinator must be HOST:PORT");
+            printUsage(out);
+            return 1;
+        }
+        if (port <= 0) {
+            out.println("worker --coordinator must be HOST:PORT");
+            printUsage(out);
+            return 1;
+        }
+
+        WorkerRunner runner = new WorkerRunner(id);
+        runner.start(host, port);
+        out.println("Worker " + id + " connecting to " + coordinator);
+        Runtime.getRuntime().addShutdownHook(new Thread(runner::close));
+        try {
+            runner.awaitTermination();
+            return 0;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            runner.close();
+            return 1;
+        }
     }
 
     private static void writeRunSummaryJson(Path outputPath, String pipelineName, PipelineRunSummary summary)

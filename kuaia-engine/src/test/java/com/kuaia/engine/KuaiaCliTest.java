@@ -357,6 +357,46 @@ class KuaiaCliTest {
     }
 
     @Test
+    void workerRequiresId() throws Exception {
+        CliResult result = run("worker", "--coordinator", "127.0.0.1:9000");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker requires --id <ID>"));
+    }
+
+    @Test
+    void workerRequiresCoordinator() throws Exception {
+        CliResult result = run("worker", "--id", "w1");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker requires --coordinator <HOST:PORT>"));
+    }
+
+    @Test
+    void workerRejectsMalformedCoordinator() throws Exception {
+        CliResult result = run("worker", "--id", "w1", "--coordinator", "no-port");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker --coordinator must be HOST:PORT"));
+    }
+
+    @Test
+    void workerRejectsNonNumericCoordinatorPort() throws Exception {
+        CliResult result = run("worker", "--id", "w1", "--coordinator", "127.0.0.1:abc");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker --coordinator must be HOST:PORT"));
+    }
+
+    @Test
+    void workerRejectsUnknownOption() throws Exception {
+        CliResult result = run("worker", "--id", "w1", "--coordinator", "127.0.0.1:9000", "--bogus", "x");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unknown worker option: --bogus"));
+    }
+
+    @Test
     void unknownCommandReturnsError() throws Exception {
         CliResult result = run("missing");
 
