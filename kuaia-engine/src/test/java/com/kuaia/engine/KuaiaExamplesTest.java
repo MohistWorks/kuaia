@@ -80,6 +80,16 @@ class KuaiaExamplesTest {
     }
 
     @Test
+    void clusterDemoExampleIsValid() throws Exception {
+        PipelineConfig demo = new PipelineConfigLoader()
+                .load(repoRoot().resolve("examples/cluster-demo/pipeline.yaml"));
+
+        assertEquals("cluster-demo", demo.getName());
+        assertEquals("file", demo.getSource().getType());
+        assertEquals("file", demo.getSink().getType());
+    }
+
+    @Test
     void externalServiceExamplesIncludeTuningOptions() throws Exception {
         Path fileToQdrantPath = repoRoot().resolve("examples/local-file-to-qdrant.yaml");
         Path chunkToQdrantPath = repoRoot().resolve("examples/local-jsonl-chunk-to-qdrant.yaml");

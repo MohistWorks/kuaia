@@ -314,6 +314,115 @@ class KuaiaCliTest {
     }
 
     @Test
+    void coordinatorRequiresPort() throws Exception {
+        CliResult result = run("coordinator", "--state-dir", tempDir.resolve("c1").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator requires --port <P>"));
+    }
+
+    @Test
+    void coordinatorRequiresStateDir() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator requires --state-dir <DIR>"));
+    }
+
+    @Test
+    void coordinatorRejectsUnknownOption() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir",
+                tempDir.resolve("c2").toString(), "--bogus", "x");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unknown coordinator option: --bogus"));
+    }
+
+    @Test
+    void coordinatorRejectsNonNumericPort() throws Exception {
+        CliResult result = run("coordinator", "--port", "abc", "--state-dir", tempDir.resolve("c3").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator --port must be a positive integer"));
+    }
+
+    @Test
+    void coordinatorRejectsNonPositivePort() throws Exception {
+        CliResult result = run("coordinator", "--port", "0", "--state-dir", tempDir.resolve("p1").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator --port must be a positive integer"));
+    }
+
+    @Test
+    void coordinatorRejectsNonPositiveMaxParallelism() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir", tempDir.resolve("p2").toString(),
+                "--max-parallelism", "0");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator --max-parallelism must be a positive integer"));
+    }
+
+    @Test
+    void coordinatorRejectsNonPositiveLeaseMillis() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir", tempDir.resolve("p3").toString(),
+                "--lease-millis", "0");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("coordinator --lease-millis must be a positive integer"));
+    }
+
+    @Test
+    void coordinatorFailsFastWhenSubmitFileMissing() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000",
+                "--state-dir", tempDir.resolve("c4").toString(),
+                "--submit", tempDir.resolve("nope.yaml").toString());
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Pipeline config not found:"));
+    }
+
+    @Test
+    void workerRequiresId() throws Exception {
+        CliResult result = run("worker", "--coordinator", "127.0.0.1:9000");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker requires --id <ID>"));
+    }
+
+    @Test
+    void workerRequiresCoordinator() throws Exception {
+        CliResult result = run("worker", "--id", "w1");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker requires --coordinator <HOST:PORT>"));
+    }
+
+    @Test
+    void workerRejectsMalformedCoordinator() throws Exception {
+        CliResult result = run("worker", "--id", "w1", "--coordinator", "no-port");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker --coordinator must be HOST:PORT"));
+    }
+
+    @Test
+    void workerRejectsNonNumericCoordinatorPort() throws Exception {
+        CliResult result = run("worker", "--id", "w1", "--coordinator", "127.0.0.1:abc");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker --coordinator must be HOST:PORT"));
+    }
+
+    @Test
+    void workerRejectsUnknownOption() throws Exception {
+        CliResult result = run("worker", "--id", "w1", "--coordinator", "127.0.0.1:9000", "--bogus", "x");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unknown worker option: --bogus"));
+    }
+
+    @Test
     void unknownCommandReturnsError() throws Exception {
         CliResult result = run("missing");
 
