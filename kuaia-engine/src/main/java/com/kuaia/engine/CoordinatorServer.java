@@ -47,16 +47,16 @@ public class CoordinatorServer implements AutoCloseable {
         this.store = store;
         WorkerRegistry registry = new WorkerRegistry();
         StreamManager streamManager = new StreamManager();
+        this.submission = new JobSubmissionService(
+                store, new TaskPlanner(), new ConnectorFactory(SinkFactoryRegistry.defaultRegistry()));
         this.service = new CoordinatorServiceImpl(
-                registry, null, new TaskAckHandler(store), store, streamManager);
+                registry, null, new TaskAckHandler(store), store, streamManager, submission);
         this.dispatcher = new TaskDispatcher(
                 store,
                 new CoordinatorRecoveryPlanner(store),
                 new Scheduler(registry, streamManager),
                 streamManager,
                 leaseDurationMillis);
-        this.submission = new JobSubmissionService(
-                store, new TaskPlanner(), new ConnectorFactory(SinkFactoryRegistry.defaultRegistry()));
     }
 
     /** Enumerate splits from {@code pipeline} and persist them as CREATED tasks. Safe to call before {@link #start}. */
