@@ -97,6 +97,11 @@ public class InMemoryStateStore implements StateStore {
     }
 
     @Override
+    public List<JobInstance> listJobs() {
+        return new ArrayList<>(jobs.values());
+    }
+
+    @Override
     public void updateJobState(String jobId, TaskState state) {
         jobs.computeIfPresent(jobId, (id, job) -> {
             job.setState(state);

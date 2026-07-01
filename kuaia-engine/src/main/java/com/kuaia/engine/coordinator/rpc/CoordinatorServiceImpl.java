@@ -1,13 +1,18 @@
 package com.kuaia.engine.coordinator.rpc;
 
+import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.NodeInfo;
 import com.kuaia.common.model.TaskRecord;
 import com.kuaia.common.model.WorkerRecord;
 import com.kuaia.common.rpc.*;
+import com.kuaia.engine.coordinator.planner.JobSubmissionService;
 import com.kuaia.engine.coordinator.recovery.CoordinatorRecoveryPlanner;
 import com.kuaia.engine.coordinator.registry.WorkerRegistry;
 import com.kuaia.engine.coordinator.state.BatchStateFlusher;
 import com.kuaia.engine.coordinator.state.StateStore;
+import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.pipeline.PipelineConfigException;
+import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import io.grpc.stub.StreamObserver;
 
 public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorServiceImplBase {
@@ -16,6 +21,7 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
     private final TaskAckHandler ackHandler;
     private final StateStore stateStore;
     private final StreamManager streamManager;
+    private final JobSubmissionService submission;
 
     public CoordinatorServiceImpl(WorkerRegistry registry, BatchStateFlusher flusher) {
         this(registry, flusher, null);
@@ -43,11 +49,26 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
             TaskAckHandler ackHandler,
             StateStore stateStore,
             StreamManager streamManager) {
+        this(registry, flusher, ackHandler, stateStore, streamManager, null);
+    }
+
+    /**
+     * @param submission enumerates a submitted pipeline's splits into persisted CREATED tasks; may be
+     *                   {@code null} for harnesses that never call {@link #submitJob}.
+     */
+    public CoordinatorServiceImpl(
+            WorkerRegistry registry,
+            BatchStateFlusher flusher,
+            TaskAckHandler ackHandler,
+            StateStore stateStore,
+            StreamManager streamManager,
+            JobSubmissionService submission) {
         this.registry = registry;
         this.flusher = flusher;
         this.ackHandler = ackHandler;
         this.stateStore = stateStore;
         this.streamManager = streamManager;
+        this.submission = submission;
         if (this.flusher != null) {
             this.flusher.start();
         }
@@ -227,6 +248,67 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
         persistHeartbeat(request.getId(), load);
         responseObserver.onNext(HeartbeatResponse.newBuilder().setAck(true).build());
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void submitJob(SubmitJobRequest request, StreamObserver<SubmitJobResponse> responseObserver) {
+        if (submission == null) {
+            responseObserver.onNext(SubmitJobResponse.newBuilder()
+                    .setSuccess(false).setError("submission not configured").build());
+            responseObserver.onCompleted();
+            return;
+        }
+        try {
+            PipelineConfig cfg = new PipelineConfigLoader().loadFromString(request.getPipelineYaml());
+            int maxParallelism = request.getMaxParallelism() <= 0 ? 4 : request.getMaxParallelism();
+            String jobId = cfg.getName() + "-" + System.currentTimeMillis();
+            JobInstance job = submission.submit(jobId, cfg, maxParallelism);
+            int taskCount = job.getTaskIds() == null ? 0 : job.getTaskIds().size();
+            responseObserver.onNext(SubmitJobResponse.newBuilder()
+                    .setSuccess(true).setJobId(jobId).setTaskCount(taskCount).build());
+        } catch (PipelineConfigException | RuntimeException e) {
+            // Return a clean business-level failure (bad pipeline, split enumeration or store error)
+            // rather than letting it surface to the client as a generic gRPC INTERNAL.
+            String msg = e.getMessage() == null ? "submit failed" : e.getMessage();
+            responseObserver.onNext(SubmitJobResponse.newBuilder().setSuccess(false).setError(msg).build());
+        }
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getJobStatus(JobStatusRequest request, StreamObserver<JobStatusResponse> responseObserver) {
+        JobInstance job = stateStore == null ? null : stateStore.getJob(request.getJobId());
+        JobStatusResponse.Builder resp = JobStatusResponse.newBuilder();
+        if (job == null) {
+            resp.setFound(false);
+        } else {
+            resp.setFound(true).setJob(toSummary(job));
+        }
+        responseObserver.onNext(resp.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void listJobs(ListJobsRequest request, StreamObserver<ListJobsResponse> responseObserver) {
+        ListJobsResponse.Builder resp = ListJobsResponse.newBuilder();
+        if (stateStore != null) {
+            for (JobInstance job : stateStore.listJobs()) {
+                resp.addJobs(toSummary(job));
+            }
+        }
+        responseObserver.onNext(resp.build());
+        responseObserver.onCompleted();
+    }
+
+    private JobSummary toSummary(JobInstance job) {
+        return JobSummary.newBuilder()
+                .setJobId(job.getJobId() == null ? "" : job.getJobId())
+                .setState(job.getState() == null ? "" : job.getState().name())
+                .setTotalTasks(job.getTaskIds() == null ? 0 : job.getTaskIds().size())
+                .setCompleted(job.getCompletedTasks())
+                .setFailed(job.getFailedTasks())
+                .setCancelled(job.getCancelledTasks())
+                .build();
     }
 
     private void persistBackpressure(String workerId, boolean paused) {

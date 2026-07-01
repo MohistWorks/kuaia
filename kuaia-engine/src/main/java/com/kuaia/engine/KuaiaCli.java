@@ -11,8 +11,21 @@ import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.pipeline.PipelineRunSummary;
 
+import com.kuaia.common.rpc.CoordinatorServiceGrpc;
+import com.kuaia.common.rpc.JobStatusRequest;
+import com.kuaia.common.rpc.JobStatusResponse;
+import com.kuaia.common.rpc.JobSummary;
+import com.kuaia.common.rpc.ListJobsRequest;
+import com.kuaia.common.rpc.ListJobsResponse;
+import com.kuaia.common.rpc.SubmitJobRequest;
+import com.kuaia.common.rpc.SubmitJobResponse;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
+
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -106,6 +119,12 @@ public class KuaiaCli {
         }
         if ("worker".equals(command)) {
             return runWorker(args, out);
+        }
+        if ("submit".equals(command)) {
+            return runSubmit(args, out);
+        }
+        if ("status".equals(command)) {
+            return runStatus(args, out);
         }
 
         out.println("Unknown command: " + command);
@@ -491,6 +510,141 @@ public class KuaiaCli {
         }
     }
 
+    private static final class HostPort {
+        final String host;
+        final int port;
+        HostPort(String host, int port) { this.host = host; this.port = port; }
+    }
+
+    private static HostPort parseCoordinator(String coordinator, String command, PrintStream out) {
+        int colon = coordinator.lastIndexOf(':');
+        if (colon <= 0 || colon == coordinator.length() - 1) {
+            out.println(command + " --coordinator must be HOST:PORT");
+            printUsage(out);
+            return null;
+        }
+        int port;
+        try {
+            port = Integer.parseInt(coordinator.substring(colon + 1));
+        } catch (NumberFormatException e) {
+            out.println(command + " --coordinator must be HOST:PORT");
+            printUsage(out);
+            return null;
+        }
+        if (port <= 0) {
+            out.println(command + " --coordinator must be HOST:PORT");
+            printUsage(out);
+            return null;
+        }
+        return new HostPort(coordinator.substring(0, colon), port);
+    }
+
+    private static int runSubmit(String[] args, PrintStream out) {
+        String coordinator = null;
+        Path file = null;
+        int maxParallelism = 4;
+        for (int i = 1; i < args.length; i++) {
+            String option = args[i];
+            switch (option) {
+                case "--coordinator":
+                    if (i + 1 >= args.length) { out.println("submit requires --coordinator <HOST:PORT>"); printUsage(out); return 1; }
+                    coordinator = args[++i];
+                    break;
+                case "-f":
+                case "--file":
+                    if (i + 1 >= args.length) { out.println("submit requires -f <pipeline.yaml>"); printUsage(out); return 1; }
+                    file = Paths.get(args[++i]);
+                    break;
+                case "--max-parallelism":
+                    if (i + 1 >= args.length) { out.println("submit --max-parallelism requires <N>"); printUsage(out); return 1; }
+                    try {
+                        maxParallelism = Integer.parseInt(args[++i]);
+                    } catch (NumberFormatException e) {
+                        out.println("submit --max-parallelism must be a positive integer"); printUsage(out); return 1;
+                    }
+                    if (maxParallelism <= 0) { out.println("submit --max-parallelism must be a positive integer"); printUsage(out); return 1; }
+                    break;
+                default:
+                    out.println("Unknown submit option: " + option); printUsage(out); return 1;
+            }
+        }
+        if (coordinator == null) { out.println("submit requires --coordinator <HOST:PORT>"); printUsage(out); return 1; }
+        if (file == null) { out.println("submit requires -f <pipeline.yaml>"); printUsage(out); return 1; }
+        HostPort hp = parseCoordinator(coordinator, "submit", out);
+        if (hp == null) { return 1; }
+        String yaml;
+        try {
+            yaml = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            out.println("Failed to read pipeline file: " + e.getMessage());
+            return 1;
+        }
+        ManagedChannel channel = ManagedChannelBuilder.forAddress(hp.host, hp.port).usePlaintext().build();
+        try {
+            SubmitJobResponse resp = CoordinatorServiceGrpc.newBlockingStub(channel)
+                    .submitJob(SubmitJobRequest.newBuilder().setPipelineYaml(yaml).setMaxParallelism(maxParallelism).build());
+            if (!resp.getSuccess()) {
+                out.println("Submit failed: " + resp.getError());
+                return 1;
+            }
+            out.println("Submitted job " + resp.getJobId() + " with " + resp.getTaskCount() + " tasks");
+            return 0;
+        } catch (StatusRuntimeException e) {
+            out.println("Failed to reach coordinator " + coordinator + ": " + e.getStatus());
+            return 1;
+        } finally {
+            channel.shutdownNow();
+        }
+    }
+
+    private static int runStatus(String[] args, PrintStream out) {
+        String coordinator = null;
+        String jobId = null;
+        for (int i = 1; i < args.length; i++) {
+            String option = args[i];
+            switch (option) {
+                case "--coordinator":
+                    if (i + 1 >= args.length) { out.println("status requires --coordinator <HOST:PORT>"); printUsage(out); return 1; }
+                    coordinator = args[++i];
+                    break;
+                case "--job":
+                    if (i + 1 >= args.length) { out.println("status --job requires <ID>"); printUsage(out); return 1; }
+                    jobId = args[++i];
+                    break;
+                default:
+                    out.println("Unknown status option: " + option); printUsage(out); return 1;
+            }
+        }
+        if (coordinator == null) { out.println("status requires --coordinator <HOST:PORT>"); printUsage(out); return 1; }
+        HostPort hp = parseCoordinator(coordinator, "status", out);
+        if (hp == null) { return 1; }
+        ManagedChannel channel = ManagedChannelBuilder.forAddress(hp.host, hp.port).usePlaintext().build();
+        try {
+            CoordinatorServiceGrpc.CoordinatorServiceBlockingStub stub = CoordinatorServiceGrpc.newBlockingStub(channel);
+            if (jobId != null) {
+                JobStatusResponse resp = stub.getJobStatus(JobStatusRequest.newBuilder().setJobId(jobId).build());
+                if (!resp.getFound()) { out.println("Job " + jobId + " not found"); return 1; }
+                JobSummary j = resp.getJob();
+                out.println("Job " + j.getJobId() + " state=" + j.getState()
+                        + " completed=" + j.getCompleted() + "/" + j.getTotalTasks()
+                        + " failed=" + j.getFailed() + " cancelled=" + j.getCancelled());
+                return 0;
+            }
+            ListJobsResponse resp = stub.listJobs(ListJobsRequest.newBuilder().build());
+            if (resp.getJobsCount() == 0) { out.println("No jobs"); return 0; }
+            out.println(String.format("%-40s %-18s %s", "JOB_ID", "STATE", "COMPLETED/TOTAL"));
+            for (JobSummary j : resp.getJobsList()) {
+                out.println(String.format("%-40s %-18s %d/%d", j.getJobId(), j.getState(), j.getCompleted(), j.getTotalTasks()));
+            }
+            return 0;
+        } catch (StatusRuntimeException e) {
+            out.println("Failed to reach coordinator " + coordinator + ": " + e.getStatus());
+            return 1;
+        } finally {
+            channel.shutdownNow();
+        }
+    }
+
     private static void writeRunSummaryJson(Path outputPath, String pipelineName, PipelineRunSummary summary)
             throws PipelineExecutionException {
         ObjectNode json = JSON_MAPPER.createObjectNode();
@@ -533,6 +687,10 @@ public class KuaiaCli {
         out.println("                               Start a coordinator (gRPC server + dispatch loop)");
         out.println("  worker --id ID --coordinator HOST:PORT");
         out.println("                               Start a worker that executes dispatched tasks");
+        out.println("  submit --coordinator HOST:PORT -f PIPELINE [--max-parallelism N]");
+        out.println("                               Submit a pipeline to a running coordinator");
+        out.println("  status --coordinator HOST:PORT [--job ID]");
+        out.println("                               List jobs, or show one job's status");
         out.println();
         out.println("Examples:");
         out.println("  kuaia run -f examples/local-file-to-file.yaml");

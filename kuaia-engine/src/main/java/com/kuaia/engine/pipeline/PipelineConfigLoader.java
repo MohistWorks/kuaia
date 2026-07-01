@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,14 +36,27 @@ public class PipelineConfigLoader {
             throw new PipelineConfigException("Pipeline config not found: " + path);
         }
 
-        Map<String, String> topLevel = new HashMap<>();
-        Map<String, Map<String, String>> sections = new HashMap<>();
-        List<Map<String, String>> transforms = new ArrayList<>();
+        List<String> lines;
         try {
-            parse(Files.readAllLines(path, StandardCharsets.UTF_8), topLevel, sections, transforms);
+            lines = Files.readAllLines(path, StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new PipelineConfigException("Failed to read pipeline config: " + path, e);
         }
+        return buildFromLines(lines, path);
+    }
+
+    public PipelineConfig loadFromString(String yaml) throws PipelineConfigException {
+        List<String> lines = Arrays.asList(yaml.split("\n", -1));
+        // No source file: resolve relative local paths against the process CWD.
+        Path syntheticPath = Paths.get("").toAbsolutePath().resolve("submitted-pipeline.yaml");
+        return buildFromLines(lines, syntheticPath);
+    }
+
+    private PipelineConfig buildFromLines(List<String> lines, Path configPath) throws PipelineConfigException {
+        Map<String, String> topLevel = new HashMap<>();
+        Map<String, Map<String, String>> sections = new HashMap<>();
+        List<Map<String, String>> transforms = new ArrayList<>();
+        parse(lines, topLevel, sections, transforms);
 
         String name = require(topLevel, "name");
         Map<String, String> source = section(sections, "source");
@@ -56,11 +70,11 @@ public class PipelineConfigLoader {
         requireSupported("source.type", sourceType, "file", "document-directory", "postgres", "mysql", "duckdb", "s3");
         requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant", "pgvector", "milvus");
 
-        PipelineConfig.SourceConfig sourceConfig = loadSource(path, sourceType, source);
-        PipelineConfig.SinkConfig sinkConfig = loadSink(path, sinkType, sink);
+        PipelineConfig.SourceConfig sourceConfig = loadSource(configPath, sourceType, source);
+        PipelineConfig.SinkConfig sinkConfig = loadSink(configPath, sinkType, sink);
         PipelineConfig.ErrorPolicyConfig errorPolicyConfig = loadErrorPolicy(errorPolicy);
 
-        String stateDir = checkpoint == null ? null : resolveCheckpointPath(path, checkpoint.get("stateDir"));
+        String stateDir = checkpoint == null ? null : resolveCheckpointPath(configPath, checkpoint.get("stateDir"));
         return new PipelineConfig(
                 name,
                 sourceConfig,

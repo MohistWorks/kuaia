@@ -32,6 +32,9 @@ public interface StateStore {
     /** @return the stored job instance, or {@code null} if none. */
     JobInstance getJob(String jobId);
 
+    /** @return all persisted jobs (unordered). */
+    List<JobInstance> listJobs();
+
     /** Force the job's aggregate state (e.g. for explicit cancellation); cascade normally maintains it. */
     void updateJobState(String jobId, TaskState state);
 

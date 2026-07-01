@@ -180,6 +180,20 @@ public class RocksDbStateStore implements StateStore, Closeable {
     }
 
     @Override
+    public List<JobInstance> listJobs() {
+        synchronized (lock) {
+            List<JobInstance> result = new ArrayList<>();
+            for (String id : scanIdsByPrefix(JOB_PREFIX)) {
+                JobInstance job = getJob(id);
+                if (job != null) {
+                    result.add(job);
+                }
+            }
+            return result;
+        }
+    }
+
+    @Override
     public void updateJobState(String jobId, TaskState state) {
         synchronized (lock) {
             try {

@@ -423,6 +423,55 @@ class KuaiaCliTest {
     }
 
     @Test
+    void submitRequiresCoordinator() throws Exception {
+        CliResult r = run("submit", "-f", tempDir.resolve("p.yaml").toString());
+        assertEquals(1, r.exitCode);
+        assertTrue(r.output.contains("submit requires --coordinator <HOST:PORT>"));
+    }
+
+    @Test
+    void submitRequiresFile() throws Exception {
+        CliResult r = run("submit", "--coordinator", "127.0.0.1:9000");
+        assertEquals(1, r.exitCode);
+        assertTrue(r.output.contains("submit requires -f <pipeline.yaml>"));
+    }
+
+    @Test
+    void submitRejectsMalformedCoordinator() throws Exception {
+        CliResult r = run("submit", "--coordinator", "no-port", "-f", tempDir.resolve("p.yaml").toString());
+        assertEquals(1, r.exitCode);
+        assertTrue(r.output.contains("submit --coordinator must be HOST:PORT"));
+    }
+
+    @Test
+    void submitReportsMissingPipelineFile() throws Exception {
+        CliResult r = run("submit", "--coordinator", "127.0.0.1:9000", "-f", tempDir.resolve("nope.yaml").toString());
+        assertEquals(1, r.exitCode);
+        assertTrue(r.output.contains("Failed to read pipeline file:"));
+    }
+
+    @Test
+    void statusRequiresCoordinator() throws Exception {
+        CliResult r = run("status", "--job", "j1");
+        assertEquals(1, r.exitCode);
+        assertTrue(r.output.contains("status requires --coordinator <HOST:PORT>"));
+    }
+
+    @Test
+    void statusRejectsMalformedCoordinator() throws Exception {
+        CliResult r = run("status", "--coordinator", "no-port");
+        assertEquals(1, r.exitCode);
+        assertTrue(r.output.contains("status --coordinator must be HOST:PORT"));
+    }
+
+    @Test
+    void statusRejectsUnknownOption() throws Exception {
+        CliResult r = run("status", "--coordinator", "127.0.0.1:9000", "--bogus", "x");
+        assertEquals(1, r.exitCode);
+        assertTrue(r.output.contains("Unknown status option: --bogus"));
+    }
+
+    @Test
     void unknownCommandReturnsError() throws Exception {
         CliResult result = run("missing");
 

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,6 +14,60 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class PipelineConfigLoaderTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void loadFromStringMatchesLoadPath(@TempDir Path tmp) throws Exception {
+        String yaml = String.join("\n",
+                "name: string-parse-demo",
+                "source:",
+                "  type: file",
+                "  path: " + tmp.resolve("in.csv"),
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: " + tmp.resolve("out.csv"),
+                "  format: csv",
+                "  mode: overwrite");
+        Path file = tmp.resolve("pipeline.yaml");
+        Files.write(file, yaml.getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig fromPath = new PipelineConfigLoader().load(file);
+        PipelineConfig fromString = new PipelineConfigLoader().loadFromString(yaml);
+
+        assertEquals(fromPath.getName(), fromString.getName());
+        assertEquals(fromPath.getSource().getType(), fromString.getSource().getType());
+        assertEquals(fromPath.getSink().getType(), fromString.getSink().getType());
+    }
+
+    @Test
+    void loadFromStringResolvesRelativePathsAgainstCwd() throws Exception {
+        // Relative source/sink paths must resolve against the coordinator process CWD via the
+        // synthetic config path — this exercises the resolveLocalPath branch that dereferences
+        // configPath (a null synthetic path would NPE here).
+        String yaml = String.join("\n",
+                "name: rel-path-demo",
+                "source:",
+                "  type: file",
+                "  path: sub/in.csv",
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: sub/out.csv",
+                "  format: csv",
+                "  mode: overwrite");
+
+        PipelineConfig cfg = new PipelineConfigLoader(false).loadFromString(yaml);
+
+        Path cwd = Paths.get("").toAbsolutePath();
+        assertEquals(
+                cwd.resolve("sub/in.csv").normalize(),
+                Paths.get(cfg.getSource().getPath()).normalize(),
+                "relative source path should resolve against the process CWD");
+        assertEquals(
+                cwd.resolve("sub/out.csv").normalize(),
+                Paths.get(cfg.getSink().getPath()).normalize(),
+                "relative sink path should resolve against the process CWD");
+    }
 
     @Test
     void loadsVectorPipelineConfig() throws Exception {

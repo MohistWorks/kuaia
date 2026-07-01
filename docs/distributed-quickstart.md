@@ -39,3 +39,33 @@ The worker connects, receives task assignments over the stream, executes them, a
 The coordinator's state under `--state-dir` survives restarts. To resume after a crash, restart with
 the **same** `--state-dir` and **without** `--submit` — the dispatch loop recovers the persisted
 tasks and re-dispatches them. Passing `--submit` again would submit a second, duplicate job.
+
+## Runtime submission (submit + status while the coordinator runs)
+
+Instead of submitting a job at coordinator startup with `--submit`, you can start the coordinator
+empty and submit jobs to it over gRPC at runtime, then query their status — no restart required.
+
+Terminal A — coordinator, started **without** `--submit`:
+
+    java -jar kuaia-engine/target/kuaia-engine-*-cli.jar coordinator \
+        --port 9000 \
+        --state-dir /tmp/kuaia-coord
+
+Terminal B — worker:
+
+    java -jar kuaia-engine/target/kuaia-engine-*-cli.jar worker \
+        --id w1 \
+        --coordinator 127.0.0.1:9000
+
+Terminal C — submit a job and watch it, using the CLI as a client:
+
+    java -jar kuaia-engine/target/kuaia-engine-*-cli.jar submit --coordinator 127.0.0.1:9000 -f examples/cluster-demo/pipeline.yaml
+    java -jar kuaia-engine/target/kuaia-engine-*-cli.jar status --coordinator 127.0.0.1:9000
+    java -jar kuaia-engine/target/kuaia-engine-*-cli.jar status --coordinator 127.0.0.1:9000 --job <job-id>
+
+- `submit` sends the pipeline YAML to the coordinator, which plans it into tasks and returns the
+  new **job id** and the **task count**. The dispatch loop then hands those tasks to connected
+  workers just like a startup `--submit` job.
+- `status` with no `--job` lists **all** jobs the coordinator knows about, with their states.
+- `status --job <job-id>` shows a single job's aggregate **state** and its per-state task counts —
+  poll it until the job reads `COMPLETED`.
