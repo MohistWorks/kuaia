@@ -162,6 +162,11 @@ public class RatisStateStore implements StateStore {
     }
 
     @Override
+    public List<JobInstance> listJobs() {
+        throw new UnsupportedOperationException("listJobs is not supported on the Raft-backed store yet");
+    }
+
+    @Override
     public void updateJobState(String jobId, TaskState state) {
         try {
             RaftCommand cmd = RaftCommand.newBuilder()
