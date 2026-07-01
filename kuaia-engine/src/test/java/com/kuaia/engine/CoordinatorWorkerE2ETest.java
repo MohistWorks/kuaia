@@ -2,8 +2,15 @@ package com.kuaia.engine;
 
 import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.TaskState;
+import com.kuaia.common.rpc.CoordinatorServiceGrpc;
+import com.kuaia.common.rpc.JobStatusRequest;
+import com.kuaia.common.rpc.JobStatusResponse;
+import com.kuaia.common.rpc.SubmitJobRequest;
+import com.kuaia.common.rpc.SubmitJobResponse;
 import com.kuaia.engine.coordinator.state.RocksDbStateStore;
 import com.kuaia.engine.pipeline.PipelineConfig;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -103,6 +110,47 @@ class CoordinatorWorkerE2ETest {
         } finally {
             worker.close();
             server2.close();
+        }
+    }
+
+    @Test
+    void runtimeSubmitViaRpcRunsJobToCompletion(@TempDir Path tmp) throws Exception {
+        Path input = tmp.resolve("in.csv");
+        Files.write(input, String.join("\n", "id", "1", "2", "3", "4", "5").getBytes(StandardCharsets.UTF_8));
+        Path output = tmp.resolve("out.csv");
+        String yaml = String.join("\n",
+                "name: e2e-runtime-submit",
+                "source:", "  type: file", "  path: " + input, "  format: csv",
+                "sink:", "  type: file", "  path: " + output, "  format: csv", "  mode: overwrite");
+
+        CoordinatorServer server = new CoordinatorServer(new RocksDbStateStore(tmp.resolve("coord-state")), 30_000L);
+        WorkerRunner worker = new WorkerRunner("worker-runtime-" + System.nanoTime());
+        ManagedChannel channel = null;
+        try {
+            server.start(0);
+            worker.start("127.0.0.1", server.port());
+            channel = ManagedChannelBuilder.forAddress("127.0.0.1", server.port()).usePlaintext().build();
+            CoordinatorServiceGrpc.CoordinatorServiceBlockingStub stub = CoordinatorServiceGrpc.newBlockingStub(channel);
+
+            SubmitJobResponse submit = stub.submitJob(SubmitJobRequest.newBuilder()
+                    .setPipelineYaml(yaml).setMaxParallelism(4).build());
+            assertTrue(submit.getSuccess(), submit.getError());
+            String jobId = submit.getJobId();
+            assertTrue(submit.getTaskCount() > 0, "expected planned tasks");
+
+            CoordinatorServiceGrpc.CoordinatorServiceBlockingStub pollStub = stub;
+            assertTrue(await(() -> {
+                JobStatusResponse st = pollStub.getJobStatus(JobStatusRequest.newBuilder().setJobId(jobId).build());
+                return st.getFound() && "COMPLETED".equals(st.getJob().getState());
+            }, 20_000), "job should reach COMPLETED via status RPC");
+
+            assertEquals(6, Files.readAllLines(output, StandardCharsets.UTF_8).size(), "header + 5 rows");
+        } finally {
+            if (channel != null) {
+                channel.shutdownNow();
+            }
+            worker.close();
+            server.close();
         }
     }
 
