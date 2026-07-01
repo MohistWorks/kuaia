@@ -6,6 +6,9 @@ service CoordinatorService {
   rpc RegisterWorker (WorkerInfo) returns (RegistrationResponse) {}
   rpc Heartbeat (WorkerHeartbeat) returns (HeartbeatResponse) {}
   rpc TaskStream (stream WorkerMessage) returns (stream CoordinatorMessage) {}
+  rpc SubmitJob    (SubmitJobRequest)  returns (SubmitJobResponse) {}
+  rpc GetJobStatus (JobStatusRequest)  returns (JobStatusResponse) {}
+  rpc ListJobs     (ListJobsRequest)   returns (ListJobsResponse) {}
 }
 
 message WorkerInfo {
@@ -126,3 +129,18 @@ message ControlSignal {
 message ControlCommand {
   string type = 1; // e.g., "PAUSE", "RESUME"
 }
+
+message SubmitJobRequest  { string pipeline_yaml = 1; int32 max_parallelism = 2; }
+message SubmitJobResponse { bool success = 1; string job_id = 2; int32 task_count = 3; string error = 4; }
+message JobStatusRequest  { string job_id = 1; }
+message JobStatusResponse { bool found = 1; JobSummary job = 2; }
+message JobSummary {
+  string job_id = 1;
+  string state = 2;
+  int32 total_tasks = 3;
+  int32 completed = 4;
+  int32 failed = 5;
+  int32 cancelled = 6;
+}
+message ListJobsRequest  {}
+message ListJobsResponse { repeated JobSummary jobs = 1; }
