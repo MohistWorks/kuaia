@@ -91,4 +91,16 @@ class CoordinatorRuntimeSubmitTest {
                 JobStatusRequest.newBuilder().setJobId("nope").build(), observer(out));
         assertFalse(out.get(0).getFound());
     }
+
+    @Test
+    void submitFailsWhenSubmissionNotConfigured() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        // 5-arg constructor → submission is null.
+        CoordinatorServiceImpl svc = new CoordinatorServiceImpl(
+                new WorkerRegistry(), null, new TaskAckHandler(store), store, new StreamManager());
+        List<SubmitJobResponse> out = capture();
+        svc.submitJob(SubmitJobRequest.newBuilder().setPipelineYaml("name: x").build(), observer(out));
+        assertFalse(out.get(0).getSuccess());
+        assertEquals("submission not configured", out.get(0).getError());
+    }
 }

@@ -266,8 +266,10 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
             int taskCount = job.getTaskIds() == null ? 0 : job.getTaskIds().size();
             responseObserver.onNext(SubmitJobResponse.newBuilder()
                     .setSuccess(true).setJobId(jobId).setTaskCount(taskCount).build());
-        } catch (PipelineConfigException e) {
-            String msg = e.getMessage() == null ? "invalid pipeline" : e.getMessage();
+        } catch (PipelineConfigException | RuntimeException e) {
+            // Return a clean business-level failure (bad pipeline, split enumeration or store error)
+            // rather than letting it surface to the client as a generic gRPC INTERNAL.
+            String msg = e.getMessage() == null ? "submit failed" : e.getMessage();
             responseObserver.onNext(SubmitJobResponse.newBuilder().setSuccess(false).setError(msg).build());
         }
         responseObserver.onCompleted();
