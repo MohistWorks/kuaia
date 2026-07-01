@@ -15,6 +15,30 @@ class PipelineConfigLoaderTest {
     Path tempDir;
 
     @Test
+    void loadFromStringMatchesLoadPath(@TempDir Path tmp) throws Exception {
+        String yaml = String.join("\n",
+                "name: string-parse-demo",
+                "source:",
+                "  type: file",
+                "  path: " + tmp.resolve("in.csv"),
+                "  format: csv",
+                "sink:",
+                "  type: file",
+                "  path: " + tmp.resolve("out.csv"),
+                "  format: csv",
+                "  mode: overwrite");
+        Path file = tmp.resolve("pipeline.yaml");
+        Files.write(file, yaml.getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig fromPath = new PipelineConfigLoader().load(file);
+        PipelineConfig fromString = new PipelineConfigLoader().loadFromString(yaml);
+
+        assertEquals(fromPath.getName(), fromString.getName());
+        assertEquals(fromPath.getSource().getType(), fromString.getSource().getType());
+        assertEquals(fromPath.getSink().getType(), fromString.getSink().getType());
+    }
+
+    @Test
     void loadsVectorPipelineConfig() throws Exception {
         Path data = tempDir.resolve("documents.csv");
         Files.write(data, "id,content\n1,Alpha".getBytes(StandardCharsets.UTF_8));
