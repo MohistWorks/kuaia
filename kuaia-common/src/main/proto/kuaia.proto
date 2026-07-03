@@ -107,7 +107,14 @@ message CoordinatorMessage {
     TaskPayload task = 1;
     ControlCommand command = 2;
     TaskAssignment assignment = 3;
+    HelloAck hello_ack = 4;
   }
+}
+
+// Reply to WorkerHello: whether this coordinator currently leads the cluster. Workers stay on a
+// leader and move to the next candidate when a follower answers false (or the stream closes).
+message HelloAck {
+  bool is_leader = 1;
 }
 
 message TaskPayload {
