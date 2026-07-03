@@ -106,6 +106,31 @@ class TaskDispatcherTest {
         assertEquals(1_000L + LEASE, task.getLeaseUntilMillis());
     }
 
+    @Test
+    void followerGateSuppressesDispatch() {
+        new JobSubmissionService(store, new TaskPlanner()).submit("job-1", List.of("s0", "s1"), 2);
+        registerWorker("worker-1");
+        TaskDispatcher follower = new TaskDispatcher(
+                store, new CoordinatorRecoveryPlanner(store),
+                new Scheduler(registry, streamManager), streamManager, LEASE, () -> false);
+
+        assertEquals(0, follower.dispatchOnce(1_000L));
+        assertEquals(2, store.scanTasksByState(TaskState.CREATED).size());
+        assertEquals(0, store.scanTasksByState(TaskState.DISPATCHING).size());
+    }
+
+    @Test
+    void leaderGateAllowsDispatch() {
+        new JobSubmissionService(store, new TaskPlanner()).submit("job-1", List.of("s0"), 1);
+        registerWorker("worker-1");
+        TaskDispatcher leader = new TaskDispatcher(
+                store, new CoordinatorRecoveryPlanner(store),
+                new Scheduler(registry, streamManager), streamManager, LEASE, () -> true);
+
+        assertEquals(1, leader.dispatchOnce(1_000L));
+        assertEquals(1, store.scanTasksByState(TaskState.DISPATCHING).size());
+    }
+
     private CollectingObserver registerWorker(String workerId) {
         registry.register(NodeInfo.builder()
                 .id(workerId).host("127.0.0.1").port(9000)
