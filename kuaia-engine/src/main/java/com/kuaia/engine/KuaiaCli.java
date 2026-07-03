@@ -308,6 +308,11 @@ public class KuaiaCli {
             if (at <= 0 || colon <= at + 1 || colon == e.length() - 1) {
                 return "coordinator --raft-peers entry must be id@host:port: " + e;
             }
+            try {
+                Integer.parseInt(e.substring(colon + 1));
+            } catch (NumberFormatException nfe) {
+                return "coordinator --raft-peers port must be numeric: " + e;
+            }
             if (e.substring(0, at).equals(nodeId)) {
                 found = true;
             }
@@ -465,13 +470,19 @@ public class KuaiaCli {
             HaCoordinator ha = new HaCoordinator(nodeId, raftPeers, stateDir.toFile(), port, leaseMillis);
             try {
                 ha.start();
-                if (pipeline != null) {
-                    ha.submit(pipeline, maxParallelism);
-                }
             } catch (Exception e) {
                 out.println(e.getMessage());
                 closeQuietly(ha);
                 return 1;
+            }
+            if (pipeline != null) {
+                try {
+                    ha.submit(pipeline, maxParallelism);
+                } catch (RuntimeException e) {
+                    // A startup submit needs a Raft quorum; if the cluster isn't formed yet, keep the
+                    // coordinator running so the job can be submitted at runtime rather than exiting.
+                    out.println("startup submit failed (coordinator still running): " + e.getMessage());
+                }
             }
             out.println("HA coordinator '" + nodeId + "' listening on port " + ha.port());
             Runtime.getRuntime().addShutdownHook(new Thread(() -> closeQuietly(ha)));

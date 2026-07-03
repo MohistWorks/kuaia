@@ -29,6 +29,7 @@ public class HaCoordinator implements AutoCloseable {
     private final RaftServer raftServer = new RaftServer();
     private RaftClient raftClient;
     private CoordinatorServer coordinator;
+    private boolean closed;
 
     public HaCoordinator(String nodeId, String peers, File storageDir, int port, long leaseMillis) {
         this.nodeId = nodeId;
@@ -72,14 +73,25 @@ public class HaCoordinator implements AutoCloseable {
         coordinator.awaitTermination();
     }
 
+    /** Idempotent, leak-safe shutdown: every layer is closed even if an earlier one throws. */
     @Override
-    public void close() throws Exception {
-        if (coordinator != null) {
-            coordinator.close();
+    public synchronized void close() throws Exception {
+        if (closed) {
+            return;
         }
-        if (raftClient != null) {
-            raftClient.close();
+        closed = true;
+        try {
+            if (coordinator != null) {
+                coordinator.close();
+            }
+        } finally {
+            try {
+                if (raftClient != null) {
+                    raftClient.close();
+                }
+            } finally {
+                raftServer.close();
+            }
         }
-        raftServer.close();
     }
 }
