@@ -7,6 +7,7 @@ import com.kuaia.engine.coordinator.state.RocksDbStateStore;
 import com.kuaia.engine.coordinator.state.StateStore;
 import com.kuaia.engine.ha.HaCoordinator;
 import com.kuaia.engine.pipeline.PipelineConfig;
+import com.kuaia.engine.worker.WorkerNode;
 import com.kuaia.engine.pipeline.PipelineConfigException;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
@@ -30,6 +31,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 public class KuaiaCli {
     private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
@@ -565,29 +568,18 @@ public class KuaiaCli {
             printUsage(out);
             return 1;
         }
-        int colon = coordinator.lastIndexOf(':');
-        if (colon <= 0 || colon == coordinator.length() - 1) {
-            out.println("worker --coordinator must be HOST:PORT");
-            printUsage(out);
-            return 1;
-        }
-        String host = coordinator.substring(0, colon);
-        int port;
-        try {
-            port = Integer.parseInt(coordinator.substring(colon + 1));
-        } catch (NumberFormatException e) {
-            out.println("worker --coordinator must be HOST:PORT");
-            printUsage(out);
-            return 1;
-        }
-        if (port <= 0) {
-            out.println("worker --coordinator must be HOST:PORT");
-            printUsage(out);
-            return 1;
+        // Comma-separated coordinator list: the worker probes the entries in order for the leader.
+        List<WorkerNode.HostPort> coordinators = new ArrayList<>();
+        for (String entry : coordinator.split(",")) {
+            HostPort parsed = parseCoordinator(entry.trim(), "worker", out);
+            if (parsed == null) {
+                return 1;
+            }
+            coordinators.add(new WorkerNode.HostPort(parsed.host, parsed.port));
         }
 
         WorkerRunner runner = new WorkerRunner(id);
-        runner.start(host, port);
+        runner.start(coordinators);
         out.println("Worker " + id + " connecting to " + coordinator);
         Runtime.getRuntime().addShutdownHook(new Thread(runner::close));
         try {
@@ -777,8 +769,8 @@ public class KuaiaCli {
         out.println("                               Start a coordinator (gRPC server + dispatch loop)");
         out.println("  coordinator --port P --state-dir DIR --node-id ID --raft-peers id@host:port,...");
         out.println("                               Start an HA coordinator node (Raft-replicated state)");
-        out.println("  worker --id ID --coordinator HOST:PORT");
-        out.println("                               Start a worker that executes dispatched tasks");
+        out.println("  worker --id ID --coordinator HOST:PORT[,HOST:PORT...]");
+        out.println("                               Start a worker; a list is probed for the current leader");
         out.println("  submit --coordinator HOST:PORT -f PIPELINE [--max-parallelism N]");
         out.println("                               Submit a pipeline to a running coordinator");
         out.println("  status --coordinator HOST:PORT [--job ID]");

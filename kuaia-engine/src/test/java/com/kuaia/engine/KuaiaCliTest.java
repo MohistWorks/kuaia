@@ -339,6 +339,22 @@ class KuaiaCliTest {
     }
 
     @Test
+    void workerRejectsMalformedEntryInCoordinatorList() throws Exception {
+        CliResult result = run("worker", "--id", "w1", "--coordinator", "127.0.0.1:9000,badhost");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker --coordinator must be HOST:PORT"));
+    }
+
+    @Test
+    void workerRejectsNonNumericPortInCoordinatorList() throws Exception {
+        CliResult result = run("worker", "--id", "w1", "--coordinator", "h1:9000,h2:abc");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("worker --coordinator must be HOST:PORT"));
+    }
+
+    @Test
     void coordinatorHaRequiresNodeId() throws Exception {
         CliResult result = run("coordinator", "--port", "9000", "--state-dir",
                 tempDir.resolve("ha1").toString(), "--raft-peers", "p1@127.0.0.1:9001");
