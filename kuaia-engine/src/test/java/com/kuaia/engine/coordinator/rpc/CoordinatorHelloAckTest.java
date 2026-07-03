@@ -90,6 +90,27 @@ class CoordinatorHelloAckTest {
     }
 
     @Test
+    void staleStreamTerminationDoesNotEvictReconnectedWorker() {
+        InMemoryStateStore store = new InMemoryStateStore();
+        StreamManager streams = new StreamManager();
+        CoordinatorServiceImpl svc = service(store, streams, () -> true);
+
+        // First connection: worker w1 registers on the leader.
+        CollectingObserver oldStream = new CollectingObserver();
+        StreamObserver<WorkerMessage> oldRequest = svc.taskStream(oldStream);
+        oldRequest.onNext(hello("w1"));
+
+        // The worker reconnects (new stream, same id) before the old stream's death is noticed.
+        CollectingObserver newStream = new CollectingObserver();
+        svc.taskStream(newStream).onNext(hello("w1"));
+        assertTrue(streams.isAvailable("w1"));
+
+        // The old stream's late terminal callback must NOT evict the fresh registration.
+        oldRequest.onError(new RuntimeException("stale connection finally died"));
+        assertTrue(streams.isAvailable("w1"), "reconnected worker must stay schedulable");
+    }
+
+    @Test
     void leaderReplaysActiveAssignmentsAfterAck() {
         InMemoryStateStore store = new InMemoryStateStore();
         store.saveTask(TaskRecord.created("job-1", "task-1")

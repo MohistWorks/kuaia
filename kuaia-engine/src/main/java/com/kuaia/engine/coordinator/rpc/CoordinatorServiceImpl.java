@@ -121,7 +121,9 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
                     return;
                 }
                 this.workerId = resolvedWorkerId;
-                streamManager.registerStream(workerId, responseObserver);
+                if (!value.hasHello()) {
+                    streamManager.registerStream(workerId, responseObserver);
+                }
 
                 if (value.hasHello()) {
                     boolean leader = isLeader.getAsBoolean();
@@ -133,12 +135,15 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
                     if (!leader) {
                         // Followers reject the stream so the worker probes the next candidate; no
                         // registration, replay, or recovery runs on a non-leader.
-                        streamManager.unregisterStream(workerId);
+                        streamManager.unregisterStream(workerId, responseObserver);
                         synchronized (responseObserver) {
                             responseObserver.onCompleted();
                         }
                         return;
                     }
+                    // Register only AFTER the ack is on the wire: the dispatch loop must not be able
+                    // to push an assignment ahead of the HelloAck the worker's handshake waits on.
+                    streamManager.registerStream(workerId, responseObserver);
                     streamManager.setPaused(workerId, false);
                     registerWorkerHello(value.getHello());
                     replayActiveAssignments(workerId);
@@ -179,13 +184,15 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
             @Override
             public void onError(Throwable t) {
                 persistStreamDisconnected(workerId);
-                streamManager.unregisterStream(workerId);
+                // Identity-checked: a stale stream's late error must not evict the stream a
+                // reconnected worker registered in the meantime.
+                streamManager.unregisterStream(workerId, responseObserver);
             }
 
             @Override
             public void onCompleted() {
                 persistStreamDisconnected(workerId);
-                streamManager.unregisterStream(workerId);
+                streamManager.unregisterStream(workerId, responseObserver);
             }
         };
     }

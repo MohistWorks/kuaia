@@ -29,11 +29,29 @@ public class StreamManager {
     }
 
     /**
+     * Identity-checked removal: drops the worker's registration only if it still points at
+     * {@code observer}. A stale stream's late terminal callback must never evict the healthy stream a
+     * reconnected worker registered moments earlier.
+     */
+    public void unregisterStream(String workerId, StreamObserver<CoordinatorMessage> observer) {
+        if (workerId != null && streams.remove(workerId, observer)) {
+            pausedWorkers.remove(workerId);
+        }
+    }
+
+    /**
      * Complete and drop every registered worker stream. A coordinator that lost Raft leadership calls
-     * this so its workers re-probe the cluster and land on the new leader.
+     * this so its workers re-probe the cluster and land on the new leader. Streams are removed one by
+     * one (not bulk-cleared) so a concurrently registered stream is either completed here or survives
+     * intact for the next sweep — never dropped without a completion.
      */
     public void disconnectAll() {
-        for (StreamObserver<CoordinatorMessage> observer : streams.values()) {
+        for (String workerId : streams.keySet()) {
+            StreamObserver<CoordinatorMessage> observer = streams.remove(workerId);
+            if (observer == null) {
+                continue;
+            }
+            pausedWorkers.remove(workerId);
             synchronized (observer) {
                 try {
                     observer.onCompleted();
@@ -42,8 +60,6 @@ public class StreamManager {
                 }
             }
         }
-        streams.clear();
-        pausedWorkers.clear();
     }
 
     public void setPaused(String workerId, boolean paused) {

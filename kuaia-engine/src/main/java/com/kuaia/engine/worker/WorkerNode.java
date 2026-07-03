@@ -22,7 +22,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +46,21 @@ public class WorkerNode {
     public record HostPort(String host, int port) {
     }
 
+    /**
+     * One connection attempt. Becomes the resident connection when its {@code HelloAck(true)} wins the
+     * handshake; all teardown is identity-checked against {@link #resident} so a stray probe or a stale
+     * stream can never tear down a healthy resident connection.
+     */
+    private static final class Connection {
+        final ManagedChannel channel;
+        final AtomicReference<StreamObserver<WorkerMessage>> request = new AtomicReference<>();
+        final CompletableFuture<Boolean> ack = new CompletableFuture<>();
+
+        Connection(ManagedChannel channel) {
+            this.channel = channel;
+        }
+    }
+
     private final String id;
     private final TaskExecutor executor = new TaskExecutor();
     private final RocksDBBuffer dbBuffer = new RocksDBBuffer();
@@ -57,8 +74,7 @@ public class WorkerNode {
     private volatile List<HostPort> coordinators;
     private volatile ScheduledExecutorService reconnectExecutor;
     private volatile long backoffMillis = INITIAL_BACKOFF_MILLIS;
-    private ManagedChannel channel;
-    private StreamObserver<WorkerMessage> requestObserver;
+    private final AtomicReference<Connection> resident = new AtomicReference<>();
     private volatile boolean stopping;
 
     public WorkerNode(String id) {
@@ -130,36 +146,63 @@ public class WorkerNode {
 
     /**
      * Probe one candidate: open a stream, say hello, and wait for its {@code HelloAck}. Only a
-     * {@code isLeader=true} answer makes this the resident connection; anything else (follower answer,
-     * timeout, connection failure) closes the probe so the loop can try the next candidate.
+     * {@code isLeader=true} answer makes this the resident connection (installed inside the stream
+     * observer, before any subsequent message on that stream is processed); anything else — follower
+     * answer, timeout, connection failure — closes the probe so the loop can try the next candidate.
      */
     private boolean tryConnect(HostPort candidate) {
-        ManagedChannel probeChannel =
-                ManagedChannelBuilder.forAddress(candidate.host(), candidate.port()).usePlaintext().build();
-        CompletableFuture<Boolean> ack = new CompletableFuture<>();
+        Connection conn = new Connection(
+                ManagedChannelBuilder.forAddress(candidate.host(), candidate.port()).usePlaintext().build());
         try {
-            CoordinatorServiceGrpc.CoordinatorServiceStub stub = CoordinatorServiceGrpc.newStub(probeChannel);
-            StreamObserver<WorkerMessage> probeObserver = stub.taskStream(coordinatorMessages(ack));
-            synchronized (probeObserver) {
-                probeObserver.onNext(helloMessage());
+            CoordinatorServiceGrpc.CoordinatorServiceStub stub = CoordinatorServiceGrpc.newStub(conn.channel);
+            StreamObserver<WorkerMessage> request = stub.taskStream(coordinatorMessages(conn));
+            conn.request.set(request);
+            synchronized (request) {
+                request.onNext(helloMessage());
             }
-            if (Boolean.TRUE.equals(ack.get(HELLO_ACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)) && !stopping) {
-                this.channel = probeChannel;
-                this.requestObserver = probeObserver;
+            boolean isLeader;
+            try {
+                isLeader = Boolean.TRUE.equals(conn.ack.get(HELLO_ACK_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            } catch (TimeoutException e) {
+                // Claim the handshake as failed so a late ack cannot install residency afterwards; a
+                // photo-finish ack that beat this claim is accepted via the re-read.
+                conn.ack.complete(false);
+                isLeader = Boolean.TRUE.equals(conn.ack.getNow(false));
+            }
+            if (isLeader && !stopping) {
                 LOG.info("Worker {} connected to leader at {}:{}", id, candidate.host(), candidate.port());
                 return true;
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            conn.ack.complete(false);
         } catch (Exception e) {
+            conn.ack.complete(false);
             LOG.debug("Worker {} probe of {}:{} failed", id, candidate.host(), candidate.port(), e);
         }
-        probeChannel.shutdownNow();
+        if (resident.get() != conn) {
+            conn.channel.shutdownNow();
+        }
         return false;
     }
 
-    /** Resident stream lost after a successful handshake → drop it and re-enter the probe loop. */
-    private void onResidentStreamDown(Throwable cause) {
+    /**
+     * Terminal callback of one stream. A probe that never resolved its handshake is claimed as failed
+     * (tryConnect cleans it up); only the stream that IS the current resident triggers a re-probe —
+     * a stray abandoned probe can never tear down a healthy resident connection.
+     */
+    private void onStreamTerminated(Connection conn, Throwable cause) {
+        if (conn.ack.complete(false)) {
+            return;
+        }
+        if (!Boolean.TRUE.equals(conn.ack.getNow(false))) {
+            return;
+        }
+        if (!resident.compareAndSet(conn, null)) {
+            conn.channel.shutdownNow();
+            return;
+        }
+        conn.channel.shutdownNow();
         if (stopping) {
             return;
         }
@@ -168,21 +211,25 @@ public class WorkerNode {
         } else {
             LOG.info("Worker {} stream closed by coordinator; re-probing coordinators", id);
         }
-        requestObserver = null;
-        ManagedChannel current = channel;
-        channel = null;
-        if (current != null) {
-            current.shutdownNow();
-        }
         scheduleReconnect(0L);
     }
 
-    private StreamObserver<CoordinatorMessage> coordinatorMessages(CompletableFuture<Boolean> ack) {
+    private StreamObserver<CoordinatorMessage> coordinatorMessages(Connection conn) {
         return new StreamObserver<CoordinatorMessage>() {
             @Override
             public void onNext(CoordinatorMessage value) {
                 if (value.hasHelloAck()) {
-                    ack.complete(value.getHelloAck().getIsLeader());
+                    if (value.getHelloAck().getIsLeader() && conn.ack.complete(true)) {
+                        // This attempt won the handshake: install residency HERE, on the stream
+                        // thread, so it happens-before every later message on this stream — task
+                        // results can never race a not-yet-assigned resident connection.
+                        resident.set(conn);
+                        if (stopping && resident.compareAndSet(conn, null)) {
+                            conn.channel.shutdownNow();
+                        }
+                    } else {
+                        conn.ack.complete(false);
+                    }
                 }
                 if (value.hasTask()) {
                     TaskPayload task = value.getTask();
@@ -242,16 +289,12 @@ public class WorkerNode {
 
             @Override
             public void onError(Throwable t) {
-                if (!ack.complete(false) && Boolean.TRUE.equals(ack.getNow(false))) {
-                    onResidentStreamDown(t);
-                }
+                onStreamTerminated(conn, t);
             }
 
             @Override
             public void onCompleted() {
-                if (!ack.complete(false) && Boolean.TRUE.equals(ack.getNow(false))) {
-                    onResidentStreamDown(null);
-                }
+                onStreamTerminated(conn, null);
             }
         };
     }
@@ -263,24 +306,27 @@ public class WorkerNode {
         if (reconnect != null) {
             reconnect.shutdownNow();
         }
-        StreamObserver<WorkerMessage> observer = requestObserver;
-        requestObserver = null;
-        if (observer != null) {
-            synchronized (observer) {
-                observer.onCompleted();
+        Connection current = resident.getAndSet(null);
+        if (current != null) {
+            StreamObserver<WorkerMessage> observer = current.request.get();
+            if (observer != null) {
+                synchronized (observer) {
+                    try {
+                        observer.onCompleted();
+                    } catch (RuntimeException ignored) {
+                        // stream already dead; channel shutdown below is what matters
+                    }
+                }
             }
-        }
-        if (channel != null) {
-            channel.shutdown();
+            current.channel.shutdown();
             try {
-                if (!channel.awaitTermination(1, TimeUnit.SECONDS)) {
-                    channel.shutdownNow();
+                if (!current.channel.awaitTermination(1, TimeUnit.SECONDS)) {
+                    current.channel.shutdownNow();
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                channel.shutdownNow();
+                current.channel.shutdownNow();
             }
-            channel = null;
         }
         taskExecutorPool.shutdownNow();
         try {
@@ -352,7 +398,11 @@ public class WorkerNode {
     }
 
     private void sendMessage(WorkerMessage message) {
-        StreamObserver<WorkerMessage> observer = requestObserver;
+        Connection current = resident.get();
+        if (current == null) {
+            return;
+        }
+        StreamObserver<WorkerMessage> observer = current.request.get();
         if (observer == null) {
             return;
         }
