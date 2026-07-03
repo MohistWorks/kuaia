@@ -19,6 +19,7 @@ public class RatisStateStore implements StateStore {
     private static final String TASK_STATE_SCAN_PREFIX = "scan/task_state/";
     private static final String TASK_WORKER_SCAN_PREFIX = "scan/task_worker/";
     private static final String WORKER_STATE_SCAN_PREFIX = "scan/worker_state/";
+    private static final String JOB_LIST_SCAN_KEY = "scan/jobs";
 
     private final RaftClient raftClient;
 
@@ -163,7 +164,7 @@ public class RatisStateStore implements StateStore {
 
     @Override
     public List<JobInstance> listJobs() {
-        throw new UnsupportedOperationException("listJobs is not supported on the Raft-backed store yet");
+        return readList(JOB_LIST_SCAN_KEY, JobInstance.class);
     }
 
     @Override

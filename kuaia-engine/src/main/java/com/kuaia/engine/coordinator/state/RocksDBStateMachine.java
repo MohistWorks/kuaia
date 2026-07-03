@@ -38,6 +38,7 @@ public class RocksDBStateMachine extends BaseStateMachine {
     private static final String TASK_STATE_SCAN_PREFIX = "scan/task_state/";
     private static final String TASK_WORKER_SCAN_PREFIX = "scan/task_worker/";
     private static final String WORKER_STATE_SCAN_PREFIX = "scan/worker_state/";
+    private static final String JOB_LIST_SCAN_KEY = "scan/jobs";
 
     private RocksDB db;
     private WriteOptions writeOptions;
@@ -108,6 +109,9 @@ public class RocksDBStateMachine extends BaseStateMachine {
                 WorkerRecord.WorkerState state = WorkerRecord.WorkerState.valueOf(
                         key.substring(WORKER_STATE_SCAN_PREFIX.length()));
                 return completedBytes(serialize(scanWorkerRecordsByState(state)));
+            }
+            if (key.equals(JOB_LIST_SCAN_KEY)) {
+                return completedBytes(serialize(scanJobRecords()));
             }
             byte[] val = db.get(bytes(key));
             if (val == null) {
@@ -233,6 +237,10 @@ public class RocksDBStateMachine extends BaseStateMachine {
         } catch (RocksDBException e) {
             throw new IOException("Failed to get worker record " + workerId, e);
         }
+    }
+
+    List<JobInstance> scanJobRecords() throws IOException {
+        return scanRecords(JOB_PREFIX, JobInstance.class);
     }
 
     List<TaskRecord> scanTaskRecordsByState(TaskState state) throws IOException {

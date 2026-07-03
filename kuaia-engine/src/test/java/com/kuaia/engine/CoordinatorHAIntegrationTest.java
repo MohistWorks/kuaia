@@ -1,5 +1,6 @@
 package com.kuaia.engine;
 
+import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.engine.coordinator.state.RatisStateStore;
@@ -17,6 +18,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class CoordinatorHAIntegrationTest {
@@ -85,6 +87,46 @@ public class CoordinatorHAIntegrationTest {
         } finally {
             fixture.close();
         }
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    public void listJobsOverRaftReturnsSubmittedJobs() throws Exception {
+        RaftClusterFixture fixture = startThreeNodeCluster();
+        RaftClient client = null;
+        try {
+            RaftProperties properties = new RaftProperties();
+            RaftClientConfigKeys.Rpc.setRequestTimeout(properties, TimeDuration.valueOf(2, TimeUnit.SECONDS));
+            client = RaftClient.newBuilder().setProperties(properties).setRaftGroup(fixture.group).build();
+            RatisStateStore store = new RatisStateStore(client);
+            waitForLeader(fixture.groupId, 10_000L, fixture.servers);
+
+            store.submitJob(job("job-a"));
+            store.submitJob(job("job-b"));
+
+            List<String> ids = new ArrayList<>();
+            long deadline = System.currentTimeMillis() + 5_000L;
+            while (System.currentTimeMillis() < deadline) {
+                ids = store.listJobs().stream().map(JobInstance::getJobId).sorted().collect(Collectors.toList());
+                if (ids.size() == 2) {
+                    break;
+                }
+                Thread.sleep(100L);
+            }
+            assertEquals(List.of("job-a", "job-b"), ids);
+        } finally {
+            if (client != null) {
+                client.close();
+            }
+            fixture.close();
+        }
+    }
+
+    private JobInstance job(String id) {
+        JobInstance j = new JobInstance();
+        j.setJobId(id);
+        j.setTaskIds(Arrays.asList(id + "-t0", id + "-t1"));
+        return j;
     }
 
     private RaftClusterFixture startThreeNodeCluster() throws Exception {
