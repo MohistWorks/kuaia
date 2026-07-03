@@ -1,5 +1,6 @@
 package com.kuaia.engine;
 
+import com.kuaia.common.model.JobInstance;
 import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.model.TaskState;
 import com.kuaia.engine.coordinator.state.RatisStateStore;
@@ -17,6 +18,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class CoordinatorHAIntegrationTest {
@@ -87,6 +89,46 @@ public class CoordinatorHAIntegrationTest {
         }
     }
 
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    public void listJobsOverRaftReturnsSubmittedJobs() throws Exception {
+        RaftClusterFixture fixture = startThreeNodeCluster();
+        RaftClient client = null;
+        try {
+            RaftProperties properties = new RaftProperties();
+            RaftClientConfigKeys.Rpc.setRequestTimeout(properties, TimeDuration.valueOf(2, TimeUnit.SECONDS));
+            client = RaftClient.newBuilder().setProperties(properties).setRaftGroup(fixture.group).build();
+            RatisStateStore store = new RatisStateStore(client);
+            waitForLeader(fixture.groupId, 10_000L, fixture.servers);
+
+            store.submitJob(job("job-a"));
+            store.submitJob(job("job-b"));
+
+            List<String> ids = new ArrayList<>();
+            long deadline = System.currentTimeMillis() + 5_000L;
+            while (System.currentTimeMillis() < deadline) {
+                ids = store.listJobs().stream().map(JobInstance::getJobId).sorted().collect(Collectors.toList());
+                if (ids.size() == 2) {
+                    break;
+                }
+                Thread.sleep(100L);
+            }
+            assertEquals(List.of("job-a", "job-b"), ids);
+        } finally {
+            if (client != null) {
+                client.close();
+            }
+            fixture.close();
+        }
+    }
+
+    private JobInstance job(String id) {
+        JobInstance j = new JobInstance();
+        j.setJobId(id);
+        j.setTaskIds(Arrays.asList(id + "-t0", id + "-t1"));
+        return j;
+    }
+
     private RaftClusterFixture startThreeNodeCluster() throws Exception {
         int p1Port = findFreePort();
         int p2Port = findFreePort();
@@ -98,17 +140,16 @@ public class CoordinatorHAIntegrationTest {
         RaftPeer p2 = RaftPeer.newBuilder().setId("p2").setAddress(p2Address).build();
         RaftPeer p3 = RaftPeer.newBuilder().setId("p3").setAddress(p3Address).build();
         RaftPeer[] peers = new RaftPeer[] { p1, p2, p3 };
-        RaftGroupId groupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes("test-group".getBytes()));
-        RaftGroup group = RaftGroup.valueOf(groupId, Arrays.asList(peers));
-        RaftServer[] servers = new RaftServer[] {
-                new RaftServer(),
-                new RaftServer(),
-                new RaftServer()
-        };
-        String allPeers = String.join(",", p1Address, p2Address, p3Address);
-        servers[0].start("p1", p1Address, allPeers, new File(tempDir.toFile(), "n1"));
-        servers[1].start("p2", p2Address, allPeers, new File(tempDir.toFile(), "n2"));
-        servers[2].start("p3", p3Address, allPeers, new File(tempDir.toFile(), "n3"));
+        RaftServer[] servers = new RaftServer[] { new RaftServer(), new RaftServer(), new RaftServer() };
+        String allPeers = String.join(",",
+                "p1@" + p1Address, "p2@" + p2Address, "p3@" + p3Address);
+        TimeDuration min = TimeDuration.valueOf(150, TimeUnit.MILLISECONDS);
+        TimeDuration max = TimeDuration.valueOf(300, TimeUnit.MILLISECONDS);
+        servers[0].start("p1", allPeers, new File(tempDir.toFile(), "n1"), min, max, "test-group");
+        servers[1].start("p2", allPeers, new File(tempDir.toFile(), "n2"), min, max, "test-group");
+        servers[2].start("p3", allPeers, new File(tempDir.toFile(), "n3"), min, max, "test-group");
+        RaftGroupId groupId = servers[0].getGroupId();
+        RaftGroup group = servers[0].getGroup();
         return new RaftClusterFixture(groupId, group, peers, servers);
     }
 

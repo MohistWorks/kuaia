@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +40,7 @@ public class TaskDispatcher implements AutoCloseable {
     private final Scheduler scheduler;
     private final StreamManager streamManager;
     private final long leaseDurationMillis;
+    private final BooleanSupplier leaderGate;
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     public TaskDispatcher(
@@ -55,11 +57,22 @@ public class TaskDispatcher implements AutoCloseable {
             Scheduler scheduler,
             StreamManager streamManager,
             long leaseDurationMillis) {
+        this(stateStore, recoveryPlanner, scheduler, streamManager, leaseDurationMillis, () -> true);
+    }
+
+    public TaskDispatcher(
+            StateStore stateStore,
+            CoordinatorRecoveryPlanner recoveryPlanner,
+            Scheduler scheduler,
+            StreamManager streamManager,
+            long leaseDurationMillis,
+            BooleanSupplier leaderGate) {
         this.stateStore = stateStore;
         this.recoveryPlanner = recoveryPlanner;
         this.scheduler = scheduler;
         this.streamManager = streamManager;
         this.leaseDurationMillis = leaseDurationMillis;
+        this.leaderGate = leaderGate;
     }
 
     /** Start the periodic dispatch loop. Per-tick exceptions are logged so the loop never dies. */
@@ -79,6 +92,9 @@ public class TaskDispatcher implements AutoCloseable {
      * @return the number of tasks successfully transitioned to {@code DISPATCHING} and sent.
      */
     public int dispatchOnce(long nowMillis) {
+        if (!leaderGate.getAsBoolean()) {
+            return 0; // only the Raft leader dispatches; followers poll but never assign
+        }
         int dispatched = 0;
         for (TaskRecord task : recoveryPlanner.recoverSchedulableTasks(nowMillis)) {
             Optional<NodeInfo> worker = scheduler.schedule(task.getDefinition());

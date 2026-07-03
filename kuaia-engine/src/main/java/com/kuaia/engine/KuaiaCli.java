@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kuaia.engine.benchmark.LocalPipelineBenchmarkRunner;
 import com.kuaia.engine.coordinator.state.RocksDbStateStore;
 import com.kuaia.engine.coordinator.state.StateStore;
+import com.kuaia.engine.ha.HaCoordinator;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineConfigException;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
@@ -295,12 +296,49 @@ public class KuaiaCli {
         return new RunOptions(configPath, summaryJsonPath);
     }
 
+    private static String validateRaftPeers(String peers, String nodeId) {
+        if (nodeId == null) {
+            return "coordinator --raft-peers requires --node-id <ID>";
+        }
+        boolean found = false;
+        for (String entry : peers.split(",")) {
+            String e = entry.trim();
+            int at = e.indexOf('@');
+            int colon = e.lastIndexOf(':');
+            if (at <= 0 || colon <= at + 1 || colon == e.length() - 1) {
+                return "coordinator --raft-peers entry must be id@host:port: " + e;
+            }
+            try {
+                Integer.parseInt(e.substring(colon + 1));
+            } catch (NumberFormatException nfe) {
+                return "coordinator --raft-peers port must be numeric: " + e;
+            }
+            if (e.substring(0, at).equals(nodeId)) {
+                found = true;
+            }
+        }
+        if (!found) {
+            return "coordinator --node-id '" + nodeId + "' must appear in --raft-peers";
+        }
+        return null;
+    }
+
+    private static void closeQuietly(HaCoordinator ha) {
+        try {
+            ha.close();
+        } catch (Exception ignored) {
+            // best-effort shutdown
+        }
+    }
+
     private static int runCoordinator(String[] args, PrintStream out) {
         Integer port = null;
         Path stateDir = null;
         Path submitPath = null;
         int maxParallelism = 4;
         long leaseMillis = 30_000L;
+        String nodeId = null;
+        String raftPeers = null;
         for (int i = 1; i < args.length; i++) {
             String option = args[i];
             switch (option) {
@@ -372,6 +410,22 @@ public class KuaiaCli {
                         return 1;
                     }
                     break;
+                case "--node-id":
+                    if (i + 1 >= args.length) {
+                        out.println("coordinator --node-id requires <ID>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    nodeId = args[++i];
+                    break;
+                case "--raft-peers":
+                    if (i + 1 >= args.length) {
+                        out.println("coordinator --raft-peers requires <id@host:port,...>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    raftPeers = args[++i];
+                    break;
                 default:
                     out.println("Unknown coordinator option: " + option);
                     printUsage(out);
@@ -402,6 +456,42 @@ public class KuaiaCli {
                 pipeline = new PipelineConfigLoader().load(submitPath);
             } catch (PipelineConfigException e) {
                 out.println(e.getMessage());
+                return 1;
+            }
+        }
+
+        if (raftPeers != null) {
+            String err = validateRaftPeers(raftPeers, nodeId);
+            if (err != null) {
+                out.println(err);
+                printUsage(out);
+                return 1;
+            }
+            HaCoordinator ha = new HaCoordinator(nodeId, raftPeers, stateDir.toFile(), port, leaseMillis);
+            try {
+                ha.start();
+            } catch (Exception e) {
+                out.println(e.getMessage());
+                closeQuietly(ha);
+                return 1;
+            }
+            if (pipeline != null) {
+                try {
+                    ha.submit(pipeline, maxParallelism);
+                } catch (RuntimeException e) {
+                    // A startup submit needs a Raft quorum; if the cluster isn't formed yet, keep the
+                    // coordinator running so the job can be submitted at runtime rather than exiting.
+                    out.println("startup submit failed (coordinator still running): " + e.getMessage());
+                }
+            }
+            out.println("HA coordinator '" + nodeId + "' listening on port " + ha.port());
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> closeQuietly(ha)));
+            try {
+                ha.awaitTermination();
+                return 0;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                closeQuietly(ha);
                 return 1;
             }
         }
@@ -685,6 +775,8 @@ public class KuaiaCli {
         out.println("  recover-demo --state-dir DIR Demonstrate RocksDB task recovery");
         out.println("  coordinator --port P --state-dir DIR [--submit PIPELINE] [--max-parallelism N] [--lease-millis M]");
         out.println("                               Start a coordinator (gRPC server + dispatch loop)");
+        out.println("  coordinator --port P --state-dir DIR --node-id ID --raft-peers id@host:port,...");
+        out.println("                               Start an HA coordinator node (Raft-replicated state)");
         out.println("  worker --id ID --coordinator HOST:PORT");
         out.println("                               Start a worker that executes dispatched tasks");
         out.println("  submit --coordinator HOST:PORT -f PIPELINE [--max-parallelism N]");

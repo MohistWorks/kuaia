@@ -339,6 +339,42 @@ class KuaiaCliTest {
     }
 
     @Test
+    void coordinatorHaRequiresNodeId() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir",
+                tempDir.resolve("ha1").toString(), "--raft-peers", "p1@127.0.0.1:9001");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("--node-id"));
+    }
+
+    @Test
+    void coordinatorHaRejectsNodeIdNotInPeers() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir",
+                tempDir.resolve("ha2").toString(), "--node-id", "zz", "--raft-peers", "p1@127.0.0.1:9001");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("must appear in --raft-peers"));
+    }
+
+    @Test
+    void coordinatorHaRejectsMalformedPeer() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir",
+                tempDir.resolve("ha3").toString(), "--node-id", "p1", "--raft-peers", "p1@badpeer");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("id@host:port"));
+    }
+
+    @Test
+    void coordinatorHaRejectsNonNumericPeerPort() throws Exception {
+        CliResult result = run("coordinator", "--port", "9000", "--state-dir",
+                tempDir.resolve("ha4").toString(), "--node-id", "p1", "--raft-peers", "p1@127.0.0.1:abc");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("port must be numeric"));
+    }
+
+    @Test
     void coordinatorRejectsNonNumericPort() throws Exception {
         CliResult result = run("coordinator", "--port", "abc", "--state-dir", tempDir.resolve("c3").toString());
 

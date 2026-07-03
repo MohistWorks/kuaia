@@ -21,6 +21,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +45,10 @@ public class CoordinatorServer implements AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public CoordinatorServer(StateStore store, long leaseDurationMillis) {
+        this(store, leaseDurationMillis, () -> true);
+    }
+
+    public CoordinatorServer(StateStore store, long leaseDurationMillis, BooleanSupplier isLeader) {
         this.store = store;
         WorkerRegistry registry = new WorkerRegistry();
         StreamManager streamManager = new StreamManager();
@@ -56,7 +61,8 @@ public class CoordinatorServer implements AutoCloseable {
                 new CoordinatorRecoveryPlanner(store),
                 new Scheduler(registry, streamManager),
                 streamManager,
-                leaseDurationMillis);
+                leaseDurationMillis,
+                isLeader);
     }
 
     /** Enumerate splits from {@code pipeline} and persist them as CREATED tasks. Safe to call before {@link #start}. */

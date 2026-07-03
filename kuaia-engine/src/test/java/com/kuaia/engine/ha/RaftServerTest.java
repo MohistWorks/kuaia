@@ -17,7 +17,7 @@ public class RaftServerTest {
         RaftServer server = new RaftServer();
         File storageDir = tempDir.toFile();
         // Start a single-node raft cluster for basic test
-        server.start("node1", "127.0.0.1:9090", "127.0.0.1:9090", storageDir);
+        server.start("node1", "node1@127.0.0.1:9090", storageDir);
         // If it starts without exception, we consider it a success for this skeleton task
         server.close();
     }
@@ -26,7 +26,7 @@ public class RaftServerTest {
     public void configuresGrpcServerToAdvertisedAddress() {
         RaftProperties properties = new RaftProperties();
 
-        RaftServer.configureGrpcAddressForTesting(properties, "127.0.0.1:19091");
+        RaftServer.configureGrpcAddress(properties, "127.0.0.1:19091");
 
         assertEquals("127.0.0.1", GrpcConfigKeys.Server.host(properties));
         assertEquals(19091, GrpcConfigKeys.Server.port(properties));
