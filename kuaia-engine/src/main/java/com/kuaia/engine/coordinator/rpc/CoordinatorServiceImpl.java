@@ -15,6 +15,8 @@ import com.kuaia.engine.pipeline.PipelineConfigException;
 import com.kuaia.engine.pipeline.PipelineConfigLoader;
 import io.grpc.stub.StreamObserver;
 
+import java.util.function.BooleanSupplier;
+
 public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorServiceImplBase {
     private final WorkerRegistry registry;
     private final BatchStateFlusher flusher;
@@ -22,6 +24,7 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
     private final StateStore stateStore;
     private final StreamManager streamManager;
     private final JobSubmissionService submission;
+    private final BooleanSupplier isLeader;
 
     public CoordinatorServiceImpl(WorkerRegistry registry, BatchStateFlusher flusher) {
         this(registry, flusher, null);
@@ -63,12 +66,29 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
             StateStore stateStore,
             StreamManager streamManager,
             JobSubmissionService submission) {
+        this(registry, flusher, ackHandler, stateStore, streamManager, submission, () -> true);
+    }
+
+    /**
+     * @param isLeader current Raft leadership of the owning coordinator; a follower answers
+     *                 {@code HelloAck(false)} and completes the worker stream so the worker probes on.
+     *                 Single-node assemblies pass a constant {@code true}.
+     */
+    public CoordinatorServiceImpl(
+            WorkerRegistry registry,
+            BatchStateFlusher flusher,
+            TaskAckHandler ackHandler,
+            StateStore stateStore,
+            StreamManager streamManager,
+            JobSubmissionService submission,
+            BooleanSupplier isLeader) {
         this.registry = registry;
         this.flusher = flusher;
         this.ackHandler = ackHandler;
         this.stateStore = stateStore;
         this.streamManager = streamManager;
         this.submission = submission;
+        this.isLeader = isLeader;
         if (this.flusher != null) {
             this.flusher.start();
         }
@@ -104,6 +124,21 @@ public class CoordinatorServiceImpl extends CoordinatorServiceGrpc.CoordinatorSe
                 streamManager.registerStream(workerId, responseObserver);
 
                 if (value.hasHello()) {
+                    boolean leader = isLeader.getAsBoolean();
+                    synchronized (responseObserver) {
+                        responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                .setHelloAck(HelloAck.newBuilder().setIsLeader(leader).build())
+                                .build());
+                    }
+                    if (!leader) {
+                        // Followers reject the stream so the worker probes the next candidate; no
+                        // registration, replay, or recovery runs on a non-leader.
+                        streamManager.unregisterStream(workerId);
+                        synchronized (responseObserver) {
+                            responseObserver.onCompleted();
+                        }
+                        return;
+                    }
                     streamManager.setPaused(workerId, false);
                     registerWorkerHello(value.getHello());
                     replayActiveAssignments(workerId);
