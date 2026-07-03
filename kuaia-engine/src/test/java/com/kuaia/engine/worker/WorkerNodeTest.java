@@ -4,6 +4,7 @@ import com.kuaia.common.model.TaskDefinition;
 import com.kuaia.common.rpc.AttemptStatus;
 import com.kuaia.common.rpc.CoordinatorMessage;
 import com.kuaia.common.rpc.CoordinatorServiceGrpc;
+import com.kuaia.common.rpc.HelloAck;
 import com.kuaia.common.rpc.TaskAssignment;
 import com.kuaia.common.rpc.WorkerMessage;
 import com.google.protobuf.ByteString;
@@ -140,6 +141,10 @@ class WorkerNodeTest {
                             @Override
                             public void onNext(WorkerMessage value) {
                                 if (value.hasHello()) {
+                                    // Leadership handshake: the worker only stays after this ack.
+                                    responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                            .setHelloAck(HelloAck.newBuilder().setIsLeader(true).build())
+                                            .build());
                                     responseObserver.onNext(CoordinatorMessage.newBuilder()
                                             .setAssignment(TaskAssignment.newBuilder()
                                                     .setTaskId("task-1")
@@ -207,6 +212,10 @@ class WorkerNodeTest {
                             @Override
                             public void onNext(WorkerMessage value) {
                                 if (value.hasHello()) {
+                                    // Leadership handshake: the worker only stays after this ack.
+                                    responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                            .setHelloAck(HelloAck.newBuilder().setIsLeader(true).build())
+                                            .build());
                                     responseObserver.onNext(CoordinatorMessage.newBuilder()
                                             .setAssignment(TaskAssignment.newBuilder()
                                                     .setTaskId("task-1")
@@ -270,6 +279,10 @@ class WorkerNodeTest {
                             @Override
                             public void onNext(WorkerMessage value) {
                                 if (value.hasHello()) {
+                                    // Leadership handshake: the worker only stays after this ack.
+                                    responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                            .setHelloAck(HelloAck.newBuilder().setIsLeader(true).build())
+                                            .build());
                                     responseObserver.onNext(CoordinatorMessage.newBuilder()
                                             .setAssignment(TaskAssignment.newBuilder()
                                                     .setTaskId("task-1")
@@ -330,6 +343,10 @@ class WorkerNodeTest {
                             @Override
                             public void onNext(WorkerMessage value) {
                                 if (value.hasHello()) {
+                                    // Leadership handshake: the worker only stays after this ack.
+                                    responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                            .setHelloAck(HelloAck.newBuilder().setIsLeader(true).build())
+                                            .build());
                                     responseObserver.onNext(CoordinatorMessage.newBuilder()
                                             .setAssignment(TaskAssignment.newBuilder()
                                                     .setTaskId("task-1")
@@ -392,6 +409,10 @@ class WorkerNodeTest {
                             @Override
                             public void onNext(WorkerMessage value) {
                                 if (value.hasHello()) {
+                                    // Leadership handshake: the worker only stays after this ack.
+                                    responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                            .setHelloAck(HelloAck.newBuilder().setIsLeader(true).build())
+                                            .build());
                                     responseObserver.onNext(CoordinatorMessage.newBuilder()
                                             .setAssignment(TaskAssignment.newBuilder()
                                                     .setTaskId("task-1")
@@ -455,6 +476,10 @@ class WorkerNodeTest {
                             @Override
                             public void onNext(WorkerMessage value) {
                                 if (value.hasHello()) {
+                                    // Leadership handshake: the worker only stays after this ack.
+                                    responseObserver.onNext(CoordinatorMessage.newBuilder()
+                                            .setHelloAck(HelloAck.newBuilder().setIsLeader(true).build())
+                                            .build());
                                     responseObserver.onNext(CoordinatorMessage.newBuilder()
                                             .setAssignment(TaskAssignment.newBuilder()
                                                     .setTaskId("task-1")
