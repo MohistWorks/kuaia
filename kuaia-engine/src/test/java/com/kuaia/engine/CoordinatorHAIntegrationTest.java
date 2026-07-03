@@ -98,17 +98,16 @@ public class CoordinatorHAIntegrationTest {
         RaftPeer p2 = RaftPeer.newBuilder().setId("p2").setAddress(p2Address).build();
         RaftPeer p3 = RaftPeer.newBuilder().setId("p3").setAddress(p3Address).build();
         RaftPeer[] peers = new RaftPeer[] { p1, p2, p3 };
-        RaftGroupId groupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes("test-group".getBytes()));
-        RaftGroup group = RaftGroup.valueOf(groupId, Arrays.asList(peers));
-        RaftServer[] servers = new RaftServer[] {
-                new RaftServer(),
-                new RaftServer(),
-                new RaftServer()
-        };
-        String allPeers = String.join(",", p1Address, p2Address, p3Address);
-        servers[0].start("p1", p1Address, allPeers, new File(tempDir.toFile(), "n1"));
-        servers[1].start("p2", p2Address, allPeers, new File(tempDir.toFile(), "n2"));
-        servers[2].start("p3", p3Address, allPeers, new File(tempDir.toFile(), "n3"));
+        RaftServer[] servers = new RaftServer[] { new RaftServer(), new RaftServer(), new RaftServer() };
+        String allPeers = String.join(",",
+                "p1@" + p1Address, "p2@" + p2Address, "p3@" + p3Address);
+        TimeDuration min = TimeDuration.valueOf(150, TimeUnit.MILLISECONDS);
+        TimeDuration max = TimeDuration.valueOf(300, TimeUnit.MILLISECONDS);
+        servers[0].start("p1", allPeers, new File(tempDir.toFile(), "n1"), min, max, "test-group");
+        servers[1].start("p2", allPeers, new File(tempDir.toFile(), "n2"), min, max, "test-group");
+        servers[2].start("p3", allPeers, new File(tempDir.toFile(), "n3"), min, max, "test-group");
+        RaftGroupId groupId = servers[0].getGroupId();
+        RaftGroup group = servers[0].getGroup();
         return new RaftClusterFixture(groupId, group, peers, servers);
     }
 

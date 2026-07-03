@@ -6,40 +6,77 @@ import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.protocol.*;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
+
 import java.io.File;
-import java.util.*;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Bootstraps one Raft node (Ratis) backed by a {@link RocksDBStateMachine}. Peers are given as
+ * explicit {@code id@host:port} entries; this node is identified by matching {@code id}. The
+ * {@link RaftGroupId} is derived from a stable group name so every node in a cluster joins the same
+ * group. Election timeouts are tunable (production defaults; tests pass short values).
+ */
 public class RaftServer {
+    private static final TimeDuration DEFAULT_TIMEOUT_MIN = TimeDuration.valueOf(1, TimeUnit.SECONDS);
+    private static final TimeDuration DEFAULT_TIMEOUT_MAX = TimeDuration.valueOf(2, TimeUnit.SECONDS);
+    private static final String DEFAULT_GROUP_NAME = "kuaia";
+
     private org.apache.ratis.server.RaftServer server;
     private RocksDBStateMachine stateMachine;
+    private RaftGroupId groupId;
+    private RaftGroup group;
 
-    public void start(String id, String address, String peerAddresses, File storageDir) throws Exception {
+    /** Start with production defaults (1s/2s election timeout, "kuaia" group). */
+    public void start(String id, String peers, File storageDir) throws Exception {
+        start(id, peers, storageDir, DEFAULT_TIMEOUT_MIN, DEFAULT_TIMEOUT_MAX, DEFAULT_GROUP_NAME);
+    }
+
+    /**
+     * @param id         this node's id; must match one of the {@code peers} entries
+     * @param peers      comma-separated {@code id@host:port} entries for the whole cluster
+     * @param storageDir Raft + RocksDB storage directory
+     * @param timeoutMin election timeout lower bound
+     * @param timeoutMax election timeout upper bound
+     * @param groupName  stable cluster name; the RaftGroupId is derived from it
+     */
+    public void start(String id, String peers, File storageDir,
+                      TimeDuration timeoutMin, TimeDuration timeoutMax, String groupName) throws Exception {
         RaftProperties properties = new RaftProperties();
         if (!storageDir.exists()) {
             storageDir.mkdirs();
         }
         RaftServerConfigKeys.setStorageDir(properties, Collections.singletonList(storageDir));
-        configureGrpcAddressForTesting(properties, address);
 
-        // Optimize for testing
-        RaftServerConfigKeys.Rpc.setTimeoutMin(properties, TimeDuration.valueOf(150, TimeUnit.MILLISECONDS));
-        RaftServerConfigKeys.Rpc.setTimeoutMax(properties, TimeDuration.valueOf(300, TimeUnit.MILLISECONDS));
-
-        String[] addresses = peerAddresses.split(",");
-        List<RaftPeer> peers = new ArrayList<>();
-        for (int i = 0; i < addresses.length; i++) {
-            String peerAddress = addresses[i].trim();
-            String peerId = peerAddress.equals(address) ? id : "p" + (i + 1);
-            peers.add(RaftPeer.newBuilder()
-                    .setId(peerId)
-                    .setAddress(peerAddress)
-                    .build());
+        List<RaftPeer> raftPeers = new ArrayList<>();
+        String selfAddress = null;
+        for (String entry : peers.split(",")) {
+            String e = entry.trim();
+            int at = e.indexOf('@');
+            if (at <= 0 || at == e.length() - 1) {
+                throw new IllegalArgumentException("Expected peer in id@host:port form: " + e);
+            }
+            String peerId = e.substring(0, at);
+            String peerAddress = e.substring(at + 1);
+            raftPeers.add(RaftPeer.newBuilder().setId(peerId).setAddress(peerAddress).build());
+            if (peerId.equals(id)) {
+                selfAddress = peerAddress;
+            }
+        }
+        if (selfAddress == null) {
+            throw new IllegalArgumentException("Node id '" + id + "' not found in peers: " + peers);
         }
 
-        // Use a consistent GroupId for testing
-        RaftGroupId groupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes("test-group".getBytes()));
-        RaftGroup group = RaftGroup.valueOf(groupId, peers);
+        configureGrpcAddress(properties, selfAddress);
+        RaftServerConfigKeys.Rpc.setTimeoutMin(properties, timeoutMin);
+        RaftServerConfigKeys.Rpc.setTimeoutMax(properties, timeoutMax);
+
+        this.groupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes(groupName.getBytes(StandardCharsets.UTF_8)));
+        this.group = RaftGroup.valueOf(groupId, raftPeers);
 
         stateMachine = new RocksDBStateMachine();
         stateMachine.initialize(new File(storageDir, "rocksdb").getAbsolutePath());
@@ -53,7 +90,7 @@ public class RaftServer {
         server.start();
     }
 
-    static void configureGrpcAddressForTesting(RaftProperties properties, String address) {
+    static void configureGrpcAddress(RaftProperties properties, String address) {
         int separator = address.lastIndexOf(':');
         if (separator <= 0 || separator == address.length() - 1) {
             throw new IllegalArgumentException("Expected advertised address in host:port form: " + address);
@@ -62,6 +99,26 @@ public class RaftServer {
         int port = Integer.parseInt(address.substring(separator + 1));
         GrpcConfigKeys.Server.setHost(properties, host);
         GrpcConfigKeys.Server.setPort(properties, port);
+    }
+
+    /** True when this node currently leads its Raft group; false while starting or not leader. */
+    public boolean isLeader() {
+        if (server == null || groupId == null) {
+            return false;
+        }
+        try {
+            return server.getDivision(groupId).getInfo().isLeader();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public RaftGroup getGroup() {
+        return group;
+    }
+
+    public RaftGroupId getGroupId() {
+        return groupId;
     }
 
     public void close() throws Exception {
