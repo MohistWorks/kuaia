@@ -120,6 +120,19 @@ class TaskDispatcherTest {
     }
 
     @Test
+    void demotedLeaderDisconnectsWorkerStreams() {
+        CollectingObserver observer = registerWorker("worker-1");
+        TaskDispatcher demoted = new TaskDispatcher(
+                store, new CoordinatorRecoveryPlanner(store),
+                new Scheduler(registry, streamManager), streamManager, LEASE, () -> false);
+
+        assertEquals(0, demoted.dispatchOnce(1_000L));
+        assertTrue(observer.completed, "demoted leader completes worker streams so they re-probe");
+        assertEquals(0, store.scanTasksByState(TaskState.DISPATCHING).size());
+        assertTrue(!streamManager.isAvailable("worker-1"), "stream is dropped after demotion");
+    }
+
+    @Test
     void leaderGateAllowsDispatch() {
         new JobSubmissionService(store, new TaskPlanner()).submit("job-1", List.of("s0"), 1);
         registerWorker("worker-1");
@@ -143,6 +156,7 @@ class TaskDispatcherTest {
     /** Captures the CoordinatorMessages the dispatcher pushes to a worker stream. */
     private static final class CollectingObserver implements StreamObserver<CoordinatorMessage> {
         private final List<CoordinatorMessage> messages = new ArrayList<>();
+        private boolean completed;
 
         @Override
         public void onNext(CoordinatorMessage value) {
@@ -159,6 +173,7 @@ class TaskDispatcherTest {
 
         @Override
         public void onCompleted() {
+            completed = true;
         }
     }
 }

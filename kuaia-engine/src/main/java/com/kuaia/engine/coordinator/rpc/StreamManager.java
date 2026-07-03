@@ -28,6 +28,24 @@ public class StreamManager {
         }
     }
 
+    /**
+     * Complete and drop every registered worker stream. A coordinator that lost Raft leadership calls
+     * this so its workers re-probe the cluster and land on the new leader.
+     */
+    public void disconnectAll() {
+        for (StreamObserver<CoordinatorMessage> observer : streams.values()) {
+            synchronized (observer) {
+                try {
+                    observer.onCompleted();
+                } catch (RuntimeException ignored) {
+                    // stream already broken; dropping it is all that matters
+                }
+            }
+        }
+        streams.clear();
+        pausedWorkers.clear();
+    }
+
     public void setPaused(String workerId, boolean paused) {
         pausedWorkers.put(workerId, paused);
     }
