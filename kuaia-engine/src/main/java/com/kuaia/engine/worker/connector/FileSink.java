@@ -68,7 +68,14 @@ public class FileSink implements SinkWriter {
             offsets.truncateBeyond(resumeFromSeq);
             writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND);
-            return; // header already present in the retained prefix
+            // keepBytes > 0 means the header is in the retained prefix; when nothing was committed at or
+            // below the resume point (no sidecar on this filesystem — e.g. a retry on a fresh worker) the
+            // file was truncated to empty and still needs a CSV header.
+            if (keepBytes == 0L && "csv".equals(format)) {
+                writer.write(formatCsvHeader());
+                writer.newLine();
+            }
+            return;
         }
 
         offsets.reset();
