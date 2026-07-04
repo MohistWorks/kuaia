@@ -111,7 +111,8 @@ The long-term direction remains broader than the MVP:
 - richer connector APIs and production-certified connectors,
 - more vector database and embedding provider integrations,
 - stronger batching and performance baselines,
-- distributed scheduling and high availability,
+- deeper distributed operation on top of the shipped coordinator/worker engine
+  and multi-coordinator HA (dynamic membership, exactly-once execution),
 - governance, lineage, and operational control-plane capabilities.
 
 Public docs should describe these as future direction until they are shipped in
