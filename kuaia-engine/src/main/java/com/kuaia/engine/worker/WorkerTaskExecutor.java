@@ -111,7 +111,8 @@ public class WorkerTaskExecutor {
             TransformPipeline transforms = assemble(() ->
                     TransformPipeline.from(openedSource.getRowType(), pipelineConfig.getTransforms(), embeddingProviders));
             writer = assemble(() -> {
-                BatchSinkWriter w = connectorFactory.createSink(pipelineConfig, transforms.getOutputType(), DISCARD);
+                BatchSinkWriter w = connectorFactory.createSink(
+                        pipelineConfig, transforms.getOutputType(), DISCARD, assignment.getStartSeq());
                 w.open();
                 return w;
             });

@@ -52,6 +52,37 @@ class FileSinkResumeTest {
     }
 
     @Test
+    void factoryWiresResumeAndCommitterForFileSink(@TempDir Path tmp) throws Exception {
+        Path out = tmp.resolve("out.csv");
+        com.kuaia.engine.pipeline.PipelineConfig cfg = new com.kuaia.engine.pipeline.PipelineConfig(
+                "eo",
+                new com.kuaia.engine.pipeline.PipelineConfig.SourceConfig("file", tmp.resolve("in.csv").toString(), "csv"),
+                new com.kuaia.engine.pipeline.PipelineConfig.SinkConfig("file", out.toString(), "csv", "overwrite"),
+                new com.kuaia.engine.pipeline.PipelineConfig.CheckpointConfig(null));
+        com.kuaia.engine.pipeline.ConnectorFactory factory = new com.kuaia.engine.pipeline.ConnectorFactory(
+                com.kuaia.engine.worker.connector.SinkFactoryRegistry.defaultRegistry());
+        java.io.PrintStream discard = new java.io.PrintStream(java.io.OutputStream.nullOutputStream());
+
+        com.kuaia.engine.worker.connector.v2.BatchSinkWriter first =
+                factory.createSink(cfg, ROW_TYPE, discard, 1L);
+        first.open();
+        first.writeBatch(List.of(rowOf(1), rowOf(2)));
+        first.committer().commit(new com.kuaia.engine.worker.connector.v2.BatchCommit("s0", 2L, 2));
+        first.writeBatch(List.of(rowOf(3), rowOf(4)));
+        first.committer().commit(new com.kuaia.engine.worker.connector.v2.BatchCommit("s0", 4L, 2));
+        first.close();
+
+        com.kuaia.engine.worker.connector.v2.BatchSinkWriter retry =
+                factory.createSink(cfg, ROW_TYPE, discard, 3L);
+        retry.open();
+        retry.writeBatch(List.of(rowOf(3), rowOf(4)));
+        retry.committer().commit(new com.kuaia.engine.worker.connector.v2.BatchCommit("s0", 4L, 2));
+        retry.close();
+
+        assertEquals(List.of("id", "1", "2", "3", "4"), Files.readAllLines(out, StandardCharsets.UTF_8));
+    }
+
+    @Test
     void freshRunTruncatesPreviousContent(@TempDir Path tmp) throws Exception {
         Path out = tmp.resolve("out.csv");
         Files.writeString(out, "stale\n", StandardCharsets.UTF_8);

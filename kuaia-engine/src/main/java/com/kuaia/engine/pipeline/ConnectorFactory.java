@@ -69,7 +69,26 @@ public class ConnectorFactory {
 
     public BatchSinkWriter createSink(PipelineConfig config, KuaiaRowType rowType, PrintStream out)
             throws PipelineExecutionException {
+        return createSink(config, rowType, out, 1L);
+    }
+
+    /**
+     * @param resumeFromSeq first sequence id this attempt will (re)write ({@code 1} = fresh run). The
+     *                      file sink uses it to truncate its output back to the committed resume point
+     *                      so re-delivered rows overwrite rather than duplicate (effectively-once).
+     */
+    public BatchSinkWriter createSink(PipelineConfig config, KuaiaRowType rowType, PrintStream out, long resumeFromSeq)
+            throws PipelineExecutionException {
         String sinkType = config.getSink().getType();
+        if ("file".equals(sinkType)) {
+            FileSink fileSink = new FileSink(
+                    rowType,
+                    Paths.get(config.getSink().getPath()),
+                    config.getSink().getFormat(),
+                    config.getSink().getMode(),
+                    resumeFromSeq);
+            return new SinkWriterBatchAdapter(fileSink, commit -> fileSink.recordCommit(commit.getMaxSeqId()));
+        }
         SinkWriter sink;
         if ("console".equals(sinkType)) {
             sink = new ConsoleSink(rowType, out);
@@ -78,12 +97,6 @@ public class ConnectorFactory {
                 || "pgvector".equals(sinkType)
                 || "milvus".equals(sinkType)) {
             sink = sinkFactories.create(sinkType, rowType, out, config.getSink());
-        } else if ("file".equals(sinkType)) {
-            sink = new FileSink(
-                    rowType,
-                    Paths.get(config.getSink().getPath()),
-                    config.getSink().getFormat(),
-                    config.getSink().getMode());
         } else {
             throw new PipelineExecutionException("Unsupported sink.type: " + sinkType);
         }
