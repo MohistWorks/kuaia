@@ -7,6 +7,8 @@ import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 
 import java.io.BufferedWriter;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
@@ -19,17 +21,35 @@ public class FileSink implements SinkWriter {
     private final Path path;
     private final String format;
     private final String mode;
+    private final long resumeFromSeq;
+    private final FileCommitOffsets offsets;
     private BufferedWriter writer;
 
     public FileSink(KuaiaRowType rowType, Path path, String mode) {
-        this(rowType, path, "csv", mode);
+        this(rowType, path, "csv", mode, 1L);
     }
 
     public FileSink(KuaiaRowType rowType, Path path, String format, String mode) {
+        this(rowType, path, format, mode, 1L);
+    }
+
+    /**
+     * @param resumeFromSeq first sequence id this attempt will (re)write; {@code 1} means a fresh run.
+     *                      A resume ({@code > 1}) truncates the output back to the byte length that was
+     *                      committed at the resume point before appending, so re-delivered rows overwrite
+     *                      rather than duplicate.
+     */
+    public FileSink(KuaiaRowType rowType, Path path, String format, String mode, long resumeFromSeq) {
         this.rowType = rowType;
         this.path = path;
         this.format = format;
         this.mode = mode;
+        this.resumeFromSeq = resumeFromSeq;
+        try {
+            this.offsets = new FileCommitOffsets(path);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Failed to open commit-offset sidecar for " + path, e);
+        }
     }
 
     @Override
@@ -39,6 +59,19 @@ public class FileSink implements SinkWriter {
             Files.createDirectories(parent);
         }
 
+        if (resumeFromSeq > 1L) {
+            long keepBytes = offsets.truncationPointFor(resumeFromSeq);
+            try (RandomAccessFile raf = new RandomAccessFile(path.toFile(), "rw");
+                 FileChannel channel = raf.getChannel()) {
+                channel.truncate(keepBytes);
+            }
+            offsets.truncateBeyond(resumeFromSeq);
+            writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND);
+            return; // header already present in the retained prefix
+        }
+
+        offsets.reset();
         boolean append = "append".equals(mode);
         boolean writeHeader = "csv".equals(format) && (!append || !Files.exists(path) || Files.size(path) == 0L);
         OpenOption[] options = append
@@ -55,6 +88,14 @@ public class FileSink implements SinkWriter {
             writer.write(formatCsvHeader());
             writer.newLine();
         }
+    }
+
+    /** Flush buffered rows and durably record the byte length committed at {@code maxSeqId}. */
+    public void recordCommit(long maxSeqId) throws Exception {
+        if (writer != null) {
+            writer.flush();
+        }
+        offsets.record(maxSeqId, Files.size(path));
     }
 
     @Override
