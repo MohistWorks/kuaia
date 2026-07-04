@@ -355,6 +355,55 @@ class KuaiaCliTest {
     }
 
     @Test
+    void clusterRequiresSubcommand() throws Exception {
+        CliResult result = run("cluster");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("cluster requires a subcommand"));
+    }
+
+    @Test
+    void clusterRejectsUnknownSubcommand() throws Exception {
+        CliResult result = run("cluster", "resize");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("Unknown cluster subcommand: resize"));
+    }
+
+    @Test
+    void clusterAddNodeRequiresRaftPeers() throws Exception {
+        CliResult result = run("cluster", "add-node", "--node", "n4@127.0.0.1:6004");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("requires --raft-peers"));
+    }
+
+    @Test
+    void clusterAddNodeRequiresNode() throws Exception {
+        CliResult result = run("cluster", "add-node", "--raft-peers", "n1@127.0.0.1:6001");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("cluster add-node requires --node"));
+    }
+
+    @Test
+    void clusterRemoveNodeRequiresNodeId() throws Exception {
+        CliResult result = run("cluster", "remove-node", "--raft-peers", "n1@127.0.0.1:6001");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("cluster remove-node requires --node-id"));
+    }
+
+    @Test
+    void clusterAddNodeRejectsMalformedNode() throws Exception {
+        CliResult result = run("cluster", "add-node",
+                "--raft-peers", "n1@127.0.0.1:6001,n2@127.0.0.1:6002", "--node", "badnode");
+
+        assertEquals(1, result.exitCode);
+        assertTrue(result.output.contains("id@host:port"));
+    }
+
+    @Test
     void coordinatorHaRequiresNodeId() throws Exception {
         CliResult result = run("coordinator", "--port", "9000", "--state-dir",
                 tempDir.resolve("ha1").toString(), "--raft-peers", "p1@127.0.0.1:9001");
