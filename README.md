@@ -375,6 +375,10 @@ YAML paths outside the YAML directory or repository `.kuaia/`.
   gate, and deferred work
 - [`docs/pipeline-yaml.md`](docs/pipeline-yaml.md): YAML pipeline contract
 - [`docs/examples.md`](docs/examples.md): runnable example catalog
+- [`docs/distributed-quickstart.md`](docs/distributed-quickstart.md): run a
+  coordinator + worker across processes
+- [`docs/ha-quickstart.md`](docs/ha-quickstart.md): highly available 3-node
+  coordinator cluster with failover and runtime membership
 - [`docs/connector-development.md`](docs/connector-development.md): connector
   extension notes
 - [`docs/release-checklist.md`](docs/release-checklist.md): open-source MVP

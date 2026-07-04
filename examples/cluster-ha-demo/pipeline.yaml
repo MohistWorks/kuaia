@@ -1,0 +1,12 @@
+# Demo pipeline for the HA cluster walkthrough. Paths are relative to the working directory;
+# run.sh rewrites them to absolute paths under a temp directory so the demo is self-contained.
+name: cluster-ha-demo
+source:
+  type: file
+  path: input.csv
+  format: csv
+sink:
+  type: file
+  path: output.csv
+  format: csv
+  mode: overwrite
