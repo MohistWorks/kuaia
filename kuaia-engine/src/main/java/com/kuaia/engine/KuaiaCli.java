@@ -130,6 +130,9 @@ public class KuaiaCli {
         if ("status".equals(command)) {
             return runStatus(args, out);
         }
+        if ("cluster".equals(command)) {
+            return runCluster(args, out);
+        }
 
         out.println("Unknown command: " + command);
         printUsage(out);
@@ -297,6 +300,122 @@ public class KuaiaCli {
             return null;
         }
         return new RunOptions(configPath, summaryJsonPath);
+    }
+
+    private static int runCluster(String[] args, PrintStream out) {
+        if (args.length < 2) {
+            out.println("cluster requires a subcommand: add-node | remove-node | info");
+            printUsage(out);
+            return 1;
+        }
+        String sub = args[1];
+        if (!"add-node".equals(sub) && !"remove-node".equals(sub) && !"info".equals(sub)) {
+            out.println("Unknown cluster subcommand: " + sub);
+            printUsage(out);
+            return 1;
+        }
+        String raftPeers = null;
+        String node = null;
+        String nodeId = null;
+        String group = com.kuaia.engine.ha.ClusterAdmin.DEFAULT_GROUP_NAME;
+        for (int i = 2; i < args.length; i++) {
+            switch (args[i]) {
+                case "--raft-peers":
+                    if (i + 1 >= args.length) {
+                        out.println("cluster " + sub + " requires --raft-peers <id@host:port,...>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    raftPeers = args[++i];
+                    break;
+                case "--node":
+                    if (i + 1 >= args.length) {
+                        out.println("cluster add-node requires --node <id@host:port>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    node = args[++i];
+                    break;
+                case "--node-id":
+                    if (i + 1 >= args.length) {
+                        out.println("cluster remove-node requires --node-id <ID>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    nodeId = args[++i];
+                    break;
+                case "--group":
+                    if (i + 1 >= args.length) {
+                        out.println("cluster " + sub + " requires --group <NAME>");
+                        printUsage(out);
+                        return 1;
+                    }
+                    group = args[++i];
+                    break;
+                default:
+                    out.println("Unknown cluster option: " + args[i]);
+                    printUsage(out);
+                    return 1;
+            }
+        }
+        if (raftPeers == null) {
+            out.println("cluster " + sub + " requires --raft-peers <id@host:port,...>");
+            printUsage(out);
+            return 1;
+        }
+        if ("add-node".equals(sub) && node == null) {
+            out.println("cluster add-node requires --node <id@host:port>");
+            printUsage(out);
+            return 1;
+        }
+        if ("remove-node".equals(sub) && nodeId == null) {
+            out.println("cluster remove-node requires --node-id <ID>");
+            printUsage(out);
+            return 1;
+        }
+
+        // Not try-with-resources: a close() failure after a committed configuration change must not
+        // make a successful operation look failed (the operator's retry would then hit confusing
+        // "already a member" errors).
+        com.kuaia.engine.ha.ClusterAdmin admin = null;
+        try {
+            admin = new com.kuaia.engine.ha.ClusterAdmin(raftPeers, group);
+            if ("add-node".equals(sub)) {
+                printMembers(out, admin.addNode(node));
+            } else if ("remove-node".equals(sub)) {
+                printMembers(out, admin.removeNode(nodeId));
+            } else {
+                com.kuaia.engine.ha.ClusterAdmin.ClusterView view = admin.info();
+                out.println("leader: " + (view.leaderId() == null ? "(none)" : view.leaderId()));
+                for (com.kuaia.engine.ha.ClusterAdmin.Member member : view.members()) {
+                    out.println(member.id() + " " + member.address() + " " + member.role());
+                }
+            }
+            return 0;
+        } catch (IllegalArgumentException e) {
+            out.println(e.getMessage());
+            printUsage(out);
+            return 1;
+        } catch (Exception e) {
+            out.println("cluster " + sub + " failed: " + e.getMessage());
+            return 1;
+        } finally {
+            if (admin != null) {
+                try {
+                    admin.close();
+                } catch (Exception ignored) {
+                    // best-effort close; the operation's outcome was already reported
+                }
+            }
+        }
+    }
+
+    private static void printMembers(PrintStream out, java.util.List<org.apache.ratis.protocol.RaftPeer> members) {
+        StringBuilder line = new StringBuilder("members:");
+        for (org.apache.ratis.protocol.RaftPeer peer : members) {
+            line.append(' ').append(peer.getId()).append('@').append(peer.getAddress());
+        }
+        out.println(line);
     }
 
     private static String validateRaftPeers(String peers, String nodeId) {
@@ -775,6 +894,12 @@ public class KuaiaCli {
         out.println("                               Submit a pipeline to a running coordinator");
         out.println("  status --coordinator HOST:PORT [--job ID]");
         out.println("                               List jobs, or show one job's status");
+        out.println("  cluster add-node --raft-peers LIST --node id@host:port [--group NAME]");
+        out.println("                               Add a started coordinator node to the Raft cluster");
+        out.println("  cluster remove-node --raft-peers LIST --node-id ID [--group NAME]");
+        out.println("                               Remove a node (leadership is transferred first if needed)");
+        out.println("  cluster info --raft-peers LIST [--group NAME]");
+        out.println("                               Show the current leader and member roles");
         out.println();
         out.println("Examples:");
         out.println("  kuaia run -f examples/local-file-to-file.yaml");
