@@ -100,11 +100,14 @@ task from its last durable checkpoint, so a batch can be re-delivered when a
 crash falls between writing to the sink and persisting the checkpoint. Sinks
 turn that at-least-once delivery into effectively-once output as follows:
 
-- **File sink** — exactly-once on a same-filesystem resume. Each committed batch
-  records its byte offset in a `<path>.kuaia-offset` sidecar; on resume the sink
-  truncates the output file back to the byte length committed at the resume point
-  and re-appends, so re-delivered rows overwrite in place rather than duplicating
-  (old append) or dropping earlier rows (old overwrite).
+- **File sink (`mode: overwrite`)** — exactly-once on a same-filesystem resume.
+  Each committed batch records its byte offset in a `<path>.kuaia-offset` sidecar;
+  on resume the sink truncates the output file back to the byte length committed at
+  the resume point and re-appends, so re-delivered rows overwrite in place rather
+  than dropping earlier rows.
+- **File sink (`mode: append`)** — at-least-once. Append targets a file the engine
+  does not own, so a resume never truncates it (pre-existing content is always
+  preserved); re-delivered rows may be appended again.
 - **Vector sinks** (`qdrant`, `pgvector`, `milvus`) — effectively-once, because
   they upsert by the configured `idField`. A missing `idField` is rejected at
   startup, and a stable id makes a re-delivered row overwrite the same point.

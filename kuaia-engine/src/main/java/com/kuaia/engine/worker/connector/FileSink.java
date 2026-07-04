@@ -59,7 +59,10 @@ public class FileSink implements SinkWriter {
             Files.createDirectories(parent);
         }
 
-        if (resumeFromSeq > 1L) {
+        // Exactly-once resume-truncate applies to overwrite mode, which owns the whole file. Append
+        // mode adds to pre-existing (foreign) content the engine does not own, so a resume there must
+        // never truncate — it falls through to the append branch (at-least-once, but no data loss).
+        if (resumeFromSeq > 1L && !"append".equals(mode)) {
             long keepBytes = offsets.truncationPointFor(resumeFromSeq);
             try (RandomAccessFile raf = new RandomAccessFile(path.toFile(), "rw");
                  FileChannel channel = raf.getChannel()) {

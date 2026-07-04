@@ -83,6 +83,22 @@ class FileSinkResumeTest {
     }
 
     @Test
+    void appendModeResumeNeverTruncatesPreexistingContent(@TempDir Path tmp) throws Exception {
+        Path out = tmp.resolve("out.csv");
+        Files.writeString(out, "foreign-1\nforeign-2\n", StandardCharsets.UTF_8);
+
+        // A resume in append mode with nothing committed at/below the resume point must preserve the
+        // pre-existing (foreign) content — never truncate it to zero — and simply append.
+        FileSink sink = new FileSink(ROW_TYPE, out, "csv", "append", 5L);
+        sink.open();
+        sink.write(rowOf(9));
+        sink.recordCommit(9L);
+        sink.close();
+
+        assertEquals(List.of("foreign-1", "foreign-2", "9"), Files.readAllLines(out, StandardCharsets.UTF_8));
+    }
+
+    @Test
     void freshRunTruncatesPreviousContent(@TempDir Path tmp) throws Exception {
         Path out = tmp.resolve("out.csv");
         Files.writeString(out, "stale\n", StandardCharsets.UTF_8);
