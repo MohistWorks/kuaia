@@ -166,7 +166,8 @@ public class LocalPipelineRunner {
                             0L);
                 }
 
-                sink = runStage(SINK_STAGE, () -> connectorFactory.createSink(config, transforms.getOutputType(), out));
+                sink = runStage(SINK_STAGE, () -> connectorFactory.createSink(
+                        config, transforms.getOutputType(), out, task.getLastCheckpointSeq() + 1));
                 BatchSinkWriter openedSink = sink;
                 runStage(SINK_STAGE, () -> {
                     openedSink.open();

@@ -93,6 +93,31 @@ Vector sinks are currently registered through `SinkFactoryRegistry`. Adding a
 new YAML `sink.type` still requires code changes in the registry and the YAML
 loader. There is no dynamic connector discovery or external plugin loading yet.
 
+### Delivery guarantees
+
+The engine checkpoints per committed batch and resumes a retried or recovered
+task from its last durable checkpoint, so a batch can be re-delivered when a
+crash falls between writing to the sink and persisting the checkpoint. Sinks
+turn that at-least-once delivery into effectively-once output as follows:
+
+- **File sink (`mode: overwrite`)** — exactly-once on a same-filesystem resume.
+  Each committed batch records its byte offset in a `<path>.kuaia-offset` sidecar;
+  on resume the sink truncates the output file back to the byte length committed at
+  the resume point and re-appends, so re-delivered rows overwrite in place rather
+  than dropping earlier rows.
+- **File sink (`mode: append`)** — at-least-once. Append targets a file the engine
+  does not own, so a resume never truncates it (pre-existing content is always
+  preserved); re-delivered rows may be appended again.
+- **Vector sinks** (`qdrant`, `pgvector`, `milvus`) — effectively-once, because
+  they upsert by the configured `idField`. A missing `idField` is rejected at
+  startup, and a stable id makes a re-delivered row overwrite the same point.
+
+Not covered: distributed **cross-worker** file output (the file sink writes the
+worker's local disk — a retry on another worker orphans the partial file; use a
+shared/idempotent sink for distributed exactly-once) and **parallel partitioned**
+file output (multiple tasks writing one path). The file-sink guarantee assumes a
+single writer per output path.
+
 ## Adding A Connector Today
 
 For a small source:
