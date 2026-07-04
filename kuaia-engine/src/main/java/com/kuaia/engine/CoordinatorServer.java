@@ -55,7 +55,7 @@ public class CoordinatorServer implements AutoCloseable {
         this.submission = new JobSubmissionService(
                 store, new TaskPlanner(), new ConnectorFactory(SinkFactoryRegistry.defaultRegistry()));
         this.service = new CoordinatorServiceImpl(
-                registry, null, new TaskAckHandler(store), store, streamManager, submission);
+                registry, null, new TaskAckHandler(store), store, streamManager, submission, isLeader);
         this.dispatcher = new TaskDispatcher(
                 store,
                 new CoordinatorRecoveryPlanner(store),

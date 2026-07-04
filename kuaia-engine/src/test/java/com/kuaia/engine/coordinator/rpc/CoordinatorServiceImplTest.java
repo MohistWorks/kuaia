@@ -31,8 +31,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class CoordinatorServiceImplTest {
@@ -192,8 +194,10 @@ class CoordinatorServiceImplTest {
                 .build());
 
         ArgumentCaptor<CoordinatorMessage> messageCaptor = ArgumentCaptor.forClass(CoordinatorMessage.class);
-        verify(responseObserver).onNext(messageCaptor.capture());
-        CoordinatorMessage message = messageCaptor.getValue();
+        verify(responseObserver, times(2)).onNext(messageCaptor.capture());
+        assertTrue(messageCaptor.getAllValues().get(0).hasHelloAck(), "hello is answered before any replay");
+        assertTrue(messageCaptor.getAllValues().get(0).getHelloAck().getIsLeader());
+        CoordinatorMessage message = messageCaptor.getAllValues().get(1);
         assertTrue(message.hasAssignment());
         assertEquals("task-1", message.getAssignment().getTaskId());
         assertEquals("attempt-1", message.getAssignment().getAttemptId());
@@ -229,7 +233,7 @@ class CoordinatorServiceImplTest {
                         .build())
                 .build());
 
-        verify(responseObserver, never()).onNext(any(CoordinatorMessage.class));
+        verify(responseObserver, never()).onNext(argThat(CoordinatorMessage::hasAssignment));
         TaskRecord recovered = store.getTask("task-1");
         assertEquals(TaskState.RETRYING, recovered.getState());
         assertEquals(41L, recovered.getLastCheckpointSeq());
@@ -261,7 +265,7 @@ class CoordinatorServiceImplTest {
                         .build())
                 .build());
 
-        verify(responseObserver, never()).onNext(any(CoordinatorMessage.class));
+        verify(responseObserver, never()).onNext(argThat(CoordinatorMessage::hasAssignment));
     }
 
     @Test

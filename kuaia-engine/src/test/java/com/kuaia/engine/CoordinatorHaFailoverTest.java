@@ -8,6 +8,7 @@ import com.kuaia.common.rpc.ListJobsResponse;
 import com.kuaia.common.rpc.SubmitJobRequest;
 import com.kuaia.common.rpc.SubmitJobResponse;
 import com.kuaia.engine.ha.HaCoordinator;
+import com.kuaia.engine.worker.WorkerNode;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.junit.jupiter.api.Test;
@@ -27,9 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Milestone proof: 3 HA coordinators replicate state through Raft; only the leader dispatches. A job
- * runs to COMPLETED on the leader, the leader is killed, a new leader is elected, the replicated job
- * state survives, and the new leader dispatches a fresh job to the reconnected worker.
+ * Milestone proof: 3 HA coordinators replicate state through Raft; only the leader dispatches. The
+ * worker is started ONCE with the full coordinator list and never touched again: it probes for the
+ * leader, a job runs to COMPLETED, the leader is killed, a new leader is elected, the replicated job
+ * state survives, and the worker re-probes on its own so the new leader dispatches a fresh job to it.
  */
 class CoordinatorHaFailoverTest {
 
@@ -58,12 +60,18 @@ class CoordinatorHaFailoverTest {
             HaCoordinator leader = awaitLeader(nodes, 30_000L);
             assertNotNull(leader, "a leader should be elected");
 
-            // Worker connects to the leader; submit job A via runtime RPC; run to COMPLETED.
+            // The worker gets the FULL coordinator list and finds the leader itself; after this line
+            // the worker is never touched again — auto-discovery must carry it across the failover.
+            worker = new WorkerRunner("worker-ha-" + System.nanoTime());
+            worker.start(List.of(
+                    new WorkerNode.HostPort("127.0.0.1", grpcPorts[0]),
+                    new WorkerNode.HostPort("127.0.0.1", grpcPorts[1]),
+                    new WorkerNode.HostPort("127.0.0.1", grpcPorts[2])));
+
+            // Submit job A via runtime RPC on the leader; run to COMPLETED.
             Path inA = tmp.resolve("inA.csv");
             Files.write(inA, String.join("\n", "id", "1", "2", "3").getBytes(StandardCharsets.UTF_8));
             Path outA = tmp.resolve("outA.csv");
-            worker = new WorkerRunner("worker-ha-" + System.nanoTime());
-            worker.start("127.0.0.1", leader.port());
 
             channel = plaintext(leader.port());
             CoordinatorServiceGrpc.CoordinatorServiceBlockingStub stub = CoordinatorServiceGrpc.newBlockingStub(channel);
@@ -90,11 +98,7 @@ class CoordinatorHaFailoverTest {
             assertTrue(list.getJobsList().stream().anyMatch(j -> j.getJobId().equals(jobA)),
                     "listJobs over Raft should include job A after failover");
 
-            // Reconnect the worker to the new leader; submit job B; the new leader dispatches it.
-            worker.close();
-            worker = new WorkerRunner("worker-ha2-" + System.nanoTime());
-            worker.start("127.0.0.1", newLeader.port());
-
+            // Submit job B on the new leader; the worker re-probes and reconnects ON ITS OWN.
             Path inB = tmp.resolve("inB.csv");
             Files.write(inB, String.join("\n", "id", "9", "8").getBytes(StandardCharsets.UTF_8));
             Path outB = tmp.resolve("outB.csv");

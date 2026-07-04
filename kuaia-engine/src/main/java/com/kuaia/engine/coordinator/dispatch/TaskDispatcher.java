@@ -93,7 +93,11 @@ public class TaskDispatcher implements AutoCloseable {
      */
     public int dispatchOnce(long nowMillis) {
         if (!leaderGate.getAsBoolean()) {
-            return 0; // only the Raft leader dispatches; followers poll but never assign
+            // Only the Raft leader dispatches. A demoted-but-alive leader also drops its worker
+            // streams so those workers re-probe and find the new leader; single-node assemblies use a
+            // constant-true gate, so this never triggers there.
+            streamManager.disconnectAll();
+            return 0;
         }
         int dispatched = 0;
         for (TaskRecord task : recoveryPlanner.recoverSchedulableTasks(nowMillis)) {

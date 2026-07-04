@@ -2,6 +2,7 @@ package com.kuaia.engine;
 
 import com.kuaia.engine.worker.WorkerNode;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
@@ -23,8 +24,13 @@ public class WorkerRunner implements AutoCloseable {
     }
 
     public void start(String host, int port) {
-        LOG.info("Worker connecting to {}:{}", host, port);
-        worker.start(host, port);
+        start(List.of(new WorkerNode.HostPort(host, port)));
+    }
+
+    /** Probe the coordinator list for the current leader and stay on it (see {@link WorkerNode}). */
+    public void start(List<WorkerNode.HostPort> coordinators) {
+        LOG.info("Worker connecting to coordinators {}", coordinators);
+        worker.start(coordinators);
     }
 
     public void awaitTermination() throws InterruptedException {
