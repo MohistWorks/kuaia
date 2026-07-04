@@ -8,11 +8,8 @@ import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -24,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 public class RaftServer {
     private static final TimeDuration DEFAULT_TIMEOUT_MIN = TimeDuration.valueOf(1, TimeUnit.SECONDS);
     private static final TimeDuration DEFAULT_TIMEOUT_MAX = TimeDuration.valueOf(2, TimeUnit.SECONDS);
-    private static final String DEFAULT_GROUP_NAME = "kuaia";
+    private static final String DEFAULT_GROUP_NAME = RaftPeers.DEFAULT_GROUP_NAME;
 
     private org.apache.ratis.server.RaftServer server;
     private RocksDBStateMachine stateMachine;
@@ -52,19 +49,11 @@ public class RaftServer {
         }
         RaftServerConfigKeys.setStorageDir(properties, Collections.singletonList(storageDir));
 
-        List<RaftPeer> raftPeers = new ArrayList<>();
+        List<RaftPeer> raftPeers = RaftPeers.parse(peers);
         String selfAddress = null;
-        for (String entry : peers.split(",")) {
-            String e = entry.trim();
-            int at = e.indexOf('@');
-            if (at <= 0 || at == e.length() - 1) {
-                throw new IllegalArgumentException("Expected peer in id@host:port form: " + e);
-            }
-            String peerId = e.substring(0, at);
-            String peerAddress = e.substring(at + 1);
-            raftPeers.add(RaftPeer.newBuilder().setId(peerId).setAddress(peerAddress).build());
-            if (peerId.equals(id)) {
-                selfAddress = peerAddress;
+        for (RaftPeer peer : raftPeers) {
+            if (peer.getId().toString().equals(id)) {
+                selfAddress = peer.getAddress();
             }
         }
         if (selfAddress == null) {
@@ -75,7 +64,7 @@ public class RaftServer {
         RaftServerConfigKeys.Rpc.setTimeoutMin(properties, timeoutMin);
         RaftServerConfigKeys.Rpc.setTimeoutMax(properties, timeoutMax);
 
-        this.groupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes(groupName.getBytes(StandardCharsets.UTF_8)));
+        this.groupId = RaftPeers.groupId(groupName);
         this.group = RaftGroup.valueOf(groupId, raftPeers);
 
         stateMachine = new RocksDBStateMachine();
