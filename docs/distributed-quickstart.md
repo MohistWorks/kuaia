@@ -69,3 +69,10 @@ Terminal C — submit a job and watch it, using the CLI as a client:
 - `status` with no `--job` lists **all** jobs the coordinator knows about, with their states.
 - `status --job <job-id>` shows a single job's aggregate **state** and its per-state task counts —
   poll it until the job reads `COMPLETED`.
+
+## Next: high-availability cluster
+
+The single coordinator above is a single point of failure. To run three coordinators that replicate
+state through Raft and survive a leader crash — with workers that discover the leader on their own and
+runtime cluster resizing — see [`ha-quickstart.md`](ha-quickstart.md), or run the one-command
+[`examples/cluster-ha-demo/run.sh`](../examples/cluster-ha-demo/run.sh).

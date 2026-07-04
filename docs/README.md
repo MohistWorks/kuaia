@@ -14,6 +14,14 @@ MVP. Internal design notes are not part of this tree.
 - [`pipeline-yaml.md`](pipeline-yaml.md): the current declarative pipeline YAML
   contract.
 
+## Running Distributed
+
+- [`distributed-quickstart.md`](distributed-quickstart.md): run a coordinator
+  and a worker across processes, with restart recovery and runtime submission.
+- [`ha-quickstart.md`](ha-quickstart.md): a highly available 3-node coordinator
+  cluster — leader-gated dispatch, worker leader auto-discovery, leader-crash
+  failover, and runtime `cluster add-node`/`remove-node`.
+
 ## Contributor References
 
 - [`connector-development.md`](connector-development.md): current source,
