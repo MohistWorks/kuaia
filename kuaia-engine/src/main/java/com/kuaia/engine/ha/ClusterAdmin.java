@@ -11,6 +11,8 @@ import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.util.TimeDuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import java.util.concurrent.TimeUnit;
  * transfers leadership to a surviving member so the removal is safe from any starting point.
  */
 public final class ClusterAdmin implements AutoCloseable {
+    private static final Logger LOG = LoggerFactory.getLogger(ClusterAdmin.class);
 
     /** One cluster member as reported by {@link #info()}. */
     public record Member(String id, String address, String role) {
@@ -54,7 +57,12 @@ public final class ClusterAdmin implements AutoCloseable {
                 .build();
     }
 
-    /** Commit a configuration containing the current peers plus {@code newPeerSpec} ({@code id@host:port}). */
+    /**
+     * Commit a configuration containing the LIVE cluster membership plus {@code newPeerSpec}
+     * ({@code id@host:port}). Membership math is based on the configuration read from the cluster,
+     * never on the operator-supplied peer list alone — a stale {@code --raft-peers} must not
+     * silently evict members it fails to mention.
+     */
     public List<RaftPeer> addNode(String newPeerSpec) throws IOException {
         RaftPeer added = RaftPeers.parseOne(newPeerSpec);
         for (RaftPeer peer : peers) {
@@ -63,7 +71,14 @@ public final class ClusterAdmin implements AutoCloseable {
                         "Node id '" + added.getId() + "' is already a cluster member");
             }
         }
-        List<RaftPeer> next = new ArrayList<>(peers);
+        List<RaftPeer> live = liveMembers();
+        for (RaftPeer peer : live) {
+            if (peer.getId().equals(added.getId())) {
+                throw new IllegalArgumentException(
+                        "Node id '" + added.getId() + "' is already in the live cluster configuration");
+            }
+        }
+        List<RaftPeer> next = new ArrayList<>(live);
         next.add(added);
         RaftClientReply reply = client.admin().setConfiguration(next);
         if (!reply.isSuccess()) {
@@ -73,13 +88,28 @@ public final class ClusterAdmin implements AutoCloseable {
     }
 
     /**
-     * Commit a configuration without {@code nodeId}. If the target currently leads the group,
-     * leadership is transferred to another member first so the removal is always safe.
+     * Commit the LIVE configuration without {@code nodeId} (see {@link #addNode} for why membership
+     * math uses the live configuration). If the target currently leads the group, leadership is
+     * transferred to a reachable member first so the removal is always safe; a failed transfer is
+     * logged and removal proceeds — Ratis lets a leader commit a configuration removing itself and
+     * then step down.
      */
     public List<RaftPeer> removeNode(String nodeId) throws IOException {
+        boolean inSupplied = false;
+        for (RaftPeer peer : peers) {
+            if (peer.getId().toString().equals(nodeId)) {
+                inSupplied = true;
+            }
+        }
+        if (!inSupplied) {
+            throw new IllegalArgumentException("Node id '" + nodeId + "' is not in the peer list");
+        }
+        if (peers.size() <= 1) {
+            throw new IllegalArgumentException("Refusing to remove the last cluster node");
+        }
         List<RaftPeer> next = new ArrayList<>();
         RaftPeer target = null;
-        for (RaftPeer peer : peers) {
+        for (RaftPeer peer : liveMembers()) {
             if (peer.getId().toString().equals(nodeId)) {
                 target = peer;
             } else {
@@ -87,19 +117,50 @@ public final class ClusterAdmin implements AutoCloseable {
             }
         }
         if (target == null) {
-            throw new IllegalArgumentException("Node id '" + nodeId + "' is not in the peer list");
+            throw new IllegalArgumentException(
+                    "Node id '" + nodeId + "' is not in the live cluster configuration");
         }
         if (next.isEmpty()) {
             throw new IllegalArgumentException("Refusing to remove the last cluster node");
         }
-        if (nodeId.equals(info().leaderId())) {
-            client.admin().transferLeadership(next.get(0).getId(), TRANSFER_TIMEOUT_MILLIS);
+        ClusterView view = info();
+        if (nodeId.equals(view.leaderId())) {
+            RaftClientReply transfer = client.admin().transferLeadership(
+                    transferTarget(view, next, nodeId), TRANSFER_TIMEOUT_MILLIS);
+            if (!transfer.isSuccess()) {
+                LOG.warn("Leadership transfer away from {} did not succeed ({}); proceeding — the "
+                        + "leader steps down after committing its own removal", nodeId, transfer.getException());
+            }
         }
         RaftClientReply reply = client.admin().setConfiguration(next);
         if (!reply.isSuccess()) {
             throw new IOException("setConfiguration failed: " + reply.getException());
         }
         return next;
+    }
+
+    /** Prefer a member the last {@link #info()} sweep saw as a reachable FOLLOWER. */
+    private static RaftPeerId transferTarget(ClusterView view, List<RaftPeer> candidates, String removingId) {
+        for (Member member : view.members()) {
+            if (!member.id().equals(removingId) && "FOLLOWER".equals(member.role())) {
+                return RaftPeerId.valueOf(member.id());
+            }
+        }
+        return candidates.get(0).getId();
+    }
+
+    /** The cluster's current membership as committed in its own configuration log. */
+    private List<RaftPeer> liveMembers() throws IOException {
+        for (RaftPeer peer : peers) {
+            try {
+                GroupInfoReply reply = client.getGroupManagementApi(
+                        RaftPeerId.valueOf(peer.getId().toString())).info(groupId);
+                return new ArrayList<>(reply.getGroup().getPeers());
+            } catch (Exception e) {
+                LOG.debug("Peer {} did not answer a group info request", peer.getId(), e);
+            }
+        }
+        throw new IOException("Cannot read the live cluster configuration from any supplied peer");
     }
 
     /** Poll every peer for its role; unreachable peers are reported, not fatal. */

@@ -27,6 +27,8 @@ class RaftPeersTest {
         assertThrows(IllegalArgumentException.class, () -> RaftPeers.parseOne("n1@hostonly"));
         assertThrows(IllegalArgumentException.class, () -> RaftPeers.parseOne("n1@127.0.0.1:"));
         assertThrows(IllegalArgumentException.class, () -> RaftPeers.parseOne("n1@127.0.0.1:abc"));
+        assertThrows(IllegalArgumentException.class, () -> RaftPeers.parseOne("n1@127.0.0.1:-1"));
+        assertThrows(IllegalArgumentException.class, () -> RaftPeers.parseOne("n1@127.0.0.1:0"));
     }
 
     @Test

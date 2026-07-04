@@ -374,7 +374,12 @@ public class KuaiaCli {
             return 1;
         }
 
-        try (com.kuaia.engine.ha.ClusterAdmin admin = new com.kuaia.engine.ha.ClusterAdmin(raftPeers, group)) {
+        // Not try-with-resources: a close() failure after a committed configuration change must not
+        // make a successful operation look failed (the operator's retry would then hit confusing
+        // "already a member" errors).
+        com.kuaia.engine.ha.ClusterAdmin admin = null;
+        try {
+            admin = new com.kuaia.engine.ha.ClusterAdmin(raftPeers, group);
             if ("add-node".equals(sub)) {
                 printMembers(out, admin.addNode(node));
             } else if ("remove-node".equals(sub)) {
@@ -394,6 +399,14 @@ public class KuaiaCli {
         } catch (Exception e) {
             out.println("cluster " + sub + " failed: " + e.getMessage());
             return 1;
+        } finally {
+            if (admin != null) {
+                try {
+                    admin.close();
+                } catch (Exception ignored) {
+                    // best-effort close; the operation's outcome was already reported
+                }
+            }
         }
     }
 

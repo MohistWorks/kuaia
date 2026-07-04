@@ -79,30 +79,46 @@ class DynamicMembershipTest {
                 assertTrue(awaitMembers(admin, 4, 20_000L), "cluster should report 4 members");
             }
 
-            // --- remove a follower among n1–n3; the cluster keeps serving.
-            String followerId = null;
+            // --- remove a follower among n1–n3, using a DELIBERATELY STALE peer list that omits n4:
+            // membership math must be based on the live configuration, so n4 survives and exactly 3
+            // members remain (a list-based removal would silently evict n4 and leave 2).
+            String leaderAfterAdd;
             try (ClusterAdmin admin = new ClusterAdmin(peers1234, ClusterAdmin.DEFAULT_GROUP_NAME)) {
-                String leaderId = awaitLeaderId(admin, 20_000L);
-                for (String candidate : new String[] { "n1", "n2", "n3" }) {
-                    if (!candidate.equals(leaderId)) {
-                        followerId = candidate;
-                        break;
-                    }
+                leaderAfterAdd = awaitLeaderId(admin, 20_000L);
+            }
+            String followerId = null;
+            for (String candidate : new String[] { "n1", "n2", "n3" }) {
+                if (!candidate.equals(leaderAfterAdd)) {
+                    followerId = candidate;
+                    break;
                 }
-                assertEquals(3, admin.removeNode(followerId).size());
+            }
+            try (ClusterAdmin staleAdmin = new ClusterAdmin(peers123, ClusterAdmin.DEFAULT_GROUP_NAME)) {
+                assertEquals(3, staleAdmin.removeNode(followerId).size(),
+                        "stale peer list must not evict the unlisted member");
             }
             nodes.remove(followerId).close();
 
             runJob(tmp, "job-b", currentLeader(nodes.values()));
 
-            // --- remove the LEADER; ClusterAdmin transfers leadership first, then commits.
+            // --- remove the current leader (leadership auto-transfers inside removeNode). In the
+            // rare run where n4 won an election, remove a non-n4 member instead so the final quorum
+            // still contains n4 and the replication proof below holds.
             String remainingPeers = peersOf(nodes.keySet(), raftAddrs, ids);
-            String leaderId;
+            String toRemove;
             try (ClusterAdmin admin = new ClusterAdmin(remainingPeers, ClusterAdmin.DEFAULT_GROUP_NAME)) {
-                leaderId = awaitLeaderId(admin, 20_000L);
-                assertEquals(2, admin.removeNode(leaderId).size());
+                toRemove = awaitLeaderId(admin, 20_000L);
+                if ("n4".equals(toRemove)) {
+                    for (String candidate : nodes.keySet()) {
+                        if (!"n4".equals(candidate)) {
+                            toRemove = candidate;
+                            break;
+                        }
+                    }
+                }
+                assertEquals(2, admin.removeNode(toRemove).size());
             }
-            nodes.remove(leaderId).close();
+            nodes.remove(toRemove).close();
 
             HaCoordinator survivor = awaitLeader(nodes.values(), 30_000L);
             assertNotNull(survivor, "a leader among the final two nodes (one of them n4)");

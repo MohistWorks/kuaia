@@ -43,7 +43,9 @@ public final class RaftPeers {
             throw new IllegalArgumentException("Expected peer in id@host:port form: " + e);
         }
         try {
-            Integer.parseInt(address.substring(colon + 1));
+            if (Integer.parseInt(address.substring(colon + 1)) <= 0) {
+                throw new IllegalArgumentException("Expected peer in id@host:port form: " + e);
+            }
         } catch (NumberFormatException nfe) {
             throw new IllegalArgumentException("Expected peer in id@host:port form: " + e);
         }
