@@ -1,9 +1,13 @@
 # Roadmap
 
-Kuaia is currently a local, checkpoint-aware AI-ready data pipeline runtime.
-The `0.1.x` line proved the public MVP: local YAML pipelines can read bounded
+Kuaia is a checkpoint-aware AI-ready data pipeline runtime with two execution
+modes: the original local in-process runner, and a distributed
+coordinator/worker engine with multi-coordinator high availability. The
+`0.1.x` line proved the public MVP: local YAML pipelines can read bounded
 data, clean and vectorize rows, write to files or Qdrant, resume from local
-checkpoints, and expose deterministic validation and run summaries.
+checkpoints, and expose deterministic validation and run summaries. The
+`0.3.x` track added the distributed engine described below (see
+`docs/distributed-quickstart.md` for how to run it).
 
 ## 0.1.3 shipped
 
@@ -79,22 +83,40 @@ the final planned `0.2.x` release.
 - Documentation and release-gate alignment for the final `0.2.x` connector
   coverage.
 
-## 0.3.0 planning
+## 0.3.x shipped: execution hardening and the distributed engine
 
-`0.3.0` starts from the finalized 0.2.x feature set and focuses on execution
-and architectural hardening.
+The `0.3.x` track started from the finalized 0.2.x feature set, hardened the
+architecture, and then built out distributed operation end to end.
 
-- Move the project baseline to Java 21 across Maven, CI, Docker, and
-  contributor setup.
-- Extract connector runtime interfaces and implementations from `kuaia-engine` into a
-  dedicated connector module to remove in-process coupling.
-- Introduce cleaner module boundaries for connector contracts before a future dynamic
-  plugin surface is added.
-- Reduce per-row overhead for connector execution and improve batch-path performance
-  for high-volume ingestion. In progress: `BinaryRow` field access is now
-  allocation-free via `VarHandle`, and the pipeline batch buffers no longer box a
-  per-row `seqId` list, with the row byte layout unchanged.
-- Finalize connector execution docs for contributor onboarding.
+Architectural hardening (shipped):
+
+- Java 21 project baseline across Maven, CI, Docker, and contributor setup.
+- Connector runtime interfaces and implementations extracted from
+  `kuaia-engine` into the dedicated `kuaia-connectors` module.
+- Reduced per-row overhead on the batch ingestion path: allocation-free
+  `BinaryRow` field access via `VarHandle` and unboxed per-row sequence
+  tracking, with the row byte layout unchanged.
+- Connector execution and contribution docs for contributor onboarding.
+
+Distributed execution engine (shipped):
+
+- Coordinator/worker runtime over gRPC bidirectional streams: task planner,
+  job-level state aggregation, a lease-based dispatch loop with
+  compare-and-set task ownership, worker-side split execution, backpressure
+  signaling, and capped task retries so failing tasks finalize.
+- Persistent coordinator state in RocksDB with recovery of planned and
+  in-flight tasks across coordinator restarts.
+- Operations surface: `kuaia coordinator` and `kuaia worker` launch the
+  processes; `kuaia submit` sends a pipeline to a running coordinator and
+  `kuaia status` polls job progress over the same gRPC API
+  (SubmitJob/GetJobStatus/ListJobs).
+- Multi-coordinator high availability: all job/task/worker state replicated
+  through Raft (Apache Ratis) into a RocksDB state machine, dispatch gated on
+  the elected leader, and an in-process three-node failover test proving a
+  leader crash is survived without losing job state.
+- Worker leader auto-discovery: workers take the full coordinator list, probe
+  for the current leader via a `HelloAck` handshake, and reconnect with capped
+  backoff across leader failover — no operator re-pointing.
 
 The intended AI connector coverage is:
 
@@ -105,15 +127,18 @@ The intended AI connector coverage is:
 - vector sinks: Qdrant, pgvector, and Milvus,
 - debug sinks: console, file, and mock-vector.
 
-## Deferred Beyond 0.2.0
+## Deferred
 
-The following remain future work and should not block `0.2.0`:
+The following remain future work:
 
 - CDC or streaming sources,
 - transform DAGs, joins, branches, or fan-out,
 - exactly-once execution,
+- dynamic Raft cluster membership (adding or removing coordinator nodes at
+  runtime) and dynamic coordinator-list changes on workers,
+- worker-side load balancing across coordinators,
+- Kubernetes operator or managed deployment tooling,
 - dynamic plugin loading or a stable connector SDK,
-- Kubernetes or distributed HA operation,
 - web UI, RBAC, lineage, or governance features,
 - broad connector catalog expansion,
 - broad vector database support beyond the current Qdrant, pgvector, and Milvus
