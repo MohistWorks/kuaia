@@ -195,6 +195,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/local-file-to-file.yaml"));
         assertTrue(result.output.contains("examples/local-quoted-csv-to-file.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-to-file.yaml"));
+        assertTrue(result.output.contains("examples/documents-to-file.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-chunk-to-vector.yaml"));

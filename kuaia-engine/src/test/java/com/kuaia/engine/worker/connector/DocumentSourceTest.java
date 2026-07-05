@@ -258,7 +258,7 @@ class DocumentSourceTest {
         assertEquals("INTRO.MD", rows.get(0).getString(1));
         assertEquals("Intro document", rows.get(0).getString(2));
         assertEquals("MANUAL.PDF", rows.get(1).getString(1));
-        assertEquals("Manual body", rows.get(1).getString(2).trim());
+        assertEquals("Manual body\n", rows.get(1).getString(2));
         assertEquals("NOTES.TXT", rows.get(2).getString(1));
         assertEquals("Notes document", rows.get(2).getString(2));
         source.close();
@@ -313,7 +313,7 @@ class DocumentSourceTest {
         assertEquals("intro.md", rows.get(0).getString(1));
         assertEquals("Intro document", rows.get(0).getString(2));
         assertEquals("manual.pdf", rows.get(1).getString(1));
-        assertEquals("Manual body", rows.get(1).getString(2).trim());
+        assertEquals("Manual body\n", rows.get(1).getString(2));
         assertEquals("nested/guide.txt", rows.get(2).getString(1));
         assertEquals("Guide document", rows.get(2).getString(2));
         source.close();
@@ -340,7 +340,7 @@ class DocumentSourceTest {
 
         assertEquals(1, read);
         assertEquals("manual.pdf", rows.get(0).getString(1));
-        assertEquals("Manual body", rows.get(0).getString(2).trim());
+        assertEquals("Manual body\n", rows.get(0).getString(2));
         source.close();
     }
 
@@ -444,9 +444,7 @@ class DocumentSourceTest {
 
         assertEquals(1, read);
         assertEquals("blank.pdf", rows.get(0).getString(1));
-        assertTrue(
-                rows.get(0).getString(2).trim().isEmpty(),
-                "Expected blank content but got: " + rows.get(0).getString(2));
+        assertEquals("\n", rows.get(0).getString(2));
         source.close();
     }
 
@@ -488,12 +486,7 @@ class DocumentSourceTest {
 
         assertEquals(1, read);
         assertEquals("manual.pdf", rows.get(0).getString(1));
-        String content = rows.get(0).getString(2);
-        int firstPageIndex = content.indexOf("First page body");
-        int secondPageIndex = content.indexOf("Second page body");
-        assertTrue(firstPageIndex >= 0, "First page text missing from: " + content);
-        assertTrue(secondPageIndex >= 0, "Second page text missing from: " + content);
-        assertTrue(firstPageIndex < secondPageIndex, "Page order not preserved in: " + content);
+        assertEquals("First page body\nSecond page body\n", rows.get(0).getString(2));
         source.close();
     }
 
@@ -516,7 +509,7 @@ class DocumentSourceTest {
 
         assertEquals(1, read);
         assertEquals("latin.pdf", rows.get(0).getString(1));
-        assertEquals("café résumé", rows.get(0).getString(2).trim());
+        assertEquals("café résumé\n", rows.get(0).getString(2));
         source.close();
     }
 

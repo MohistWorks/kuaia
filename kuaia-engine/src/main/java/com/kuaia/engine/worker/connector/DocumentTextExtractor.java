@@ -36,7 +36,13 @@ public final class DocumentTextExtractor {
 
     private static String extractPdfText(Path document) throws IOException {
         try (PDDocument pdf = Loader.loadPDF(document.toFile())) {
-            return new PDFTextStripper().getText(pdf);
+            PDFTextStripper stripper = new PDFTextStripper();
+            // PDFTextStripper defaults both separators to System.lineSeparator(): lineSeparator
+            // between the lines of a page and pageEnd after each page. Pin both to "\n" so
+            // extracted content and downstream chunk boundaries are identical on every platform.
+            stripper.setLineSeparator("\n");
+            stripper.setPageEnd("\n");
+            return stripper.getText(pdf);
         }
     }
 
