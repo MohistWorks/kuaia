@@ -201,7 +201,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/local-faq-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-skip-bad-records.yaml"));
         assertTrue(result.output.contains("Common RAG flows:"));
-        assertTrue(result.output.contains("Document directory to Qdrant: kuaia run -f examples/document-directory-to-qdrant.yaml"));
+        assertTrue(result.output.contains("Document directory to Qdrant: kuaia run -f examples/documents-to-qdrant.yaml"));
         assertTrue(result.output.contains("FAQ import: kuaia run -f examples/local-faq-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("DuckDB to Qdrant: kuaia run -f examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(result.output.contains("Local file to Milvus: kuaia run -f examples/local-file-to-milvus.yaml"));
@@ -212,7 +212,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/local-file-to-openai-compatible-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/local-jsonl-chunk-to-qdrant.yaml"));
-        assertTrue(result.output.contains("examples/document-directory-to-qdrant.yaml"));
+        assertTrue(result.output.contains("examples/documents-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(result.output.contains("examples/local-file-to-milvus.yaml"));
         assertTrue(result.output.contains("examples/postgres-to-qdrant.yaml"));
@@ -697,8 +697,9 @@ class KuaiaCliTest {
         Files.write(config, String.join("\n",
                 "name: document-directory-to-file",
                 "source:",
-                "  type: document-directory",
+                "  type: file",
                 "  path: " + docs,
+                "  format: document",
                 "sink:",
                 "  type: file",
                 "  path: " + output,
@@ -1260,7 +1261,7 @@ class KuaiaCliTest {
         CliResult result = run("run", "-f", config.toString());
 
         assertEquals(1, result.exitCode);
-        assertTrue(result.output.contains("source.maxRowsPerSplit is only supported for source.type: file"));
+        assertTrue(result.output.contains("source.maxRowsPerSplit is only supported for file formats csv and jsonl"));
         assertFalse(result.output.contains("Run Summary:"));
     }
 

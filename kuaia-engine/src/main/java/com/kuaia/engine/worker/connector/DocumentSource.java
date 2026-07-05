@@ -15,22 +15,32 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
 
-public class DocumentDirectorySource implements LocalSource {
+public class DocumentSource implements LocalSource {
     private static final KuaiaRowType ROW_TYPE = new KuaiaRowType(
             new String[]{"id", "path", "content"},
             new DataType[]{DataType.LONG, DataType.STRING, DataType.STRING});
 
     private final Path root;
+    private final String documentType;
     private List<Path> documents;
 
-    public DocumentDirectorySource(Path root) {
+    public DocumentSource(Path root, String documentType) {
         this.root = root;
+        this.documentType = documentType == null ? "auto" : documentType;
     }
 
     @Override
     public void open() throws PipelineExecutionException {
         if (!Files.exists(root)) {
             throw new PipelineExecutionException("Document directory not found: " + root);
+        }
+        if (Files.isRegularFile(root)) {
+            if (!isSupportedDocument(root)) {
+                throw new PipelineExecutionException("Document file is not a supported document: " + root);
+            }
+            documents = new ArrayList<>();
+            documents.add(root);
+            return;
         }
         if (!Files.isDirectory(root)) {
             throw new PipelineExecutionException("Document source path is not a directory: " + root);
@@ -103,10 +113,19 @@ public class DocumentDirectorySource implements LocalSource {
 
     private boolean isSupportedDocument(Path path) {
         String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        if ("text".equals(documentType)) {
+            return name.endsWith(".txt");
+        }
+        if ("markdown".equals(documentType)) {
+            return name.endsWith(".md") || name.endsWith(".markdown");
+        }
         return name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".markdown");
     }
 
     private String relativePath(Path path) {
+        if (path.equals(root)) {
+            return path.getFileName().toString();
+        }
         return root.relativize(path).toString().replace('\\', '/');
     }
 

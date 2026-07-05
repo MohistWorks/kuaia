@@ -113,7 +113,7 @@ class BuiltInSourceContractTest {
 
         return Arrays.asList(
                 new SourceCase("file", () -> new FileSource(csv)),
-                new SourceCase("document-directory", () -> new DocumentDirectorySource(docs)),
+                new SourceCase("document", () -> new DocumentSource(docs, "auto")),
                 new SourceCase("s3", () -> new S3ObjectSource("kuaia-docs", "docs/", fakeObjectStore())),
                 new SourceCase("duckdb", () -> new DuckDBSource(duckDbConfig())),
                 new SourceCase("postgres", () -> new PostgresSource(

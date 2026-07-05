@@ -237,8 +237,8 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("examples/mysql/init/01-documents.sql")), "MySQL init SQL should exist");
         assertTrue(Files.exists(root.resolve("examples/duckdb-csv-to-qdrant.yaml")),
                 "DuckDB to Qdrant example should exist");
-        assertTrue(Files.exists(root.resolve("examples/document-directory-to-qdrant.yaml")),
-                "Document directory to Qdrant example should exist");
+        assertTrue(Files.exists(root.resolve("examples/documents-to-qdrant.yaml")),
+                "Documents to Qdrant example should exist");
         assertTrue(Files.exists(root.resolve("examples/s3-docs-to-qdrant.yaml")),
                 "S3 to Qdrant example should exist");
         assertTrue(Files.exists(root.resolve("examples/data/docs/intro.md")),

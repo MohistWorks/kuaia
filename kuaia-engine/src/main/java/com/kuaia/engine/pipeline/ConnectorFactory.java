@@ -3,7 +3,7 @@ package com.kuaia.engine.pipeline;
 import com.kuaia.common.api.SinkWriter;
 import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.worker.connector.ConsoleSink;
-import com.kuaia.engine.worker.connector.DocumentDirectorySource;
+import com.kuaia.engine.worker.connector.DocumentSource;
 import com.kuaia.engine.worker.connector.DuckDBSource;
 import com.kuaia.engine.worker.connector.FileSink;
 import com.kuaia.engine.worker.connector.FileSource;
@@ -42,6 +42,13 @@ public class ConnectorFactory {
     public SourceEnumerator createSource(PipelineConfig config) throws PipelineExecutionException {
         String sourceType = config.getSource().getType();
         if ("file".equals(sourceType)) {
+            if ("document".equals(config.getSource().getFormat())) {
+                return new LocalSourceAdapter(
+                        new DocumentSource(
+                                Paths.get(config.getSource().getPath()),
+                                config.getSource().getDocumentType()),
+                        "document-0");
+            }
             return new FileSourceAdapter(
                     new FileSource(Paths.get(config.getSource().getPath()), config.getSource().getFormat()),
                     "file-0",
@@ -55,11 +62,6 @@ public class ConnectorFactory {
         }
         if ("duckdb".equals(sourceType)) {
             return new LocalSourceAdapter(new DuckDBSource(config.getSource()), "duckdb-0");
-        }
-        if ("document-directory".equals(sourceType)) {
-            return new LocalSourceAdapter(
-                    new DocumentDirectorySource(Paths.get(config.getSource().getPath())),
-                    "document-directory-0");
         }
         if ("s3".equals(sourceType)) {
             return new LocalSourceAdapter(new S3ObjectSource(config.getSource()), "s3-0");

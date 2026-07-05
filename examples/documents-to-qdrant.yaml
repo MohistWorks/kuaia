@@ -1,7 +1,8 @@
 name: document-directory-to-qdrant
 source:
-  type: document-directory
+  type: file
   path: data/docs
+  format: document
 transforms:
   - type: mock-embedding
     input: content
