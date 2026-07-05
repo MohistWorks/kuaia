@@ -1878,7 +1878,7 @@ class PipelineConfigLoaderTest {
     void loadsDocumentSourceConfigWithExplicitDocumentType() throws Exception {
         Path docs = tempDir.resolve("docs");
         Files.createDirectories(docs);
-        for (String documentType : new String[]{"auto", "text", "markdown"}) {
+        for (String documentType : new String[]{"auto", "text", "markdown", "pdf"}) {
             Path configPath = tempDir.resolve("document-source-" + documentType + ".yaml");
             Files.write(configPath, String.join("\n",
                     "name: document-source-" + documentType,
@@ -1956,6 +1956,29 @@ class PipelineConfigLoaderTest {
                 () -> new PipelineConfigLoader().load(configPath));
 
         assertEquals("source.documentType is only supported for source.format: document", error.getMessage());
+    }
+
+    @Test
+    void rejectsDocumentTypeForNonFileSourceTypes() throws Exception {
+        for (String sourceType : new String[]{"duckdb", "postgres", "s3"}) {
+            Path configPath = tempDir.resolve(sourceType + "-document-type.yaml");
+            Files.write(configPath, String.join("\n",
+                    "name: " + sourceType + "-document-type",
+                    "source:",
+                    "  type: " + sourceType,
+                    "  documentType: auto",
+                    "sink:",
+                    "  type: console").getBytes(StandardCharsets.UTF_8));
+
+            PipelineConfigException error = assertThrows(
+                    PipelineConfigException.class,
+                    () -> new PipelineConfigLoader().load(configPath));
+
+            assertEquals(
+                    "source.documentType is only supported for source.format: document",
+                    error.getMessage(),
+                    sourceType);
+        }
     }
 
     @Test
