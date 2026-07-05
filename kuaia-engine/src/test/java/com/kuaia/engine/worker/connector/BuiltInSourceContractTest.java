@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -56,7 +57,7 @@ class BuiltInSourceContractTest {
         try (LocalSource source = sourceCase.create()) {
             source.open();
             int contentOrdinal = assertRowTypeContract(sourceCase.name, source.getRowType());
-            CapturedRows rows = readRows(sourceCase.name, source, 0L, contentOrdinal);
+            CapturedRows rows = readRows(sourceCase, source, 0L, contentOrdinal);
 
             assertEquals(2, rows.size(), sourceCase.name);
             assertEquals(Arrays.asList(1L, 2L), rows.seqIds(), sourceCase.name);
@@ -68,7 +69,7 @@ class BuiltInSourceContractTest {
         try (LocalSource source = sourceCase.create()) {
             source.open();
             int contentOrdinal = assertRowTypeContract(sourceCase.name, source.getRowType());
-            CapturedRows rows = readRows(sourceCase.name, source, 1L, contentOrdinal);
+            CapturedRows rows = readRows(sourceCase, source, 1L, contentOrdinal);
 
             assertEquals(1, rows.size(), sourceCase.name);
             assertEquals(Collections.singletonList(2L), rows.seqIds(), sourceCase.name);
@@ -86,16 +87,17 @@ class BuiltInSourceContractTest {
         return contentOrdinal;
     }
 
-    private CapturedRows readRows(String name, LocalSource source, long lastCheckpointSeq, int contentOrdinal)
+    private CapturedRows readRows(SourceCase sourceCase, LocalSource source, long lastCheckpointSeq, int contentOrdinal)
             throws Exception {
         CapturedRows rows = new CapturedRows();
         int read = source.readFrom(
                 lastCheckpointSeq,
-                (seqId, row) -> rows.add(seqId, row.getString(contentOrdinal)),
+                (seqId, row) -> rows.add(seqId, sourceCase.normalizeContent(row.getString(contentOrdinal))),
                 (seqId, error) -> {
-                    throw new AssertionError(name + " emitted unexpected row error at seq " + seqId, error);
+                    throw new AssertionError(
+                            sourceCase.name + " emitted unexpected row error at seq " + seqId, error);
                 });
-        assertEquals(rows.size(), read, name);
+        assertEquals(rows.size(), read, sourceCase.name);
         return rows;
     }
 
@@ -111,9 +113,17 @@ class BuiltInSourceContractTest {
         Files.write(docs.resolve("a.md"), "Alpha".getBytes(StandardCharsets.UTF_8));
         Files.write(docs.resolve("b.txt"), "Beta".getBytes(StandardCharsets.UTF_8));
 
+        Path pdfDocs = tempDir.resolve("pdf-docs");
+        Files.createDirectories(pdfDocs);
+        DocumentSourceTest.writePdf(pdfDocs.resolve("a.pdf"), "Alpha");
+        DocumentSourceTest.writePdf(pdfDocs.resolve("b.pdf"), "Beta");
+
         return Arrays.asList(
                 new SourceCase("file", () -> new FileSource(csv)),
                 new SourceCase("document", () -> new DocumentSource(docs, "auto")),
+                // PDF text extraction appends a line separator after each text line; trim it away so the
+                // contract compares the logical document content.
+                new SourceCase("document-pdf", () -> new DocumentSource(pdfDocs, "auto"), String::trim),
                 new SourceCase("s3", () -> new S3ObjectSource("kuaia-docs", "docs/", fakeObjectStore())),
                 new SourceCase("duckdb", () -> new DuckDBSource(duckDbConfig())),
                 new SourceCase("postgres", () -> new PostgresSource(
@@ -192,14 +202,24 @@ class BuiltInSourceContractTest {
     private static final class SourceCase {
         private final String name;
         private final SourceFactory factory;
+        private final UnaryOperator<String> contentNormalizer;
 
         private SourceCase(String name, SourceFactory factory) {
+            this(name, factory, UnaryOperator.identity());
+        }
+
+        private SourceCase(String name, SourceFactory factory, UnaryOperator<String> contentNormalizer) {
             this.name = name;
             this.factory = factory;
+            this.contentNormalizer = contentNormalizer;
         }
 
         private LocalSource create() throws Exception {
             return factory.create();
+        }
+
+        private String normalizeContent(String content) {
+            return contentNormalizer.apply(content);
         }
     }
 

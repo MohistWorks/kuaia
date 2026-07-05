@@ -33,11 +33,13 @@ class KuaiaExamplesTest {
                 "examples/local-file-to-file.yaml",
                 "examples/local-quoted-csv-to-file.yaml",
                 "examples/local-jsonl-to-file.yaml",
-                "examples/local-file-skip-bad-records.yaml");
+                "examples/local-file-skip-bad-records.yaml",
+                "examples/documents-to-file.yaml");
 
         Path fileSinkOutput = repoRoot().resolve(".kuaia/output/local-file-to-file.csv");
         Path quotedCsvSinkOutput = repoRoot().resolve(".kuaia/output/local-quoted-csv-to-file.csv");
         Path jsonlSinkOutput = repoRoot().resolve(".kuaia/output/local-jsonl-to-file.jsonl");
+        Path documentsSinkOutput = repoRoot().resolve(".kuaia/output/documents-to-file.csv");
         for (String stateDir : Arrays.asList(
                 "local-file-to-console",
                 "local-file-transform-to-console",
@@ -48,12 +50,14 @@ class KuaiaExamplesTest {
                 "local-file-to-file",
                 "local-quoted-csv-to-file",
                 "local-jsonl-to-file",
-                "local-file-skip-bad-records")) {
+                "local-file-skip-bad-records",
+                "documents-to-file")) {
             deleteExampleState(stateDir);
         }
         Files.deleteIfExists(fileSinkOutput);
         Files.deleteIfExists(quotedCsvSinkOutput);
         Files.deleteIfExists(jsonlSinkOutput);
+        Files.deleteIfExists(documentsSinkOutput);
 
         for (String example : examples) {
             CliResult result = run("run", "-f", repoRoot().resolve(example).toString());
@@ -77,6 +81,13 @@ class KuaiaExamplesTest {
                 Arrays.asList(
                         "{\"id\":1,\"content\":\"alfa\"}"),
                 Files.readAllLines(jsonlSinkOutput, StandardCharsets.UTF_8));
+        String documentsCsv = new String(Files.readAllBytes(documentsSinkOutput), StandardCharsets.UTF_8);
+        assertTrue(
+                documentsCsv.startsWith("id,path,chunk,chunk_index"),
+                "Unexpected documents-to-file header: " + documentsCsv);
+        assertTrue(
+                documentsCsv.contains("Kuaia PDF handbook fixture"),
+                "Expected PDF-extracted chunk in: " + documentsCsv);
     }
 
     @Test

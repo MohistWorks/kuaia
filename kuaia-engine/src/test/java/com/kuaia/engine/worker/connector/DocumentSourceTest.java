@@ -450,21 +450,74 @@ class DocumentSourceTest {
         source.close();
     }
 
-    static void writePdf(Path path, String text) throws IOException {
+    static void writePdf(Path path, String... pageTexts) throws IOException {
         try (PDDocument document = new PDDocument()) {
-            PDPage page = new PDPage();
-            document.addPage(page);
-            try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
-                if (!text.isEmpty()) {
-                    contentStream.beginText();
-                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
-                    contentStream.newLineAtOffset(72, 720);
-                    contentStream.showText(text);
-                    contentStream.endText();
+            for (String pageText : pageTexts) {
+                PDPage page = new PDPage();
+                document.addPage(page);
+                try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
+                    if (!pageText.isEmpty()) {
+                        contentStream.beginText();
+                        contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                        contentStream.newLineAtOffset(72, 720);
+                        contentStream.showText(pageText);
+                        contentStream.endText();
+                    }
                 }
             }
             document.save(path.toFile());
         }
+    }
+
+    @Test
+    void multiPagePdfExtractsAllPagesInPageOrder() throws Exception {
+        Path docs = tempDir.resolve("docs");
+        Files.createDirectories(docs);
+        writePdf(docs.resolve("manual.pdf"), "First page body", "Second page body");
+
+        DocumentSource source = new DocumentSource(docs, "pdf");
+        source.open();
+        List<BinaryRow> rows = new ArrayList<>();
+
+        int read = source.readFrom(
+                0L,
+                (seqId, row) -> rows.add(row),
+                (seqId, error) -> {
+                    throw new AssertionError("Unexpected row error for seq " + seqId, error);
+                });
+
+        assertEquals(1, read);
+        assertEquals("manual.pdf", rows.get(0).getString(1));
+        String content = rows.get(0).getString(2);
+        int firstPageIndex = content.indexOf("First page body");
+        int secondPageIndex = content.indexOf("Second page body");
+        assertTrue(firstPageIndex >= 0, "First page text missing from: " + content);
+        assertTrue(secondPageIndex >= 0, "Second page text missing from: " + content);
+        assertTrue(firstPageIndex < secondPageIndex, "Page order not preserved in: " + content);
+        source.close();
+    }
+
+    @Test
+    void pdfWithNonAsciiLatinTextExtractsAccentedCharacters() throws Exception {
+        Path docs = tempDir.resolve("docs");
+        Files.createDirectories(docs);
+        writePdf(docs.resolve("latin.pdf"), "café résumé");
+
+        DocumentSource source = new DocumentSource(docs, "pdf");
+        source.open();
+        List<BinaryRow> rows = new ArrayList<>();
+
+        int read = source.readFrom(
+                0L,
+                (seqId, row) -> rows.add(row),
+                (seqId, error) -> {
+                    throw new AssertionError("Unexpected row error for seq " + seqId, error);
+                });
+
+        assertEquals(1, read);
+        assertEquals("latin.pdf", rows.get(0).getString(1));
+        assertEquals("café résumé", rows.get(0).getString(2).trim());
+        source.close();
     }
 
     @Test

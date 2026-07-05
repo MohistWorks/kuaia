@@ -16,12 +16,18 @@ public final class DocumentTextExtractor {
     }
 
     public static String extractText(Path document, String relativePath) throws PipelineExecutionException {
+        if (!isPdf(document) && !isText(document)) {
+            throw new PipelineExecutionException("No text extractor for document: " + relativePath);
+        }
         try {
             if (isPdf(document)) {
                 return extractPdfText(document);
             }
             return new String(Files.readAllBytes(document), StandardCharsets.UTF_8);
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
+            // pdfbox throws unchecked exceptions (IllegalArgumentException, IndexOutOfBoundsException,
+            // NegativeArraySizeException, ...) on malformed PDFs; wrap those too so bad documents stay
+            // on the per-record error path instead of killing the whole split.
             throw new PipelineExecutionException(
                     "Document source read failed at " + relativePath + ": " + e.getMessage(),
                     e);
@@ -35,6 +41,15 @@ public final class DocumentTextExtractor {
     }
 
     private static boolean isPdf(Path document) {
-        return document.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".pdf");
+        return fileName(document).endsWith(".pdf");
+    }
+
+    private static boolean isText(Path document) {
+        String name = fileName(document);
+        return name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".markdown");
+    }
+
+    private static String fileName(Path document) {
+        return document.getFileName().toString().toLowerCase(Locale.ROOT);
     }
 }
