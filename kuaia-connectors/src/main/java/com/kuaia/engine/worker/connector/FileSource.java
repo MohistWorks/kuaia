@@ -34,6 +34,7 @@ public class FileSource implements LocalSource {
     private KuaiaRowType rowType;
     private List<String> lines;
     private List<CSVRecord> csvRecords;
+    private boolean fsClosed;
 
     public FileSource(Path path) {
         this(path, "csv");
@@ -232,6 +233,15 @@ public class FileSource implements LocalSource {
     public void close() {
         lines = null;
         csvRecords = null;
+        // The source owns the injected filesystem (both the DI'd one and the one created by the
+        // (Path, ...) delegate ctors); release it so a resource-holding backend (e.g. an S3 client)
+        // does not leak. No-op for LocalFileSystem. Guarded against null/double-close.
+        if (!fsClosed) {
+            fsClosed = true;
+            if (fs != null) {
+                fs.close();
+            }
+        }
     }
 
     @Override
@@ -376,6 +386,11 @@ public class FileSource implements LocalSource {
      * Split {@code bytes} into lines exactly like {@link java.nio.file.Files#readAllLines}: a line is
      * terminated by {@code \n}, {@code \r}, or {@code \r\n}, and a trailing terminator does not yield a
      * trailing empty line (BufferedReader.readLine returns {@code null} at EOF).
+     *
+     * <p>Note the UTF-8 decode is REPLACE (malformed input becomes the U+FFFD replacement char), the
+     * default of {@link InputStreamReader}. This differs from {@link java.nio.file.Files#readAllLines},
+     * which is REPORT (throws on malformed input), and intentionally matches the leniency of the CSV
+     * path (commons-csv's {@code CSVParser.parse(Reader, ...)} over an UTF-8 reader).
      */
     private static List<String> readLines(byte[] bytes) throws IOException {
         List<String> result = new ArrayList<>();

@@ -3,6 +3,7 @@ package com.kuaia.engine.worker.connector;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +12,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocalFileSystemTest {
@@ -80,13 +82,37 @@ class LocalFileSystemTest {
     }
 
     @Test
-    void listAcceptsFileSchemeUriRoot() throws Exception {
+    void listReturnsChildrenInTheSameStringSpaceAsAFileSchemeUriRoot() throws Exception {
         Path intro = tempDir.resolve("intro.md");
         Files.write(intro, "intro".getBytes(StandardCharsets.UTF_8));
 
         List<String> listed = fs.list(tempDir.toUri().toString());
 
+        // A file:// root must yield file:// children (each prefixed by the argument), not bare paths,
+        // so callers can relativize by stripping the argument prefix.
         assertEquals(1, listed.size());
-        assertTrue(listed.contains(intro.toString()), "expected " + intro + " in " + listed);
+        assertTrue(listed.contains(intro.toUri().toString()), "expected " + intro.toUri() + " in " + listed);
+    }
+
+    @Test
+    void listReturnsEmptyForAnEmptyDirectory() throws Exception {
+        Path empty = tempDir.resolve("empty");
+        Files.createDirectories(empty);
+
+        assertTrue(fs.list(empty.toString()).isEmpty());
+    }
+
+    @Test
+    void listThrowsForAMissingPath() {
+        String missing = tempDir.resolve("missing").toString();
+
+        assertThrows(IOException.class, () -> fs.list(missing));
+    }
+
+    @Test
+    void readAllBytesThrowsForAMissingFile() {
+        String missing = tempDir.resolve("missing.txt").toString();
+
+        assertThrows(IOException.class, () -> fs.readAllBytes(missing));
     }
 }

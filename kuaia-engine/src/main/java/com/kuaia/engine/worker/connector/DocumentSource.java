@@ -5,7 +5,6 @@ import com.kuaia.common.type.DataType;
 import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,6 +22,7 @@ public class DocumentSource implements LocalSource {
     private final String rootUri;
     private final String documentType;
     private List<String> documentUris;
+    private boolean fsClosed;
 
     public DocumentSource(Path root, String documentType) {
         this(new LocalFileSystem(), root.toString(), documentType);
@@ -39,7 +39,7 @@ public class DocumentSource implements LocalSource {
     }
 
     @Override
-    public void open() throws PipelineExecutionException {
+    public void open() throws Exception {
         if (!fs.exists(rootUri)) {
             throw new PipelineExecutionException("Document path not found: " + rootUri);
         }
@@ -55,9 +55,9 @@ public class DocumentSource implements LocalSource {
         List<String> children;
         try {
             children = fs.list(rootUri);
-        } catch (UncheckedIOException e) {
+        } catch (Exception e) {
             throw new PipelineExecutionException(
-                    "Document directory scan failed: " + rootUri + ": " + e.getCause().getMessage(), e);
+                    "Document directory scan failed: " + rootUri + ": " + e.getMessage(), e);
         }
         documentUris = new ArrayList<>();
         children.stream()
@@ -104,6 +104,15 @@ public class DocumentSource implements LocalSource {
     @Override
     public void close() {
         documentUris = null;
+        // The source owns the injected filesystem (both the DI'd one and the one created by the
+        // (Path, ...) delegate ctor); release it so a resource-holding backend (e.g. an S3 client)
+        // does not leak. No-op for LocalFileSystem. Guarded against null/double-close.
+        if (!fsClosed) {
+            fsClosed = true;
+            if (fs != null) {
+                fs.close();
+            }
+        }
     }
 
     private BinaryRow readDocument(long seqId, String documentUri) throws PipelineExecutionException {
