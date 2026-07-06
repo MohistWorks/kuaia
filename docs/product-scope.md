@@ -49,9 +49,10 @@ Supported sources:
 - batch MySQL queries through `source.type: mysql`.
 
 PDF ingestion extracts embedded text only. There is no OCR, so scanned PDFs
-produce rows with empty `content`; use a `filter` transform with
-`op: not-empty` to drop them. Corrupt or encrypted PDFs are per-record source
-errors that `errorPolicy.mode: skip-bad-records` can skip.
+produce rows with blank (whitespace-only) `content`; use a `filter` transform
+with `op: not-empty`, which trims before testing, to drop them. Corrupt or
+encrypted PDFs are per-record source errors that
+`errorPolicy.mode: skip-bad-records` can skip.
 
 Supported transforms:
 

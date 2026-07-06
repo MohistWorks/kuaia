@@ -64,8 +64,8 @@ the final planned `0.2.x` release.
 - DuckDB batch source for local SQL over files, including common CSV, JSON, and
   Parquet read paths exposed through DuckDB queries.
 - Local document-directory source for `.txt`, `.md`, and `.markdown` inputs,
-  including a documents-to-Qdrant example and e2e case. This source has since
-  been folded into the `file` source as `format: document`.
+  including a document-directory-to-Qdrant example and e2e case. This source
+  has since been folded into the `file` source as `format: document`.
 
 `0.2.2` shipped scope:
 

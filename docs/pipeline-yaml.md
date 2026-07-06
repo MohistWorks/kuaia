@@ -109,8 +109,9 @@ relative source paths should be kept as metadata.
 - `content` is the UTF-8 file content for text documents and the extracted
   text for `.pdf` documents,
 - PDF extraction reads embedded text with `"\n"` line separators on every
-  platform; there is no OCR, so scanned PDFs produce rows with empty
-  `content` that a `filter` transform with `op: not-empty` can drop,
+  platform; there is no OCR, so scanned PDFs produce rows with blank
+  (whitespace-only) `content` that the trimming `op: not-empty` `filter`
+  transform drops,
 - corrupt or encrypted PDFs are source row errors and can be skipped with
   `errorPolicy.mode: skip-bad-records`.
 

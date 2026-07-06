@@ -337,8 +337,9 @@ creates deterministic mock embeddings from `content`, and upserts three points
 into Qdrant collection `kuaia_documents`. The sink uses
 `payloadFields: [id, path, content]` so each vector keeps the generated document
 id, relative path, and source content. The `handbook.pdf` fixture is a one-page
-PDF generated with pdfbox, so it can be regenerated whenever the fixture text
-needs to change.
+PDF generated with pdfbox; the `writePdf` helper in the engine's
+`DocumentSourceTest` shows how to regenerate it if the fixture text needs to
+change.
 
 ## DuckDB CSV To Qdrant
 

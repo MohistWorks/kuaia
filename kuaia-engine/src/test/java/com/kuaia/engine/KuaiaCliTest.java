@@ -202,7 +202,7 @@ class KuaiaCliTest {
         assertTrue(result.output.contains("examples/local-faq-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("examples/local-file-skip-bad-records.yaml"));
         assertTrue(result.output.contains("Common RAG flows:"));
-        assertTrue(result.output.contains("Document directory to Qdrant: kuaia run -f examples/documents-to-qdrant.yaml"));
+        assertTrue(result.output.contains("Documents to Qdrant: kuaia run -f examples/documents-to-qdrant.yaml"));
         assertTrue(result.output.contains("FAQ import: kuaia run -f examples/local-faq-jsonl-to-vector.yaml"));
         assertTrue(result.output.contains("DuckDB to Qdrant: kuaia run -f examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(result.output.contains("Local file to Milvus: kuaia run -f examples/local-file-to-milvus.yaml"));
@@ -687,16 +687,16 @@ class KuaiaCliTest {
     }
 
     @Test
-    void runReadsDocumentDirectoryToJsonlFile() throws Exception {
+    void runReadsDocumentsToJsonlFile() throws Exception {
         Path docs = tempDir.resolve("docs");
         Files.createDirectories(docs.resolve("nested"));
         Files.write(docs.resolve("intro.md"), "Intro document".getBytes(StandardCharsets.UTF_8));
         Files.write(docs.resolve("nested/guide.txt"), "Guide document".getBytes(StandardCharsets.UTF_8));
         Files.write(docs.resolve("image.png"), "ignored".getBytes(StandardCharsets.UTF_8));
         Path output = tempDir.resolve("out/documents.jsonl");
-        Path config = tempDir.resolve("document-directory-to-file.yaml");
+        Path config = tempDir.resolve("documents-to-file-test.yaml");
         Files.write(config, String.join("\n",
-                "name: document-directory-to-file",
+                "name: documents-to-file-test",
                 "source:",
                 "  type: file",
                 "  path: " + docs,
@@ -710,7 +710,7 @@ class KuaiaCliTest {
         CliResult result = run("run", "-f", config.toString());
 
         assertEquals(0, result.exitCode, result.output);
-        assertTrue(result.output.contains("Starting pipeline: document-directory-to-file"));
+        assertTrue(result.output.contains("Starting pipeline: documents-to-file-test"));
         assertTrue(result.output.contains("Pipeline Finished. rows=2"));
         assertTrue(result.output.contains(
                 "Run Summary: rowsRead=2 rowsWritten=2 rowsFailed=0 rowsSkipped=0 checkpointSeq=2 taskState=COMPLETED sourceSplits=1 sinkBatches=2 durationMs="));

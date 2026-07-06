@@ -10,8 +10,9 @@ All notable public changes to Kuaia are tracked here.
   ingestion, with an optional `documentType` selector (`auto`, `text`,
   `markdown`, or `pdf`) and a single-file path read as a one-document corpus.
 - Added PDF text extraction for document format sources. Extraction has no
-  OCR, so scanned PDFs produce empty `content`, and corrupt or encrypted PDFs
-  are per-record errors that `errorPolicy.mode: skip-bad-records` can skip.
+  OCR, so scanned PDFs produce blank (whitespace-only) `content` that the
+  trimming `not-empty` filter drops, and corrupt or encrypted PDFs are
+  per-record errors that `errorPolicy.mode: skip-bad-records` can skip.
 - Added a no-service `examples/documents-to-file.yaml` example that chunks a
   local document directory, including a PDF, into a CSV file.
 

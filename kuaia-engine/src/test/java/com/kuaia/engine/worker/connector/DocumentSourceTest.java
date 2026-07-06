@@ -6,6 +6,8 @@ import com.kuaia.engine.pipeline.PipelineExecutionException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.encryption.AccessPermission;
+import org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
@@ -426,6 +428,40 @@ class DocumentSourceTest {
     }
 
     @Test
+    void encryptedPdfIsSkippedWhenErrorConsumerAcceptsIt() throws Exception {
+        Path docs = tempDir.resolve("docs");
+        Files.createDirectories(docs);
+        Files.write(docs.resolve("a.md"), "Alpha document".getBytes(StandardCharsets.UTF_8));
+        writeEncryptedPdf(docs.resolve("locked.pdf"), "Locked body");
+        Files.write(docs.resolve("z.txt"), "Zulu document".getBytes(StandardCharsets.UTF_8));
+
+        DocumentSource source = new DocumentSource(docs, "auto");
+        source.open();
+        List<BinaryRow> rows = new ArrayList<>();
+        List<Long> errorSeqIds = new ArrayList<>();
+        List<Exception> errors = new ArrayList<>();
+
+        int read = source.readFrom(
+                0L,
+                (seqId, row) -> rows.add(row),
+                (seqId, error) -> {
+                    errorSeqIds.add(seqId);
+                    errors.add(error);
+                    return true;
+                });
+
+        assertEquals(2, read);
+        assertEquals(2, rows.size());
+        assertEquals("a.md", rows.get(0).getString(1));
+        assertEquals("z.txt", rows.get(1).getString(1));
+        assertEquals(Arrays.asList(2L), errorSeqIds);
+        assertTrue(
+                errors.get(0).getMessage().startsWith("Document source read failed at locked.pdf: "),
+                "Unexpected error message: " + errors.get(0).getMessage());
+        source.close();
+    }
+
+    @Test
     void pdfWithoutTextYieldsRowWithBlankContent() throws Exception {
         Path docs = tempDir.resolve("docs");
         Files.createDirectories(docs);
@@ -463,6 +499,22 @@ class DocumentSourceTest {
                     }
                 }
             }
+            document.save(path.toFile());
+        }
+    }
+
+    static void writeEncryptedPdf(Path path, String pageText) throws IOException {
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
+                contentStream.beginText();
+                contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                contentStream.newLineAtOffset(72, 720);
+                contentStream.showText(pageText);
+                contentStream.endText();
+            }
+            document.protect(new StandardProtectionPolicy("owner", "user", new AccessPermission()));
             document.save(path.toFile());
         }
     }
