@@ -24,7 +24,7 @@ public final class FileSystems {
             return new LocalFileSystem();
         }
         if ("hdfs".equals(scheme)) {
-            throw new PipelineExecutionException("storage scheme hdfs:// is not yet supported");
+            throw new PipelineExecutionException("source.path storage scheme hdfs:// is not yet supported");
         }
         throw new PipelineExecutionException("source.path storage scheme " + scheme + ":// is not supported");
     }

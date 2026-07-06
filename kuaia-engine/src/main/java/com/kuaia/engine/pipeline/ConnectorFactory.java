@@ -75,6 +75,12 @@ public class ConnectorFactory {
             throw new PipelineExecutionException(
                     "source.type document-directory has been replaced by source.type: file with format: document");
         }
+        if ("s3".equals(sourceType)) {
+            // Persisted pre-upgrade tasks replayed by a coordinator bypass the YAML loader; keep
+            // this literal in sync with the migration error in PipelineConfigLoader.
+            throw new PipelineExecutionException(
+                    "source.type s3 has been replaced by source.type: file with an s3:// path");
+        }
         throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
     }
 

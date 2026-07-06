@@ -204,7 +204,10 @@ source:
 ```
 
 The middle document column is now `path` (was `key`), so update sink
-`payloadFields` from `[id, key, content]` to `[id, path, content]`. The
+`payloadFields` from `[id, key, content]` to `[id, path, content]`, and note
+the `path` value is the object key relative to the prefix (e.g. `a.pdf`),
+matching local documents, not the full key (`docs/a.pdf`) the old `key` column
+held. The
 `bucket` and `prefix` keys are rejected; the trailing slash on
 `s3://kuaia-docs/docs/` marks it as a prefix (corpus) rather than a single
 object.

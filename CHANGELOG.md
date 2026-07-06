@@ -50,7 +50,9 @@ All notable public changes to Kuaia are tracked here.
   Fold the old `bucket` and `prefix` into the `s3://` URI, keep `endpoint`,
   `region`, and the credential fields as siblings of `path`, and rename the
   middle document column from `key` to `path` in sink `payloadFields`
-  (`[id, key, content]` becomes `[id, path, content]`):
+  (`[id, key, content]` becomes `[id, path, content]`) — and note the `path`
+  value is now the object key **relative to the prefix** (e.g. `a.pdf`), not
+  the full key (`docs/a.pdf`) the old `key` column held:
 
   ```yaml
   # before
