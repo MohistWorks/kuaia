@@ -120,6 +120,11 @@ pipeline that still uses it fails with `source.type document-directory has
 been replaced by source.type: file with format: document`. Change the source
 to `type: file` with `format: document` and keep the same `path`.
 
+Checkpoint state is keyed by the pipeline `name`. When migrating a
+checkpointed pipeline, start with a fresh `checkpoint.stateDir` or a new
+`name`; resuming against the old state can no-op, silently skip `.pdf` files
+newly included by `documentType: auto`, or duplicate the tail document.
+
 ### s3
 
 ```yaml
@@ -1178,10 +1183,12 @@ Common examples:
 - `DuckDB source read failed: <message>`
 - `Invalid DuckDB row seq=<seq>: field <field> is null`
 - `Document path not found: <path>`
-- `Document file is not a supported document: <path>`
+- `Document file is not a supported document: <path>` — with a
+  ` (documentType: <type>)` suffix when `documentType` is not `auto`
 - `Document source path is not a directory: <path>`
 - `Document directory scan failed: <path>: <message>`
-- `Document directory has no supported documents: <path>`
+- `Document directory has no supported documents: <path>` — with a
+  ` (documentType: <type>)` suffix when `documentType` is not `auto`
 - `Document source read failed at <path>: <message>`
 - `Embedding request failed with status <code>: <response>`
 - `Embedding response did not contain an embedding vector`

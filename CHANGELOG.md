@@ -36,6 +36,11 @@ All notable public changes to Kuaia are tracked here.
     format: document
   ```
 
+  Checkpoint state is keyed by the pipeline `name`: when migrating, start with
+  a fresh `checkpoint.stateDir` or a new `name`, otherwise resuming against
+  the old state can no-op, skip newly included `.pdf` files, or duplicate the
+  tail document.
+
 - The document-directory-to-Qdrant example is now
   `examples/documents-to-qdrant.yaml`, upserts into Qdrant collection
   `kuaia_documents`, and reads a PDF alongside the text documents; the

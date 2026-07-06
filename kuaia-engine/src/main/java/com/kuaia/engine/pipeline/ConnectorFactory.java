@@ -66,6 +66,12 @@ public class ConnectorFactory {
         if ("s3".equals(sourceType)) {
             return new LocalSourceAdapter(new S3ObjectSource(config.getSource()), "s3-0");
         }
+        if ("document-directory".equals(sourceType)) {
+            // Persisted pre-upgrade tasks replayed by a coordinator bypass the YAML loader; keep
+            // this literal in sync with the migration error in PipelineConfigLoader.
+            throw new PipelineExecutionException(
+                    "source.type document-directory has been replaced by source.type: file with format: document");
+        }
         throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
     }
 
