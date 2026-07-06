@@ -373,8 +373,11 @@ functions when those files are available locally.
 ## S3-Compatible Object Storage To Qdrant
 
 Start an S3-compatible object store such as MinIO and Qdrant. The example
-expects a bucket named `kuaia-docs` with text-like objects under the `docs/`
-prefix.
+expects a bucket named `kuaia-docs` with documents under the `docs/` prefix. It
+uses `source.type: file` with the `s3://kuaia-docs/docs/` path and
+`format: document`, so it reads through the same document path as a local
+directory, including any PDF objects, with the endpoint, region, and credential
+fields as siblings of `path`.
 
 Create the example Qdrant collection:
 
@@ -392,12 +395,13 @@ export KUAIA_S3_SECRET_KEY=...
 bin/kuaia run -f examples/s3-docs-to-qdrant.yaml
 ```
 
-The example reads `.txt`, `.md`, `.markdown`, `.jsonl`, and `.csv` objects from
-`s3://kuaia-docs/docs/`, creates deterministic mock embeddings from `content`,
-and upserts points into Qdrant collection `kuaia_s3_docs` with
-`payloadFields: [id, key, content]`. It is not part of default smoke because it
-requires object storage and Qdrant services. For an automated local proof, run
-`make e2e CASE=s3-qdrant`; the e2e case starts MinIO and Qdrant with Docker.
+The example reads `.txt`, `.md`, `.markdown`, and `.pdf` documents from
+`s3://kuaia-docs/docs/` (a prefix path, so the trailing slash is required),
+creates deterministic mock embeddings from `content`, and upserts points into
+Qdrant collection `kuaia_s3_docs` with `payloadFields: [id, path, content]`. It
+is not part of default smoke because it requires object storage and Qdrant
+services. For an automated local proof, run `make e2e CASE=s3-qdrant`; the e2e
+case starts MinIO and Qdrant with Docker.
 
 ## Postgres To Qdrant
 

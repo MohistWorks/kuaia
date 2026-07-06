@@ -121,9 +121,9 @@ Distributed execution engine (shipped):
 
 The intended AI connector coverage is:
 
-- batch sources: file (CSV, JSONL, and document format with `.txt`, `.md`,
-  `.markdown`, and `.pdf` inputs), Postgres, MySQL, DuckDB, and S3-compatible
-  object storage,
+- batch sources: file over local, `s3://`, and planned `hdfs://` paths (CSV,
+  JSONL, and document format with `.txt`, `.md`, `.markdown`, and `.pdf`
+  inputs), Postgres, MySQL, and DuckDB,
 - embedding providers: mock and OpenAI-compatible, with local-provider support
   such as Ollama evaluated after fake-server e2e coverage is stable,
 - vector sinks: Qdrant, pgvector, and Milvus,

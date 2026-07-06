@@ -20,8 +20,8 @@ Kuaia is useful when you want to:
 - split JSONL document text into embed-ready chunks,
 - ingest local `.txt`, `.md`, `.markdown`, and `.pdf` document directories
   while preserving relative paths,
-- ingest text-like objects from S3-compatible storage such as MinIO while
-  preserving object keys,
+- ingest documents and tables from S3-compatible storage such as MinIO through
+  the `file` source's `s3://` paths, preserving relative object paths,
 - import small FAQ JSONL datasets while preserving question and answer fields,
 - generate mock or OpenAI-compatible embeddings,
 - write to console, local CSV or JSONL files, mock vector output, Qdrant, or
@@ -332,9 +332,10 @@ export KUAIA_S3_SECRET_KEY=...
 bin/kuaia run -f examples/s3-docs-to-qdrant.yaml
 ```
 
-The example expects a bucket named `kuaia-docs` with text-like objects under
-the `docs/` prefix, plus a running Qdrant collection named `kuaia_s3_docs`.
-For an automated local proof with MinIO and Qdrant, run
+The pipeline uses `source.type: file` with the `s3://kuaia-docs/docs/` path and
+`format: document`. The example expects a bucket named `kuaia-docs` with
+documents under the `docs/` prefix, plus a running Qdrant collection named
+`kuaia_s3_docs`. For an automated local proof with MinIO and Qdrant, run
 `make e2e CASE=s3-qdrant`.
 
 MySQL-to-Qdrant example:
@@ -356,7 +357,7 @@ service requirements.
 
 | Area | Current support |
 | --- | --- |
-| Sources | `file` CSV, JSONL, and `document` format (`.txt`, `.md`, `.markdown`, `.pdf`), `s3`, batch `duckdb`, `postgres`, and `mysql` queries |
+| Sources | `file` CSV, JSONL, and `document` format (`.txt`, `.md`, `.markdown`, `.pdf`) over local or `s3://` paths, batch `duckdb`, `postgres`, and `mysql` queries |
 | Transforms | `select`, `rename`, `trim`, `lowercase`, `replace`, `filter` (`not-empty`, `min-length`, `contains`, `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`, `greater-than-or-equal`, `less-than`, `less-than-or-equal`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
 | Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant`, `pgvector`, `milvus` |
 | Runtime | Linear batch pipeline, preflight validation, checkpoint resume, bad-record skip mode |

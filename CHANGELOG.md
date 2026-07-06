@@ -41,6 +41,34 @@ All notable public changes to Kuaia are tracked here.
   the old state can no-op, skip newly included `.pdf` files, or duplicate the
   tail document.
 
+- Breaking: the standalone `source.type: s3` source has been removed.
+  S3-compatible object storage is now read through `source.type: file` with an
+  `s3://` path, so it uses the same `FileSource`/`DocumentSource` code as local
+  files and gains csv/jsonl table parsing and document (including PDF)
+  extraction. Pipelines that still use the old type fail to load with
+  `source.type s3 has been replaced by source.type: file with an s3:// path`.
+  Fold the old `bucket` and `prefix` into the `s3://` URI, keep `endpoint`,
+  `region`, and the credential fields as siblings of `path`, and rename the
+  middle document column from `key` to `path` in sink `payloadFields`
+  (`[id, key, content]` becomes `[id, path, content]`):
+
+  ```yaml
+  # before
+  source:
+    type: s3
+    bucket: kuaia-docs
+    prefix: docs/
+
+  # after
+  source:
+    type: file
+    path: s3://kuaia-docs/docs/
+    format: document
+  ```
+
+  Reads now route through a new `KuaiaFileSystem` storage abstraction: bare
+  paths and `file://` use the local filesystem, `s3://` uses S3, and `hdfs://`
+  is a reserved slot for a future backend.
 - The document-directory-to-Qdrant example is now
   `examples/documents-to-qdrant.yaml`, upserts into Qdrant collection
   `kuaia_documents`, and reads a PDF alongside the text documents; the
