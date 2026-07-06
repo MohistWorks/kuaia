@@ -3,7 +3,6 @@ package com.kuaia.engine.worker.connector;
 import com.kuaia.common.type.DataType;
 import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.pipeline.PipelineConfig;
-import com.kuaia.engine.pipeline.PipelineExecutionException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -124,7 +123,14 @@ class BuiltInSourceContractTest {
                 // yields its text with exactly one trailing "\n" on every platform.
                 new SourceCase("document-pdf", () -> new DocumentSource(pdfDocs, "auto"),
                         Arrays.asList("Alpha\n", "Beta\n")),
-                new SourceCase("s3", () -> new S3ObjectSource("kuaia-docs", "docs/", fakeObjectStore())),
+                // s3:// path flows through the shared DocumentSource over an in-memory filesystem,
+                // proving the same-string-space list contract drives relativization + reads.
+                new SourceCase("s3", () -> new DocumentSource(
+                        new InMemoryFileSystem()
+                                .put("s3://kuaia-docs/docs/a.md", "Alpha")
+                                .put("s3://kuaia-docs/docs/b.txt", "Beta"),
+                        "s3://kuaia-docs/docs/",
+                        "auto")),
                 new SourceCase("duckdb", () -> new DuckDBSource(duckDbConfig())),
                 new SourceCase("postgres", () -> new PostgresSource(
                         jdbcConfig("postgres", "jdbc:kuaia-contract-postgres:documents"),
@@ -163,36 +169,6 @@ class BuiltInSourceContractTest {
             env.put(keyValues[i], keyValues[i + 1]);
         }
         return env;
-    }
-
-    private S3ObjectStore fakeObjectStore() {
-        return new S3ObjectStore() {
-            private final List<S3ObjectMetadata> objects = Arrays.asList(
-                    new S3ObjectMetadata("docs/b.txt", 4L),
-                    new S3ObjectMetadata("docs/a.md", 5L));
-
-            @Override
-            public List<S3ObjectMetadata> listObjects(String bucket, String prefix) {
-                assertEquals("kuaia-docs", bucket);
-                assertEquals("docs/", prefix);
-                return objects;
-            }
-
-            @Override
-            public String readUtf8Object(String bucket, String key) throws PipelineExecutionException {
-                assertEquals("kuaia-docs", bucket);
-                if ("docs/a.md".equals(key)) {
-                    return "Alpha";
-                }
-                if ("docs/b.txt".equals(key)) {
-                    return "Beta";
-                }
-                throw new PipelineExecutionException("Unexpected fake S3 object: " + key);
-            }
-
-            @Override
-            public void close() {}
-        };
     }
 
     private interface SourceFactory {

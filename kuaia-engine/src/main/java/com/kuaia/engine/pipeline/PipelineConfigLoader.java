@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -75,7 +76,11 @@ public class PipelineConfigLoader {
             throw new PipelineConfigException(
                     "source.type document-directory has been replaced by source.type: file with format: document");
         }
-        requireSupported("source.type", sourceType, "file", "postgres", "mysql", "duckdb", "s3");
+        if ("s3".equals(sourceType)) {
+            throw new PipelineConfigException(
+                    "source.type s3 has been replaced by source.type: file with an s3:// path");
+        }
+        requireSupported("source.type", sourceType, "file", "postgres", "mysql", "duckdb");
         requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant", "pgvector", "milvus");
 
         PipelineConfig.SourceConfig sourceConfig = loadSource(configPath, sourceType, source);
@@ -214,29 +219,6 @@ public class PipelineConfigLoader {
                     parseSourceFetchSize(source.get("fetchSize")));
         }
 
-        if ("s3".equals(sourceType)) {
-            rejectIfPresent(source, "path", "source.path is only supported for local source types");
-            rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
-            rejectIfPresent(source, "url", "source.url is only supported for JDBC source types");
-            rejectIfPresent(source, "userEnv", "source.userEnv is only supported for JDBC source types");
-            rejectIfPresent(source, "passwordEnv", "source.passwordEnv is only supported for JDBC source types");
-            rejectIfPresent(source, "query", "source.query is only supported for JDBC source types");
-            rejectIfPresent(source, "documentType", DOCUMENT_TYPE_UNSUPPORTED_MESSAGE);
-            if (hasText(source.get("fetchSize"))) {
-                throw new PipelineConfigException("source.fetchSize is only supported for JDBC source types");
-            }
-            rejectIfPresent(source, "maxRowsPerSplit", MAX_ROWS_PER_SPLIT_UNSUPPORTED_MESSAGE);
-            return new PipelineConfig.SourceConfig(
-                    sourceType,
-                    require(source, "source.endpoint"),
-                    require(source, "source.region"),
-                    require(source, "source.bucket"),
-                    source.getOrDefault("prefix", ""),
-                    require(source, "source.accessKeyEnv"),
-                    require(source, "source.secretKeyEnv"),
-                    parseBoolean(source.get("pathStyleAccess"), "source.pathStyleAccess", true));
-        }
-
         if (isCredentialJdbcSource(sourceType)) {
             rejectIfPresent(source, "path", "source.path is only supported for local source types");
             rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
@@ -263,7 +245,24 @@ public class PipelineConfigLoader {
         if (hasText(source.get("fetchSize"))) {
             throw new PipelineConfigException("source.fetchSize is only supported for JDBC source types");
         }
-        String sourcePath = resolveLocalPath(configPath, require(source, "source.path"), "source.path");
+        String rawPath = require(source, "source.path");
+        String scheme = parsePathScheme(rawPath);
+        if ("s3".equals(scheme)) {
+            return loadS3FileSource(source, rawPath);
+        }
+        if (scheme != null && !"file".equals(scheme)) {
+            if ("hdfs".equals(scheme)) {
+                throw new PipelineConfigException("source.path storage scheme hdfs:// is not yet supported");
+            }
+            throw new PipelineConfigException("source.path storage scheme " + scheme + ":// is not supported");
+        }
+        // Local file source (file:// URI or a bare path). Stray s3-only fields are a config error here.
+        rejectIfPresent(source, "endpoint", "source.endpoint is only supported for s3:// paths");
+        rejectIfPresent(source, "region", "source.region is only supported for s3:// paths");
+        rejectIfPresent(source, "accessKeyEnv", "source.accessKeyEnv is only supported for s3:// paths");
+        rejectIfPresent(source, "secretKeyEnv", "source.secretKeyEnv is only supported for s3:// paths");
+        rejectIfPresent(source, "pathStyleAccess", "source.pathStyleAccess is only supported for s3:// paths");
+        String sourcePath = resolveLocalPath(configPath, rawPath, "source.path");
         String sourceFormat = require(source, "source.format");
         requireSupported("source.format", sourceFormat, "csv", "jsonl", "document");
         if ("document".equals(sourceFormat)) {
@@ -281,6 +280,58 @@ public class PipelineConfigLoader {
                 sourcePath,
                 sourceFormat,
                 parseSourceMaxRowsPerSplit(source.get("maxRowsPerSplit")));
+    }
+
+    /**
+     * File source over a remote {@code s3://} path. The URI is kept verbatim (never resolved as a
+     * local path); {@code S3FileSystem} parses bucket/key from it. csv/jsonl gain object parsing and
+     * {@code document} gains PDF/text extraction through the shared source paths.
+     */
+    private PipelineConfig.SourceConfig loadS3FileSource(Map<String, String> source, String path)
+            throws PipelineConfigException {
+        String sourceFormat = require(source, "source.format");
+        requireSupported("source.format", sourceFormat, "csv", "jsonl", "document");
+        // bucket/prefix are parsed from the s3:// path, so the legacy source.type: s3 keys are dead
+        // here; reject them so a stale bucket/prefix can't silently disagree with the URI.
+        rejectIfPresent(source, "bucket",
+                "source.bucket is not supported for source.type: file; put the bucket in the s3:// path");
+        rejectIfPresent(source, "prefix",
+                "source.prefix is not supported for source.type: file; put the prefix in the s3:// path");
+        String endpoint = require(source, "source.endpoint");
+        String region = require(source, "source.region");
+        String accessKeyEnv = require(source, "source.accessKeyEnv");
+        String secretKeyEnv = require(source, "source.secretKeyEnv");
+        boolean pathStyleAccess = parseBoolean(source.get("pathStyleAccess"), "source.pathStyleAccess", true);
+        String documentType = null;
+        int maxRowsPerSplit = 0;
+        if ("document".equals(sourceFormat)) {
+            rejectIfPresent(source, "maxRowsPerSplit", MAX_ROWS_PER_SPLIT_UNSUPPORTED_MESSAGE);
+            documentType = source.get("documentType");
+            if (!hasText(documentType)) {
+                documentType = "auto";
+            }
+            requireSupported("source.documentType", documentType, "auto", "text", "markdown", "pdf");
+        } else {
+            rejectIfPresent(source, "documentType", DOCUMENT_TYPE_UNSUPPORTED_MESSAGE);
+            // csv/jsonl honor maxRowsPerSplit exactly like local: FileSource buffers the whole object
+            // at open(), so getRecordCount/readRange multi-split over the S3-fetched bytes.
+            maxRowsPerSplit = parseSourceMaxRowsPerSplit(source.get("maxRowsPerSplit"));
+        }
+        return new PipelineConfig.SourceConfig(
+                "file", path, sourceFormat, documentType, maxRowsPerSplit,
+                endpoint, region, accessKeyEnv, secretKeyEnv, pathStyleAccess);
+    }
+
+    /** @return the lowercased URI scheme of {@code path} (e.g. {@code "s3"}), or {@code null} if none. */
+    private String parsePathScheme(String path) {
+        if (path == null) {
+            return null;
+        }
+        int idx = path.indexOf("://");
+        if (idx <= 0) {
+            return null;
+        }
+        return path.substring(0, idx).toLowerCase(Locale.ROOT);
     }
 
     private boolean isCredentialJdbcSource(String sourceType) {

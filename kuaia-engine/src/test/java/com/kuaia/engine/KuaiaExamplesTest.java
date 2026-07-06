@@ -106,13 +106,11 @@ class KuaiaExamplesTest {
         Path chunkToQdrantPath = repoRoot().resolve("examples/local-jsonl-chunk-to-qdrant.yaml");
         Path postgresToQdrantPath = repoRoot().resolve("examples/postgres-to-qdrant.yaml");
         Path mysqlToQdrantPath = repoRoot().resolve("examples/mysql-to-qdrant.yaml");
-        Path s3ToQdrantPath = repoRoot().resolve("examples/s3-docs-to-qdrant.yaml");
         Path fileToMilvusPath = repoRoot().resolve("examples/local-file-to-milvus.yaml");
         PipelineConfig fileToQdrant = new PipelineConfigLoader().load(fileToQdrantPath);
         PipelineConfig chunkToQdrant = new PipelineConfigLoader().load(chunkToQdrantPath);
         PipelineConfig postgresToQdrant = new PipelineConfigLoader().load(postgresToQdrantPath);
         PipelineConfig mysqlToQdrant = new PipelineConfigLoader().load(mysqlToQdrantPath);
-        PipelineConfig s3ToQdrant = new PipelineConfigLoader().load(s3ToQdrantPath);
         PipelineConfig fileToMilvus = new PipelineConfigLoader().load(fileToMilvusPath);
 
         assertTrue(read(fileToQdrantPath).contains("timeoutMs: 30000"));
@@ -148,7 +146,6 @@ class KuaiaExamplesTest {
         assertTrue(read(postgresToQdrantPath).contains("timeoutMs: 30000"));
         assertTrue(read(mysqlToQdrantPath).contains("fetchSize: 1000"));
         assertTrue(read(mysqlToQdrantPath).contains("timeoutMs: 30000"));
-        assertTrue(read(s3ToQdrantPath).contains("pathStyleAccess: true"));
         assertTrue(read(fileToMilvusPath).contains("apiKeyEnv: KUAIA_MILVUS_TOKEN"));
         assertEquals(30000, fileToQdrant.getSink().getTimeoutMs());
         assertEquals(Arrays.asList("id", "content"), fileToQdrant.getSink().getPayloadFields());
@@ -160,10 +157,6 @@ class KuaiaExamplesTest {
         assertEquals(1000, postgresToQdrant.getSource().getFetchSize());
         assertEquals(30000, postgresToQdrant.getSink().getTimeoutMs());
         assertEquals(Arrays.asList("id", "content"), postgresToQdrant.getSink().getPayloadFields());
-        assertEquals("s3", s3ToQdrant.getSource().getType());
-        assertEquals("kuaia-docs", s3ToQdrant.getSource().getBucket());
-        assertEquals("docs/", s3ToQdrant.getSource().getPrefix());
-        assertEquals(Arrays.asList("id", "key", "content"), s3ToQdrant.getSink().getPayloadFields());
         assertEquals("mysql", mysqlToQdrant.getSource().getType());
         assertEquals(1000, mysqlToQdrant.getSource().getFetchSize());
         assertEquals(30000, mysqlToQdrant.getSink().getTimeoutMs());

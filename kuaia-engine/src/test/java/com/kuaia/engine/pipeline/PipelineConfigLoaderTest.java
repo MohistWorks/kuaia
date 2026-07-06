@@ -125,16 +125,17 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
-    void loadsS3SourceConfig() throws Exception {
-        Path configPath = tempDir.resolve("s3-source.yaml");
+    void loadsS3DocumentSourceConfig() throws Exception {
+        Path configPath = tempDir.resolve("s3-document-source.yaml");
         Files.write(configPath, String.join("\n",
-                "name: s3-source",
+                "name: s3-document-source",
                 "source:",
-                "  type: s3",
+                "  type: file",
+                "  path: s3://kuaia-docs/docs/",
+                "  format: document",
+                "  documentType: auto",
                 "  endpoint: http://127.0.0.1:9000",
                 "  region: us-east-1",
-                "  bucket: kuaia-docs",
-                "  prefix: docs/",
                 "  accessKeyEnv: KUAIA_S3_ACCESS_KEY",
                 "  secretKeyEnv: KUAIA_S3_SECRET_KEY",
                 "  pathStyleAccess: true",
@@ -143,14 +144,263 @@ class PipelineConfigLoaderTest {
 
         PipelineConfig config = new PipelineConfigLoader().load(configPath);
 
-        assertEquals("s3", config.getSource().getType());
+        assertEquals("file", config.getSource().getType());
+        // s3:// paths are kept verbatim (never resolved as a local path).
+        assertEquals("s3://kuaia-docs/docs/", config.getSource().getPath());
+        assertEquals("document", config.getSource().getFormat());
+        assertEquals("auto", config.getSource().getDocumentType());
         assertEquals("http://127.0.0.1:9000", config.getSource().getEndpoint());
         assertEquals("us-east-1", config.getSource().getRegion());
-        assertEquals("kuaia-docs", config.getSource().getBucket());
-        assertEquals("docs/", config.getSource().getPrefix());
         assertEquals("KUAIA_S3_ACCESS_KEY", config.getSource().getAccessKeyEnv());
         assertEquals("KUAIA_S3_SECRET_KEY", config.getSource().getSecretKeyEnv());
         assertEquals(true, config.getSource().isPathStyleAccess());
+        // bucket/prefix are parsed from the path by S3FileSystem, not carried on the config.
+        assertEquals(null, config.getSource().getBucket());
+        assertEquals(null, config.getSource().getPrefix());
+    }
+
+    @Test
+    void loadsS3CsvSourceConfig() throws Exception {
+        Path configPath = tempDir.resolve("s3-csv-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: s3-csv-source",
+                "source:",
+                "  type: file",
+                "  path: s3://kuaia-docs/data/table.csv",
+                "  format: csv",
+                "  endpoint: http://127.0.0.1:9000",
+                "  region: us-east-1",
+                "  accessKeyEnv: KUAIA_S3_ACCESS_KEY",
+                "  secretKeyEnv: KUAIA_S3_SECRET_KEY",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        assertEquals("file", config.getSource().getType());
+        assertEquals("s3://kuaia-docs/data/table.csv", config.getSource().getPath());
+        assertEquals("csv", config.getSource().getFormat());
+        assertEquals(null, config.getSource().getDocumentType());
+        // pathStyleAccess defaults to true when omitted.
+        assertEquals(true, config.getSource().isPathStyleAccess());
+    }
+
+    @Test
+    void loadsS3CsvSourceMaxRowsPerSplit() throws Exception {
+        Path configPath = tempDir.resolve("s3-csv-source-split.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: s3-csv-source-split",
+                "source:",
+                "  type: file",
+                "  path: s3://kuaia-docs/data/table.csv",
+                "  format: csv",
+                "  maxRowsPerSplit: 3",
+                "  endpoint: http://127.0.0.1:9000",
+                "  region: us-east-1",
+                "  accessKeyEnv: KUAIA_S3_ACCESS_KEY",
+                "  secretKeyEnv: KUAIA_S3_SECRET_KEY",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+        // s3 csv carries maxRowsPerSplit exactly like local csv (no longer silently dropped).
+        assertEquals(3, config.getSource().getMaxRowsPerSplit());
+    }
+
+    @Test
+    void rejectsS3DocumentSourceMaxRowsPerSplit() throws Exception {
+        Path configPath = tempDir.resolve("s3-document-source-split.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: s3-document-source-split",
+                "source:",
+                "  type: file",
+                "  path: s3://kuaia-docs/docs/",
+                "  format: document",
+                "  maxRowsPerSplit: 3",
+                "  endpoint: http://127.0.0.1:9000",
+                "  region: us-east-1",
+                "  accessKeyEnv: KUAIA_S3_ACCESS_KEY",
+                "  secretKeyEnv: KUAIA_S3_SECRET_KEY",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.maxRowsPerSplit is only supported for file formats csv and jsonl", error.getMessage());
+    }
+
+    @Test
+    void rejectsStrayBucketOnS3Path() throws Exception {
+        Path configPath = tempDir.resolve("s3-with-bucket.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: s3-with-bucket",
+                "source:",
+                "  type: file",
+                "  path: s3://kuaia-docs/data/table.csv",
+                "  format: csv",
+                "  bucket: kuaia-docs",
+                "  endpoint: http://127.0.0.1:9000",
+                "  region: us-east-1",
+                "  accessKeyEnv: KUAIA_S3_ACCESS_KEY",
+                "  secretKeyEnv: KUAIA_S3_SECRET_KEY",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals(
+                "source.bucket is not supported for source.type: file; put the bucket in the s3:// path",
+                error.getMessage());
+    }
+
+    @Test
+    void rejectsStrayPrefixOnS3Path() throws Exception {
+        Path configPath = tempDir.resolve("s3-with-prefix.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: s3-with-prefix",
+                "source:",
+                "  type: file",
+                "  path: s3://kuaia-docs/docs/",
+                "  format: document",
+                "  prefix: docs/",
+                "  endpoint: http://127.0.0.1:9000",
+                "  region: us-east-1",
+                "  accessKeyEnv: KUAIA_S3_ACCESS_KEY",
+                "  secretKeyEnv: KUAIA_S3_SECRET_KEY",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals(
+                "source.prefix is not supported for source.type: file; put the prefix in the s3:// path",
+                error.getMessage());
+    }
+
+    @Test
+    void rejectsS3FileSourceMissingRequiredFields() throws Exception {
+        String[] requiredFields = {"endpoint", "region", "accessKeyEnv", "secretKeyEnv"};
+        for (String omitted : requiredFields) {
+            Path configPath = tempDir.resolve("s3-missing-" + omitted + ".yaml");
+            java.util.List<String> lines = new java.util.ArrayList<>(java.util.Arrays.asList(
+                    "name: s3-missing-" + omitted,
+                    "source:",
+                    "  type: file",
+                    "  path: s3://kuaia-docs/docs/",
+                    "  format: document"));
+            if (!"endpoint".equals(omitted)) {
+                lines.add("  endpoint: http://127.0.0.1:9000");
+            }
+            if (!"region".equals(omitted)) {
+                lines.add("  region: us-east-1");
+            }
+            if (!"accessKeyEnv".equals(omitted)) {
+                lines.add("  accessKeyEnv: KUAIA_S3_ACCESS_KEY");
+            }
+            if (!"secretKeyEnv".equals(omitted)) {
+                lines.add("  secretKeyEnv: KUAIA_S3_SECRET_KEY");
+            }
+            lines.add("sink:");
+            lines.add("  type: console");
+            Files.write(configPath, String.join("\n", lines).getBytes(StandardCharsets.UTF_8));
+
+            PipelineConfigException error = assertThrows(
+                    PipelineConfigException.class,
+                    () -> new PipelineConfigLoader().load(configPath),
+                    omitted);
+
+            assertEquals("Missing required field: source." + omitted, error.getMessage(), omitted);
+        }
+    }
+
+    @Test
+    void rejectsLegacyS3SourceTypeWithMigrationHint() throws Exception {
+        Path configPath = tempDir.resolve("legacy-s3-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: legacy-s3-source",
+                "source:",
+                "  type: s3",
+                "  endpoint: http://127.0.0.1:9000",
+                "  region: us-east-1",
+                "  bucket: kuaia-docs",
+                "  prefix: docs/",
+                "  accessKeyEnv: KUAIA_S3_ACCESS_KEY",
+                "  secretKeyEnv: KUAIA_S3_SECRET_KEY",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals(
+                "source.type s3 has been replaced by source.type: file with an s3:// path",
+                error.getMessage());
+    }
+
+    @Test
+    void rejectsHdfsPathAsNotYetSupported() throws Exception {
+        Path configPath = tempDir.resolve("hdfs-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: hdfs-source",
+                "source:",
+                "  type: file",
+                "  path: hdfs://namenode:8020/docs/",
+                "  format: document",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.path storage scheme hdfs:// is not yet supported", error.getMessage());
+    }
+
+    @Test
+    void rejectsUnknownPathSchemeAsUnsupported() throws Exception {
+        Path configPath = tempDir.resolve("ftp-source.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: ftp-source",
+                "source:",
+                "  type: file",
+                "  path: ftp://host/docs/",
+                "  format: document",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.path storage scheme ftp:// is not supported", error.getMessage());
+    }
+
+    @Test
+    void rejectsStrayS3FieldOnLocalPath() throws Exception {
+        Path configPath = tempDir.resolve("local-with-s3-field.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: local-with-s3-field",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "  endpoint: http://127.0.0.1:9000",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.endpoint is only supported for s3:// paths", error.getMessage());
     }
 
     @Test
@@ -1960,7 +2210,7 @@ class PipelineConfigLoaderTest {
 
     @Test
     void rejectsDocumentTypeForNonFileSourceTypes() throws Exception {
-        for (String sourceType : new String[]{"duckdb", "postgres", "s3"}) {
+        for (String sourceType : new String[]{"duckdb", "postgres"}) {
             Path configPath = tempDir.resolve(sourceType + "-document-type.yaml");
             Files.write(configPath, String.join("\n",
                     "name: " + sourceType + "-document-type",

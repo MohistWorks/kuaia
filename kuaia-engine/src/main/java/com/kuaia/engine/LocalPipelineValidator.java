@@ -28,7 +28,7 @@ public class LocalPipelineValidator {
     }
 
     public void validate(PipelineConfig config, PrintStream out) throws Exception {
-        if (isDeferredSource(config.getSource().getType())) {
+        if (isDeferredSource(config.getSource())) {
             printDeferredReport(config, out);
             return;
         }
@@ -57,11 +57,26 @@ public class LocalPipelineValidator {
         out.println("Transform and sink row-type checks deferred for source.type: " + config.getSource().getType());
     }
 
-    private boolean isDeferredSource(String sourceType) {
-        return "postgres".equals(sourceType)
-                || "mysql".equals(sourceType)
-                || "duckdb".equals(sourceType)
-                || "s3".equals(sourceType);
+    private boolean isDeferredSource(PipelineConfig.SourceConfig source) {
+        String sourceType = source.getType();
+        if ("postgres".equals(sourceType) || "mysql".equals(sourceType) || "duckdb".equals(sourceType)) {
+            return true;
+        }
+        // A file source over a remote scheme (e.g. s3://) is opened at run time, not at validate:
+        // defer the row-type/transform/sink checks so validate stays offline. Local file:// and bare
+        // paths are still opened here.
+        return "file".equals(sourceType) && isRemotePath(source.getPath());
+    }
+
+    private boolean isRemotePath(String path) {
+        if (path == null) {
+            return false;
+        }
+        int idx = path.indexOf("://");
+        if (idx <= 0) {
+            return false;
+        }
+        return !"file".equalsIgnoreCase(path.substring(0, idx));
     }
 
     private KuaiaRowType loadSourceType(PipelineConfig config) throws Exception {

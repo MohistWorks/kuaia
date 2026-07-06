@@ -99,6 +99,45 @@ public class PipelineConfig implements Serializable {
                     null, null, null, null, null, null, false, documentType);
         }
 
+        /**
+         * File source over a remote {@code s3://} path: keeps the URI verbatim in {@code path}
+         * (bucket/key are parsed from it by {@code S3FileSystem}, so bucket/prefix stay {@code null})
+         * and carries the S3 client settings. {@code documentType} is {@code null} for csv/jsonl.
+         */
+        public SourceConfig(
+                String type,
+                String path,
+                String format,
+                String documentType,
+                String endpoint,
+                String region,
+                String accessKeyEnv,
+                String secretKeyEnv,
+                boolean pathStyleAccess) {
+            this(type, path, format, documentType, 0,
+                    endpoint, region, accessKeyEnv, secretKeyEnv, pathStyleAccess);
+        }
+
+        /**
+         * File source over a remote {@code s3://} path that also carries {@code maxRowsPerSplit} for
+         * csv/jsonl multi-splitting (0 for the {@code document} format). See the 9-arg overload for
+         * how the URI, S3 client settings, and {@code documentType} are handled.
+         */
+        public SourceConfig(
+                String type,
+                String path,
+                String format,
+                String documentType,
+                int maxRowsPerSplit,
+                String endpoint,
+                String region,
+                String accessKeyEnv,
+                String secretKeyEnv,
+                boolean pathStyleAccess) {
+            this(type, path, format, null, null, null, null, maxRowsPerSplit, 0,
+                    endpoint, region, null, null, accessKeyEnv, secretKeyEnv, pathStyleAccess, documentType);
+        }
+
         public SourceConfig(
                 String type,
                 String path,
