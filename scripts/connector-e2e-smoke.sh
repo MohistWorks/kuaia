@@ -793,11 +793,11 @@ EOF
 cat > "$S3_TO_QDRANT" <<EOF
 name: connector-e2e-s3-to-qdrant
 source:
-  type: s3
+  type: file
+  path: s3://kuaia-docs/docs/
+  format: document
   endpoint: $MINIO_ENDPOINT
   region: us-east-1
-  bucket: kuaia-docs
-  prefix: docs/
   accessKeyEnv: KUAIA_S3_ACCESS_KEY
   secretKeyEnv: KUAIA_S3_SECRET_KEY
   pathStyleAccess: true
@@ -813,7 +813,7 @@ sink:
   collection: kuaia_e2e_s3_docs
   idField: id
   vectorField: embedding
-  payloadFields: [id, key, content]
+  payloadFields: [id, path, content]
   wait: true
   timeoutMs: 30000
 checkpoint:
@@ -1005,9 +1005,6 @@ if case_selected duckdb-qdrant; then
   require_qdrant_count kuaia_e2e_duckdb_docs 2
 fi
 
-# The MinIO seed uploads all of examples/data/docs including handbook.pdf, but the
-# s3 source does not support .pdf objects yet and skips them, so this case still
-# reads and upserts 2 documents while the local documents case reads 3.
 if case_selected s3-qdrant; then
   KUAIA_S3_ACCESS_KEY=minioadmin \
   KUAIA_S3_SECRET_KEY=minioadmin \
@@ -1015,9 +1012,9 @@ if case_selected s3-qdrant; then
     connector-e2e-s3-to-qdrant \
     "$S3_TO_QDRANT" \
     "$WORK_DIR/summaries/s3-to-qdrant.json" \
-    2 \
-    2
-  require_qdrant_count kuaia_e2e_s3_docs 2
+    3 \
+    3
+  require_qdrant_count kuaia_e2e_s3_docs 3
 fi
 
 if case_selected postgres-qdrant; then
