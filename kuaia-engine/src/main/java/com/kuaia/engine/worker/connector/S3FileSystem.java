@@ -31,8 +31,8 @@ import java.util.Map;
  * strings are built and parsed by string concatenation/splitting only (never {@link URI} encoding),
  * so they round-trip through {@link #parse(String)} unchanged.
  *
- * <p>This class owns the AWS {@link S3Client} (moved here from the former {@code AwsSdkS3ObjectStore})
- * and stays in the engine module so the AWS SDK never leaks into {@code kuaia-connectors}.
+ * <p>This class owns the AWS {@link S3Client} and stays in the engine module so the AWS SDK never
+ * leaks into {@code kuaia-connectors}.
  */
 public class S3FileSystem implements KuaiaFileSystem {
     private static final String SCHEME = "s3://";

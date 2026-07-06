@@ -1,6 +1,9 @@
 package com.kuaia.engine.pipeline;
 
+import com.kuaia.engine.worker.connector.UriSchemes;
+
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,7 +13,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -246,7 +248,7 @@ public class PipelineConfigLoader {
             throw new PipelineConfigException("source.fetchSize is only supported for JDBC source types");
         }
         String rawPath = require(source, "source.path");
-        String scheme = parsePathScheme(rawPath);
+        String scheme = UriSchemes.schemeOf(rawPath);
         if ("s3".equals(scheme)) {
             return loadS3FileSource(source, rawPath);
         }
@@ -257,12 +259,17 @@ public class PipelineConfigLoader {
             throw new PipelineConfigException("source.path storage scheme " + scheme + ":// is not supported");
         }
         // Local file source (file:// URI or a bare path). Stray s3-only fields are a config error here.
+        rejectIfPresent(source, "bucket", "source.bucket is only supported for s3:// paths");
+        rejectIfPresent(source, "prefix", "source.prefix is only supported for s3:// paths");
         rejectIfPresent(source, "endpoint", "source.endpoint is only supported for s3:// paths");
         rejectIfPresent(source, "region", "source.region is only supported for s3:// paths");
         rejectIfPresent(source, "accessKeyEnv", "source.accessKeyEnv is only supported for s3:// paths");
         rejectIfPresent(source, "secretKeyEnv", "source.secretKeyEnv is only supported for s3:// paths");
         rejectIfPresent(source, "pathStyleAccess", "source.pathStyleAccess is only supported for s3:// paths");
-        String sourcePath = resolveLocalPath(configPath, rawPath, "source.path");
+        // A literal file:// URI must become a real local path before resolving/sandboxing; Paths.get
+        // on the raw URI string would mangle it (relative "file:/…"). Bare paths pass through as-is.
+        String localPath = "file".equals(scheme) ? Paths.get(URI.create(rawPath)).toString() : rawPath;
+        String sourcePath = resolveLocalPath(configPath, localPath, "source.path");
         String sourceFormat = require(source, "source.format");
         requireSupported("source.format", sourceFormat, "csv", "jsonl", "document");
         if ("document".equals(sourceFormat)) {
@@ -320,18 +327,6 @@ public class PipelineConfigLoader {
         return new PipelineConfig.SourceConfig(
                 "file", path, sourceFormat, documentType, maxRowsPerSplit,
                 endpoint, region, accessKeyEnv, secretKeyEnv, pathStyleAccess);
-    }
-
-    /** @return the lowercased URI scheme of {@code path} (e.g. {@code "s3"}), or {@code null} if none. */
-    private String parsePathScheme(String path) {
-        if (path == null) {
-            return null;
-        }
-        int idx = path.indexOf("://");
-        if (idx <= 0) {
-            return null;
-        }
-        return path.substring(0, idx).toLowerCase(Locale.ROOT);
     }
 
     private boolean isCredentialJdbcSource(String sourceType) {

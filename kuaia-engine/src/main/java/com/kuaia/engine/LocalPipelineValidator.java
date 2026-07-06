@@ -9,6 +9,7 @@ import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.DocumentSource;
 import com.kuaia.engine.worker.connector.FileSource;
 import com.kuaia.engine.worker.connector.LocalFileSystem;
+import com.kuaia.engine.worker.connector.UriSchemes;
 
 import java.io.PrintStream;
 
@@ -65,18 +66,7 @@ public class LocalPipelineValidator {
         // A file source over a remote scheme (e.g. s3://) is opened at run time, not at validate:
         // defer the row-type/transform/sink checks so validate stays offline. Local file:// and bare
         // paths are still opened here.
-        return "file".equals(sourceType) && isRemotePath(source.getPath());
-    }
-
-    private boolean isRemotePath(String path) {
-        if (path == null) {
-            return false;
-        }
-        int idx = path.indexOf("://");
-        if (idx <= 0) {
-            return false;
-        }
-        return !"file".equalsIgnoreCase(path.substring(0, idx));
+        return "file".equals(sourceType) && UriSchemes.isRemote(source.getPath());
     }
 
     private KuaiaRowType loadSourceType(PipelineConfig config) throws Exception {

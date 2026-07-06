@@ -404,6 +404,66 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
+    void rejectsStrayBucketOrPrefixOnLocalPath() throws Exception {
+        // bucket/prefix belong to s3:// paths; on a local path they'd be silently ignored, so reject
+        // them the same way the local branch already rejects the s3-client fields.
+        for (String field : new String[]{"bucket", "prefix"}) {
+            Path configPath = tempDir.resolve("local-with-" + field + ".yaml");
+            Files.write(configPath, String.join("\n",
+                    "name: local-with-" + field,
+                    "source:",
+                    "  type: file",
+                    "  path: data/documents.csv",
+                    "  format: csv",
+                    "  " + field + ": kuaia-docs",
+                    "sink:",
+                    "  type: console").getBytes(StandardCharsets.UTF_8));
+
+            PipelineConfigException error = assertThrows(
+                    PipelineConfigException.class,
+                    () -> new PipelineConfigLoader().load(configPath),
+                    field);
+
+            assertEquals("source." + field + " is only supported for s3:// paths", error.getMessage(), field);
+        }
+    }
+
+    @Test
+    void resolvesFileSchemePathToSameLocalPathAsBareEquivalent() throws Exception {
+        // A literal file:// URI must resolve/sandbox/open identically to the equivalent bare path.
+        Path dataFile = tempDir.resolve("in.csv");
+
+        Path bareConfig = tempDir.resolve("bare-path.yaml");
+        Files.write(bareConfig, String.join("\n",
+                "name: bare-path",
+                "source:",
+                "  type: file",
+                "  path: " + dataFile,
+                "  format: csv",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        Path fileUriConfig = tempDir.resolve("file-uri-path.yaml");
+        Files.write(fileUriConfig, String.join("\n",
+                "name: file-uri-path",
+                "source:",
+                "  type: file",
+                "  path: " + dataFile.toUri(),
+                "  format: csv",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        String bareResolved = new PipelineConfigLoader(false).load(bareConfig).getSource().getPath();
+        String fileUriResolved = new PipelineConfigLoader(false).load(fileUriConfig).getSource().getPath();
+
+        assertEquals(
+                bareResolved,
+                fileUriResolved,
+                "file:// path should resolve to the same local path as the bare equivalent");
+        assertEquals(dataFile.toString(), fileUriResolved);
+    }
+
+    @Test
     void rejectsInvalidFileSourceMaxRowsPerSplit() throws Exception {
         Path configPath = tempDir.resolve("invalid-file-source-split.yaml");
         Files.write(configPath, String.join("\n",

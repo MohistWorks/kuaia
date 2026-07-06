@@ -3,8 +3,6 @@ package com.kuaia.engine.worker.connector;
 import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 
-import java.util.Locale;
-
 /**
  * Selects the {@link KuaiaFileSystem} backend for a {@code file} source from its {@code path} scheme:
  * {@code s3://} -> {@link S3FileSystem}, {@code file://} or a bare path -> {@link LocalFileSystem},
@@ -18,7 +16,7 @@ public final class FileSystems {
     private FileSystems() {}
 
     public static KuaiaFileSystem forSource(PipelineConfig.SourceConfig config) throws PipelineExecutionException {
-        String scheme = scheme(config.getPath());
+        String scheme = UriSchemes.schemeOf(config.getPath());
         if ("s3".equals(scheme)) {
             return new S3FileSystem(config);
         }
@@ -29,17 +27,5 @@ public final class FileSystems {
             throw new PipelineExecutionException("storage scheme hdfs:// is not yet supported");
         }
         throw new PipelineExecutionException("source.path storage scheme " + scheme + ":// is not supported");
-    }
-
-    /** @return the lowercased URI scheme of {@code path} (e.g. {@code "s3"}), or {@code null} if none. */
-    static String scheme(String path) {
-        if (path == null) {
-            return null;
-        }
-        int idx = path.indexOf("://");
-        if (idx <= 0) {
-            return null;
-        }
-        return path.substring(0, idx).toLowerCase(Locale.ROOT);
     }
 }
