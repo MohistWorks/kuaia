@@ -7,6 +7,7 @@ import com.kuaia.engine.worker.connector.DocumentSource;
 import com.kuaia.engine.worker.connector.DuckDBSource;
 import com.kuaia.engine.worker.connector.FileSink;
 import com.kuaia.engine.worker.connector.FileSource;
+import com.kuaia.engine.worker.connector.LocalFileSystem;
 import com.kuaia.engine.worker.connector.MySQLSource;
 import com.kuaia.engine.worker.connector.PostgresSource;
 import com.kuaia.engine.worker.connector.S3ObjectSource;
@@ -45,12 +46,16 @@ public class ConnectorFactory {
             if ("document".equals(config.getSource().getFormat())) {
                 return new LocalSourceAdapter(
                         new DocumentSource(
-                                Paths.get(config.getSource().getPath()),
+                                new LocalFileSystem(),
+                                config.getSource().getPath(),
                                 config.getSource().getDocumentType()),
                         "document-0");
             }
             return new FileSourceAdapter(
-                    new FileSource(Paths.get(config.getSource().getPath()), config.getSource().getFormat()),
+                    new FileSource(
+                            new LocalFileSystem(),
+                            config.getSource().getPath(),
+                            config.getSource().getFormat()),
                     "file-0",
                     fileRowsPerSplit(config));
         }

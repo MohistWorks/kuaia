@@ -7,35 +7,33 @@ import org.apache.pdfbox.text.PDFTextStripper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Locale;
 
 public final class DocumentTextExtractor {
     private DocumentTextExtractor() {
     }
 
-    public static String extractText(Path document, String relativePath) throws PipelineExecutionException {
-        if (!isPdf(document) && !isText(document)) {
-            throw new PipelineExecutionException("No text extractor for document: " + relativePath);
+    public static String extractText(byte[] bytes, String name) throws PipelineExecutionException {
+        if (!isPdf(name) && !isText(name)) {
+            throw new PipelineExecutionException("No text extractor for document: " + name);
         }
         try {
-            if (isPdf(document)) {
-                return extractPdfText(document);
+            if (isPdf(name)) {
+                return extractPdfText(bytes);
             }
-            return new String(Files.readAllBytes(document), StandardCharsets.UTF_8);
+            return new String(bytes, StandardCharsets.UTF_8);
         } catch (IOException | RuntimeException e) {
             // pdfbox throws unchecked exceptions (IllegalArgumentException, IndexOutOfBoundsException,
             // NegativeArraySizeException, ...) on malformed PDFs; wrap those too so bad documents stay
             // on the per-record error path instead of killing the whole split.
             throw new PipelineExecutionException(
-                    "Document source read failed at " + relativePath + ": " + e.getMessage(),
+                    "Document source read failed at " + name + ": " + e.getMessage(),
                     e);
         }
     }
 
-    private static String extractPdfText(Path document) throws IOException {
-        try (PDDocument pdf = Loader.loadPDF(document.toFile())) {
+    private static String extractPdfText(byte[] bytes) throws IOException {
+        try (PDDocument pdf = Loader.loadPDF(bytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
             // PDFTextStripper defaults both separators to System.lineSeparator(): lineSeparator
             // between the lines of a page and pageEnd after each page. Pin both to "\n" so
@@ -46,16 +44,16 @@ public final class DocumentTextExtractor {
         }
     }
 
-    private static boolean isPdf(Path document) {
-        return fileName(document).endsWith(".pdf");
+    private static boolean isPdf(String name) {
+        return fileName(name).endsWith(".pdf");
     }
 
-    private static boolean isText(Path document) {
-        String name = fileName(document);
-        return name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".markdown");
+    private static boolean isText(String name) {
+        String fileName = fileName(name);
+        return fileName.endsWith(".txt") || fileName.endsWith(".md") || fileName.endsWith(".markdown");
     }
 
-    private static String fileName(Path document) {
-        return document.getFileName().toString().toLowerCase(Locale.ROOT);
+    private static String fileName(String name) {
+        return name.toLowerCase(Locale.ROOT);
     }
 }

@@ -5,15 +5,13 @@ import com.kuaia.common.type.DataType;
 import com.kuaia.common.type.KuaiaRowType;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 
-import java.io.IOException;
-import java.nio.file.Files;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.stream.Stream;
 
 public class DocumentSource implements LocalSource {
     private static final KuaiaRowType ROW_TYPE = new KuaiaRowType(
@@ -21,48 +19,54 @@ public class DocumentSource implements LocalSource {
             new DataType[]{DataType.LONG, DataType.STRING, DataType.STRING});
     private static final Set<String> SUPPORTED_DOCUMENT_TYPES = Set.of("auto", "text", "markdown", "pdf");
 
-    private final Path root;
+    private final KuaiaFileSystem fs;
+    private final String rootUri;
     private final String documentType;
-    private List<Path> documents;
+    private List<String> documentUris;
 
     public DocumentSource(Path root, String documentType) {
+        this(new LocalFileSystem(), root.toString(), documentType);
+    }
+
+    public DocumentSource(KuaiaFileSystem fs, String rootUri, String documentType) {
         String effectiveDocumentType = documentType == null ? "auto" : documentType;
         if (!SUPPORTED_DOCUMENT_TYPES.contains(effectiveDocumentType)) {
             throw new IllegalArgumentException("Unsupported documentType: " + documentType);
         }
-        this.root = root;
+        this.fs = fs;
+        this.rootUri = rootUri;
         this.documentType = effectiveDocumentType;
     }
 
     @Override
     public void open() throws PipelineExecutionException {
-        if (!Files.exists(root)) {
-            throw new PipelineExecutionException("Document path not found: " + root);
+        if (!fs.exists(rootUri)) {
+            throw new PipelineExecutionException("Document path not found: " + rootUri);
         }
-        if (Files.isRegularFile(root)) {
-            if (!isSupportedDocument(root)) {
+        if (!fs.isDirectory(rootUri)) {
+            if (!isSupportedDocument(fileName(rootUri))) {
                 throw new PipelineExecutionException(
-                        "Document file is not a supported document: " + root + documentTypeSuffix());
+                        "Document file is not a supported document: " + rootUri + documentTypeSuffix());
             }
-            documents = new ArrayList<>();
-            documents.add(root);
+            documentUris = new ArrayList<>();
+            documentUris.add(rootUri);
             return;
         }
-        if (!Files.isDirectory(root)) {
-            throw new PipelineExecutionException("Document source path is not a directory: " + root);
-        }
-        try (Stream<Path> stream = Files.walk(root)) {
-            documents = new ArrayList<>();
-            stream.filter(Files::isRegularFile)
-                    .filter(this::isSupportedDocument)
-                    .sorted(Comparator.comparing(this::relativePath))
-                    .forEach(documents::add);
-        } catch (IOException e) {
-            throw new PipelineExecutionException("Document directory scan failed: " + root + ": " + e.getMessage(), e);
-        }
-        if (documents.isEmpty()) {
+        List<String> children;
+        try {
+            children = fs.list(rootUri);
+        } catch (UncheckedIOException e) {
             throw new PipelineExecutionException(
-                    "Document directory has no supported documents: " + root + documentTypeSuffix());
+                    "Document directory scan failed: " + rootUri + ": " + e.getCause().getMessage(), e);
+        }
+        documentUris = new ArrayList<>();
+        children.stream()
+                .filter(uri -> isSupportedDocument(fileName(uri)))
+                .sorted(Comparator.comparing(this::relativePath))
+                .forEach(documentUris::add);
+        if (documentUris.isEmpty()) {
+            throw new PipelineExecutionException(
+                    "Document directory has no supported documents: " + rootUri + documentTypeSuffix());
         }
     }
 
@@ -71,12 +75,12 @@ public class DocumentSource implements LocalSource {
             throws Exception {
         ensureOpen();
         int count = 0;
-        for (int i = 0; i < documents.size(); i++) {
+        for (int i = 0; i < documentUris.size(); i++) {
             long seqId = i + 1L;
             if (seqId <= lastCheckpointSeq) {
                 continue;
             }
-            Path document = documents.get(i);
+            String document = documentUris.get(i);
             BinaryRow row;
             try {
                 row = readDocument(seqId, document);
@@ -99,30 +103,38 @@ public class DocumentSource implements LocalSource {
 
     @Override
     public void close() {
-        documents = null;
+        documentUris = null;
     }
 
-    private BinaryRow readDocument(long seqId, Path document) throws PipelineExecutionException {
-        String content = DocumentTextExtractor.extractText(document, relativePath(document));
+    private BinaryRow readDocument(long seqId, String documentUri) throws PipelineExecutionException {
+        String display = relativePath(documentUri);
+        byte[] bytes;
+        try {
+            bytes = fs.readAllBytes(documentUri);
+        } catch (Exception e) {
+            throw new PipelineExecutionException(
+                    "Document source read failed at " + display + ": " + e.getMessage(), e);
+        }
+        String content = DocumentTextExtractor.extractText(bytes, display);
         BinaryRow row = new BinaryRow(3);
         row.setLong(0, seqId);
-        row.setString(1, relativePath(document));
+        row.setString(1, display);
         row.setString(2, content);
         return row;
     }
 
-    private boolean isSupportedDocument(Path path) {
-        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+    private boolean isSupportedDocument(String name) {
+        String lower = name.toLowerCase(Locale.ROOT);
         if ("text".equals(documentType)) {
-            return name.endsWith(".txt");
+            return lower.endsWith(".txt");
         }
         if ("markdown".equals(documentType)) {
-            return name.endsWith(".md") || name.endsWith(".markdown");
+            return lower.endsWith(".md") || lower.endsWith(".markdown");
         }
         if ("pdf".equals(documentType)) {
-            return name.endsWith(".pdf");
+            return lower.endsWith(".pdf");
         }
-        return name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".markdown") || name.endsWith(".pdf");
+        return lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".pdf");
     }
 
     private String documentTypeSuffix() {
@@ -132,15 +144,31 @@ public class DocumentSource implements LocalSource {
         return " (documentType: " + documentType + ")";
     }
 
-    private String relativePath(Path path) {
-        if (path.equals(root)) {
-            return path.getFileName().toString();
+    /**
+     * The {@code path} column / sort key. Mirrors the old {@code Path}-based behavior: single-file
+     * corpus (the object equals the root) uses the file name; directory members use the child URI
+     * relative to the root, with {@code \\} normalized to {@code /}.
+     */
+    private String relativePath(String uri) {
+        if (uri.equals(rootUri)) {
+            return fileName(rootUri);
         }
-        return root.relativize(path).toString().replace('\\', '/');
+        String rest = uri.substring(rootUri.length());
+        int i = 0;
+        while (i < rest.length() && (rest.charAt(i) == '/' || rest.charAt(i) == '\\')) {
+            i++;
+        }
+        return rest.substring(i).replace('\\', '/');
+    }
+
+    private static String fileName(String uri) {
+        String normalized = uri.replace('\\', '/');
+        int slash = normalized.lastIndexOf('/');
+        return slash < 0 ? normalized : normalized.substring(slash + 1);
     }
 
     private void ensureOpen() throws PipelineExecutionException {
-        if (documents == null) {
+        if (documentUris == null) {
             throw new PipelineExecutionException("Document source is not open");
         }
     }

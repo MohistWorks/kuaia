@@ -8,9 +8,9 @@ import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.DocumentSource;
 import com.kuaia.engine.worker.connector.FileSource;
+import com.kuaia.engine.worker.connector.LocalFileSystem;
 
 import java.io.PrintStream;
-import java.nio.file.Paths;
 
 public class LocalPipelineValidator {
     private static final String SOURCE_STAGE = "Source";
@@ -68,7 +68,8 @@ public class LocalPipelineValidator {
         if ("file".equals(config.getSource().getType())) {
             if ("document".equals(config.getSource().getFormat())) {
                 DocumentSource source = new DocumentSource(
-                        Paths.get(config.getSource().getPath()),
+                        new LocalFileSystem(),
+                        config.getSource().getPath(),
                         config.getSource().getDocumentType());
                 try {
                     source.open();
@@ -78,7 +79,8 @@ public class LocalPipelineValidator {
                 }
             }
             FileSource source = new FileSource(
-                    Paths.get(config.getSource().getPath()),
+                    new LocalFileSystem(),
+                    config.getSource().getPath(),
                     config.getSource().getFormat());
             try {
                 source.open();

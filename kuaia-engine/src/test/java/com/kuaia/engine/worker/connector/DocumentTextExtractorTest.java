@@ -22,7 +22,7 @@ class DocumentTextExtractorTest {
 
         PipelineExecutionException error = assertThrows(
                 PipelineExecutionException.class,
-                () -> DocumentTextExtractor.extractText(document, "payload.xyz"));
+                () -> DocumentTextExtractor.extractText(Files.readAllBytes(document), "payload.xyz"));
 
         assertEquals("No text extractor for document: payload.xyz", error.getMessage());
     }
