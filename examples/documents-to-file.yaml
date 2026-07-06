@@ -1,0 +1,19 @@
+name: documents-to-file
+source:
+  type: file
+  path: data/docs
+  format: document
+transforms:
+  - type: chunk
+    input: content
+    output: chunk
+    chunkSize: 40
+    overlap: 8
+    dropInput: true
+sink:
+  type: file
+  path: ../.kuaia/output/documents-to-file.csv
+  format: csv
+  mode: overwrite
+checkpoint:
+  stateDir: .kuaia/state/documents-to-file

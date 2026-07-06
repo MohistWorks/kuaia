@@ -41,12 +41,18 @@ control plane, RBAC, lineage, Kubernetes operation, or a large connector catalog
 Supported sources:
 
 - local CSV and JSONL files through `source.type: file`,
-- local `.txt`, `.md`, and `.markdown` directories through
-  `source.type: document-directory`,
+- local `.txt`, `.md`, `.markdown`, and `.pdf` documents through
+  `source.type: file` with `format: document`,
 - S3-compatible object storage through `source.type: s3`,
 - local DuckDB SQL queries through `source.type: duckdb`,
 - batch PostgreSQL queries through `source.type: postgres`,
 - batch MySQL queries through `source.type: mysql`.
+
+PDF ingestion extracts embedded text only. There is no OCR, so scanned PDFs
+produce rows with blank (whitespace-only) `content`; use a `filter` transform
+with `op: not-empty`, which trims before testing, to drop them. Corrupt or
+encrypted PDFs are per-record source errors that
+`errorPolicy.mode: skip-bad-records` can skip.
 
 Supported transforms:
 

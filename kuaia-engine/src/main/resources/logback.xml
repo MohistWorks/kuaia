@@ -10,6 +10,9 @@
     <logger name="org.apache.ratis" level="WARN"/>
     <logger name="io.grpc" level="WARN"/>
     <logger name="io.netty" level="WARN"/>
+    <!-- pdfbox and fontbox WARN about font substitution on real-world PDFs; keep pipeline output clean. -->
+    <logger name="org.apache.pdfbox" level="ERROR"/>
+    <logger name="org.apache.fontbox" level="ERROR"/>
 
     <root level="INFO">
         <appender-ref ref="STDOUT"/>

@@ -6,7 +6,7 @@ import com.kuaia.engine.pipeline.PipelineConfig;
 import com.kuaia.engine.pipeline.PipelineExecutionException;
 import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
-import com.kuaia.engine.worker.connector.DocumentDirectorySource;
+import com.kuaia.engine.worker.connector.DocumentSource;
 import com.kuaia.engine.worker.connector.FileSource;
 
 import java.io.PrintStream;
@@ -66,18 +66,20 @@ public class LocalPipelineValidator {
 
     private KuaiaRowType loadSourceType(PipelineConfig config) throws Exception {
         if ("file".equals(config.getSource().getType())) {
+            if ("document".equals(config.getSource().getFormat())) {
+                DocumentSource source = new DocumentSource(
+                        Paths.get(config.getSource().getPath()),
+                        config.getSource().getDocumentType());
+                try {
+                    source.open();
+                    return source.getRowType();
+                } finally {
+                    source.close();
+                }
+            }
             FileSource source = new FileSource(
                     Paths.get(config.getSource().getPath()),
                     config.getSource().getFormat());
-            try {
-                source.open();
-                return source.getRowType();
-            } finally {
-                source.close();
-            }
-        }
-        if ("document-directory".equals(config.getSource().getType())) {
-            DocumentDirectorySource source = new DocumentDirectorySource(Paths.get(config.getSource().getPath()));
             try {
                 source.open();
                 return source.getRowType();

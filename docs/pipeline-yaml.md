@@ -48,11 +48,15 @@ source:
 Fields:
 
 - `type`: must be `file`
-- `path`: local CSV or JSONL path. Relative paths are resolved from the YAML
-  file directory.
-- `format`: must be `csv` or `jsonl`
-- `maxRowsPerSplit`: optional internal source split size. Defaults to `10000`
-  and must be a positive integer when configured.
+- `path`: local file path, or a local directory path for `format: document`.
+  Relative paths are resolved from the YAML file directory.
+- `format`: must be `csv`, `jsonl`, or `document`
+- `documentType`: optional document selector for `format: document`. Must be
+  `auto`, `text`, `markdown`, or `pdf` when configured and defaults to `auto`.
+  Rejected for the `csv` and `jsonl` formats and for non-file source types.
+- `maxRowsPerSplit`: optional internal source split size for the `csv` and
+  `jsonl` formats. Defaults to `10000` and must be a positive integer when
+  configured. Rejected for `format: document`.
 
 CSV rules:
 
@@ -77,36 +81,49 @@ JSONL rules:
 - malformed JSONL rows are source row errors and can be skipped with
   `errorPolicy.mode: skip-bad-records`.
 
-### document-directory
+Document rules:
 
 ```yaml
 source:
-  type: document-directory
+  type: file
   path: data/docs
+  format: document
+  documentType: auto
 ```
 
-`source.type: document-directory` recursively reads local text documents and
-emits one row per supported file. It is intended for small local RAG ingestion
-inputs where relative source paths should be kept as metadata.
+`format: document` recursively reads local documents and emits one row per
+supported file. It is intended for small local RAG ingestion inputs where
+relative source paths should be kept as metadata.
 
-Fields:
-
-- `type`: must be `document-directory`
-- `path`: local directory path. Relative paths are resolved from the YAML file
-  directory.
-
-Document-directory type rules:
-
-- supported files are `.txt`, `.md`, and `.markdown`,
+- `path` may be a directory or a single document file; a single file is read
+  as a one-document corpus,
+- `documentType: auto` selects `.txt`, `.md`, `.markdown`, and `.pdf` files;
+  `text` selects `.txt`; `markdown` selects `.md` and `.markdown`; `pdf`
+  selects `.pdf`,
 - unsupported files are ignored,
 - documents are processed in stable relative-path order,
 - output fields are fixed as `id LONG`, `path STRING`, and `content STRING`,
 - `id` is the 1-based sequence id in sorted document order,
-- `path` is the slash-separated relative path under `source.path`,
-- `content` is the UTF-8 file content.
+- `path` is the slash-separated relative path under `source.path`, or the file
+  name for a single-file corpus,
+- `content` is the UTF-8 file content for text documents and the extracted
+  text for `.pdf` documents,
+- PDF extraction reads embedded text with `"\n"` line separators on every
+  platform; there is no OCR, so scanned PDFs produce rows with blank
+  (whitespace-only) `content` that the trimming `op: not-empty` `filter`
+  transform drops,
+- corrupt or encrypted PDFs are source row errors and can be skipped with
+  `errorPolicy.mode: skip-bad-records`.
 
-Directory sources do not use `format`, `query`, `url`, `userEnv`,
-`passwordEnv`, `fetchSize`, or `maxRowsPerSplit`.
+Migration note: `source.type: document-directory` has been removed. Loading a
+pipeline that still uses it fails with `source.type document-directory has
+been replaced by source.type: file with format: document`. Change the source
+to `type: file` with `format: document` and keep the same `path`.
+
+Checkpoint state is keyed by the pipeline `name`. When migrating a
+checkpointed pipeline, start with a fresh `checkpoint.stateDir` or a new
+`name`; resuming against the old state can no-op, silently skip `.pdf` files
+newly included by `documentType: auto`, or duplicate the tail document.
 
 ### s3
 
@@ -1042,7 +1059,7 @@ Run a local document directory through mock embedding into Qdrant:
 
 ```bash
 docker compose -f docker-compose.qdrant.yml up -d
-bin/kuaia run -f examples/document-directory-to-qdrant.yaml
+bin/kuaia run -f examples/documents-to-qdrant.yaml
 ```
 
 Run batch MySQL through mock embedding into Qdrant:
@@ -1062,8 +1079,8 @@ Use `validate` to check a pipeline without executing it:
 bin/kuaia validate -f examples/local-file-to-file.yaml
 ```
 
-For `source.type: file` and `source.type: document-directory`, validation opens
-the source enough to infer the row type, builds the transform chain, and checks
+For `source.type: file`, including `format: document`, validation opens the
+source enough to infer the row type, builds the transform chain, and checks
 sink field compatibility. It does not write sink output or checkpoint state.
 
 For `source.type: duckdb`, `source.type: postgres`, and `source.type: mysql`,
@@ -1120,7 +1137,11 @@ Common examples:
 - `Unsupported transforms[0].provider: <value>`
 - `source.path is only supported for local source types`
 - `source.format is only supported for source.type: file`
-- `source.maxRowsPerSplit is only supported for source.type: file`
+- `source.maxRowsPerSplit is only supported for file formats csv and jsonl`
+- `Unsupported source.documentType: <value>`
+- `source.documentType is only supported for source.format: document`
+- `source.type document-directory has been replaced by source.type: file with
+  format: document`
 - `source.url is only supported for JDBC source types`
 - `source.userEnv is only supported for JDBC source types`
 - `source.passwordEnv is only supported for JDBC source types`
@@ -1161,10 +1182,13 @@ Common examples:
 - `DuckDB source query failed: <message>`
 - `DuckDB source read failed: <message>`
 - `Invalid DuckDB row seq=<seq>: field <field> is null`
-- `Document directory not found: <path>`
+- `Document path not found: <path>`
+- `Document file is not a supported document: <path>` — with a
+  ` (documentType: <type>)` suffix when `documentType` is not `auto`
 - `Document source path is not a directory: <path>`
 - `Document directory scan failed: <path>: <message>`
-- `Document directory has no supported documents: <path>`
+- `Document directory has no supported documents: <path>` — with a
+  ` (documentType: <type>)` suffix when `documentType` is not `auto`
 - `Document source read failed at <path>: <message>`
 - `Embedding request failed with status <code>: <response>`
 - `Embedding response did not contain an embedding vector`

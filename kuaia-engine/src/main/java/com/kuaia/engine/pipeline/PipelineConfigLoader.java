@@ -20,6 +20,10 @@ public class PipelineConfigLoader {
     private static final long DEFAULT_QDRANT_CHUNK_ID_MULTIPLIER = 1_000_000L;
     private static final int DEFAULT_EMBEDDING_BATCH_SIZE = 32;
     private static final String RESTRICT_LOCAL_PATHS_ENV = "KUAIA_RESTRICT_LOCAL_PATHS";
+    private static final String MAX_ROWS_PER_SPLIT_UNSUPPORTED_MESSAGE =
+            "source.maxRowsPerSplit is only supported for file formats csv and jsonl";
+    private static final String DOCUMENT_TYPE_UNSUPPORTED_MESSAGE =
+            "source.documentType is only supported for source.format: document";
 
     private final boolean restrictLocalPaths;
 
@@ -67,7 +71,11 @@ public class PipelineConfigLoader {
         String sourceType = require(source, "source.type");
         String sinkType = require(sink, "sink.type");
 
-        requireSupported("source.type", sourceType, "file", "document-directory", "postgres", "mysql", "duckdb", "s3");
+        if ("document-directory".equals(sourceType)) {
+            throw new PipelineConfigException(
+                    "source.type document-directory has been replaced by source.type: file with format: document");
+        }
+        requireSupported("source.type", sourceType, "file", "postgres", "mysql", "duckdb", "s3");
         requireSupported("sink.type", sinkType, "console", "mock-vector", "file", "qdrant", "pgvector", "milvus");
 
         PipelineConfig.SourceConfig sourceConfig = loadSource(configPath, sourceType, source);
@@ -190,9 +198,8 @@ public class PipelineConfigLoader {
             rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
             rejectIfPresent(source, "userEnv", "source.userEnv is not supported for source.type: duckdb");
             rejectIfPresent(source, "passwordEnv", "source.passwordEnv is not supported for source.type: duckdb");
-            if (hasText(source.get("maxRowsPerSplit"))) {
-                throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
-            }
+            rejectIfPresent(source, "documentType", DOCUMENT_TYPE_UNSUPPORTED_MESSAGE);
+            rejectIfPresent(source, "maxRowsPerSplit", MAX_ROWS_PER_SPLIT_UNSUPPORTED_MESSAGE);
             String sourceUrl = hasText(source.get("url")) ? source.get("url") : "jdbc:duckdb:";
             validateJdbcSourceUrl(sourceType, sourceUrl);
             return new PipelineConfig.SourceConfig(
@@ -214,12 +221,11 @@ public class PipelineConfigLoader {
             rejectIfPresent(source, "userEnv", "source.userEnv is only supported for JDBC source types");
             rejectIfPresent(source, "passwordEnv", "source.passwordEnv is only supported for JDBC source types");
             rejectIfPresent(source, "query", "source.query is only supported for JDBC source types");
+            rejectIfPresent(source, "documentType", DOCUMENT_TYPE_UNSUPPORTED_MESSAGE);
             if (hasText(source.get("fetchSize"))) {
                 throw new PipelineConfigException("source.fetchSize is only supported for JDBC source types");
             }
-            if (hasText(source.get("maxRowsPerSplit"))) {
-                throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
-            }
+            rejectIfPresent(source, "maxRowsPerSplit", MAX_ROWS_PER_SPLIT_UNSUPPORTED_MESSAGE);
             return new PipelineConfig.SourceConfig(
                     sourceType,
                     require(source, "source.endpoint"),
@@ -234,9 +240,8 @@ public class PipelineConfigLoader {
         if (isCredentialJdbcSource(sourceType)) {
             rejectIfPresent(source, "path", "source.path is only supported for local source types");
             rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
-            if (hasText(source.get("maxRowsPerSplit"))) {
-                throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
-            }
+            rejectIfPresent(source, "documentType", DOCUMENT_TYPE_UNSUPPORTED_MESSAGE);
+            rejectIfPresent(source, "maxRowsPerSplit", MAX_ROWS_PER_SPLIT_UNSUPPORTED_MESSAGE);
             String sourceUrl = require(source, "source.url");
             validateJdbcSourceUrl(sourceType, sourceUrl);
             return new PipelineConfig.SourceConfig(
@@ -251,22 +256,6 @@ public class PipelineConfigLoader {
                     parseSourceFetchSize(source.get("fetchSize")));
         }
 
-        if ("document-directory".equals(sourceType)) {
-            rejectIfPresent(source, "format", "source.format is only supported for source.type: file");
-            rejectIfPresent(source, "url", "source.url is only supported for JDBC source types");
-            rejectIfPresent(source, "userEnv", "source.userEnv is only supported for JDBC source types");
-            rejectIfPresent(source, "passwordEnv", "source.passwordEnv is only supported for JDBC source types");
-            rejectIfPresent(source, "query", "source.query is only supported for JDBC source types");
-            if (hasText(source.get("fetchSize"))) {
-                throw new PipelineConfigException("source.fetchSize is only supported for JDBC source types");
-            }
-            if (hasText(source.get("maxRowsPerSplit"))) {
-                throw new PipelineConfigException("source.maxRowsPerSplit is only supported for source.type: file");
-            }
-            String sourcePath = resolveLocalPath(configPath, require(source, "source.path"), "source.path");
-            return new PipelineConfig.SourceConfig(sourceType, sourcePath, null);
-        }
-
         rejectIfPresent(source, "url", "source.url is only supported for JDBC source types");
         rejectIfPresent(source, "userEnv", "source.userEnv is only supported for JDBC source types");
         rejectIfPresent(source, "passwordEnv", "source.passwordEnv is only supported for JDBC source types");
@@ -276,7 +265,17 @@ public class PipelineConfigLoader {
         }
         String sourcePath = resolveLocalPath(configPath, require(source, "source.path"), "source.path");
         String sourceFormat = require(source, "source.format");
-        requireSupported("source.format", sourceFormat, "csv", "jsonl");
+        requireSupported("source.format", sourceFormat, "csv", "jsonl", "document");
+        if ("document".equals(sourceFormat)) {
+            rejectIfPresent(source, "maxRowsPerSplit", MAX_ROWS_PER_SPLIT_UNSUPPORTED_MESSAGE);
+            String documentType = source.get("documentType");
+            if (!hasText(documentType)) {
+                documentType = "auto";
+            }
+            requireSupported("source.documentType", documentType, "auto", "text", "markdown", "pdf");
+            return new PipelineConfig.SourceConfig(sourceType, sourcePath, sourceFormat, documentType);
+        }
+        rejectIfPresent(source, "documentType", DOCUMENT_TYPE_UNSUPPORTED_MESSAGE);
         return new PipelineConfig.SourceConfig(
                 sourceType,
                 sourcePath,

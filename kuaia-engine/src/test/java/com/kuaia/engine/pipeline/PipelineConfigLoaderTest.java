@@ -192,7 +192,7 @@ class PipelineConfigLoaderTest {
                 PipelineConfigException.class,
                 () -> new PipelineConfigLoader().load(configPath));
 
-        assertEquals("source.maxRowsPerSplit is only supported for source.type: file", error.getMessage());
+        assertEquals("source.maxRowsPerSplit is only supported for file formats csv and jsonl", error.getMessage());
     }
 
     @Test
@@ -1848,15 +1848,16 @@ class PipelineConfigLoaderTest {
     }
 
     @Test
-    void loadsDocumentDirectorySourceConfig() throws Exception {
+    void loadsDocumentSourceConfigWithDefaultDocumentType() throws Exception {
         Path docs = tempDir.resolve("docs");
         Files.createDirectories(docs);
-        Path configPath = tempDir.resolve("document-directory-source.yaml");
+        Path configPath = tempDir.resolve("document-source.yaml");
         Files.write(configPath, String.join("\n",
-                "name: document-directory-source",
+                "name: document-source",
                 "source:",
-                "  type: document-directory",
+                "  type: file",
                 "  path: docs",
+                "  format: document",
                 "transforms:",
                 "  - type: chunk",
                 "    input: content",
@@ -1867,20 +1868,44 @@ class PipelineConfigLoaderTest {
 
         PipelineConfig config = new PipelineConfigLoader().load(configPath);
 
-        assertEquals("document-directory", config.getSource().getType());
+        assertEquals("file", config.getSource().getType());
         assertEquals(docs.toString(), config.getSource().getPath());
-        assertEquals(null, config.getSource().getFormat());
+        assertEquals("document", config.getSource().getFormat());
+        assertEquals("auto", config.getSource().getDocumentType());
     }
 
     @Test
-    void rejectsDocumentDirectoryFormat() throws Exception {
-        Path configPath = tempDir.resolve("document-directory-format.yaml");
+    void loadsDocumentSourceConfigWithExplicitDocumentType() throws Exception {
+        Path docs = tempDir.resolve("docs");
+        Files.createDirectories(docs);
+        for (String documentType : new String[]{"auto", "text", "markdown", "pdf"}) {
+            Path configPath = tempDir.resolve("document-source-" + documentType + ".yaml");
+            Files.write(configPath, String.join("\n",
+                    "name: document-source-" + documentType,
+                    "source:",
+                    "  type: file",
+                    "  path: docs",
+                    "  format: document",
+                    "  documentType: " + documentType,
+                    "sink:",
+                    "  type: console").getBytes(StandardCharsets.UTF_8));
+
+            PipelineConfig config = new PipelineConfigLoader().load(configPath);
+
+            assertEquals("file", config.getSource().getType());
+            assertEquals("document", config.getSource().getFormat());
+            assertEquals(documentType, config.getSource().getDocumentType());
+        }
+    }
+
+    @Test
+    void rejectsDocumentDirectorySourceTypeWithMigrationHint() throws Exception {
+        Path configPath = tempDir.resolve("document-directory-source.yaml");
         Files.write(configPath, String.join("\n",
-                "name: document-directory-format",
+                "name: document-directory-source",
                 "source:",
                 "  type: document-directory",
                 "  path: docs",
-                "  format: jsonl",
                 "sink:",
                 "  type: console").getBytes(StandardCharsets.UTF_8));
 
@@ -1888,7 +1913,92 @@ class PipelineConfigLoaderTest {
                 PipelineConfigException.class,
                 () -> new PipelineConfigLoader().load(configPath));
 
-        assertEquals("source.format is only supported for source.type: file", error.getMessage());
+        assertEquals(
+                "source.type document-directory has been replaced by source.type: file with format: document",
+                error.getMessage());
+    }
+
+    @Test
+    void rejectsMaxRowsPerSplitForDocumentFormat() throws Exception {
+        Path configPath = tempDir.resolve("document-source-split.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: document-source-split",
+                "source:",
+                "  type: file",
+                "  path: docs",
+                "  format: document",
+                "  maxRowsPerSplit: 2",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.maxRowsPerSplit is only supported for file formats csv and jsonl", error.getMessage());
+    }
+
+    @Test
+    void rejectsDocumentTypeForCsvFormat() throws Exception {
+        Path configPath = tempDir.resolve("csv-document-type.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: csv-document-type",
+                "source:",
+                "  type: file",
+                "  path: data/documents.csv",
+                "  format: csv",
+                "  documentType: auto",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("source.documentType is only supported for source.format: document", error.getMessage());
+    }
+
+    @Test
+    void rejectsDocumentTypeForNonFileSourceTypes() throws Exception {
+        for (String sourceType : new String[]{"duckdb", "postgres", "s3"}) {
+            Path configPath = tempDir.resolve(sourceType + "-document-type.yaml");
+            Files.write(configPath, String.join("\n",
+                    "name: " + sourceType + "-document-type",
+                    "source:",
+                    "  type: " + sourceType,
+                    "  documentType: auto",
+                    "sink:",
+                    "  type: console").getBytes(StandardCharsets.UTF_8));
+
+            PipelineConfigException error = assertThrows(
+                    PipelineConfigException.class,
+                    () -> new PipelineConfigLoader().load(configPath));
+
+            assertEquals(
+                    "source.documentType is only supported for source.format: document",
+                    error.getMessage(),
+                    sourceType);
+        }
+    }
+
+    @Test
+    void rejectsUnknownDocumentType() throws Exception {
+        Path configPath = tempDir.resolve("unknown-document-type.yaml");
+        Files.write(configPath, String.join("\n",
+                "name: unknown-document-type",
+                "source:",
+                "  type: file",
+                "  path: docs",
+                "  format: document",
+                "  documentType: html",
+                "sink:",
+                "  type: console").getBytes(StandardCharsets.UTF_8));
+
+        PipelineConfigException error = assertThrows(
+                PipelineConfigException.class,
+                () -> new PipelineConfigLoader().load(configPath));
+
+        assertEquals("Unsupported source.documentType: html", error.getMessage());
     }
 
     @Test

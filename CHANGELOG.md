@@ -4,8 +4,47 @@ All notable public changes to Kuaia are tracked here.
 
 ## Unreleased
 
+### Added
+
+- `source.type: file` now supports `format: document` for local document
+  ingestion, with an optional `documentType` selector (`auto`, `text`,
+  `markdown`, or `pdf`) and a single-file path read as a one-document corpus.
+- Added PDF text extraction for document format sources. Extraction has no
+  OCR, so scanned PDFs produce blank (whitespace-only) `content` that the
+  trimming `not-empty` filter drops, and corrupt or encrypted PDFs are
+  per-record errors that `errorPolicy.mode: skip-bad-records` can skip.
+- Added a no-service `examples/documents-to-file.yaml` example that chunks a
+  local document directory, including a PDF, into a CSV file.
+
 ### Changed
 
+- Breaking: `source.type: document-directory` has been removed and replaced by
+  `source.type: file` with `format: document`. Pipelines that still use the
+  old type fail to load with `source.type document-directory has been replaced
+  by source.type: file with format: document`. Migrate the source block:
+
+  ```yaml
+  # before
+  source:
+    type: document-directory
+    path: data/docs
+
+  # after
+  source:
+    type: file
+    path: data/docs
+    format: document
+  ```
+
+  Checkpoint state is keyed by the pipeline `name`: when migrating, start with
+  a fresh `checkpoint.stateDir` or a new `name`, otherwise resuming against
+  the old state can no-op, skip newly included `.pdf` files, or duplicate the
+  tail document.
+
+- The document-directory-to-Qdrant example is now
+  `examples/documents-to-qdrant.yaml`, upserts into Qdrant collection
+  `kuaia_documents`, and reads a PDF alongside the text documents; the
+  connector e2e case is now `documents-qdrant`.
 - Main branch development version is now `0.3.0-SNAPSHOT` after the `v0.2.3` release.
 - The build, CI, Docker image, and contributor setup now require Java 21.
 - Reduced per-row overhead on the batch ingestion path: `BinaryRow` field

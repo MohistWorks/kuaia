@@ -71,6 +71,7 @@ public class PipelineConfig implements Serializable {
         private final String type;
         private final String path;
         private final String format;
+        private final String documentType;
         private final String url;
         private final String userEnv;
         private final String passwordEnv;
@@ -91,6 +92,11 @@ public class PipelineConfig implements Serializable {
 
         public SourceConfig(String type, String path, String format, int maxRowsPerSplit) {
             this(type, path, format, null, null, null, null, maxRowsPerSplit, 0);
+        }
+
+        public SourceConfig(String type, String path, String format, String documentType) {
+            this(type, path, format, null, null, null, null, 0, 0,
+                    null, null, null, null, null, null, false, documentType);
         }
 
         public SourceConfig(
@@ -127,7 +133,7 @@ public class PipelineConfig implements Serializable {
                 int maxRowsPerSplit,
                 int fetchSize) {
             this(type, path, format, url, userEnv, passwordEnv, query, maxRowsPerSplit, fetchSize,
-                    null, null, null, null, null, null, false);
+                    null, null, null, null, null, null, false, null);
         }
 
         public SourceConfig(
@@ -140,7 +146,7 @@ public class PipelineConfig implements Serializable {
                 String secretKeyEnv,
                 boolean pathStyleAccess) {
             this(type, null, null, null, null, null, null, 0, 0,
-                    endpoint, region, bucket, prefix, accessKeyEnv, secretKeyEnv, pathStyleAccess);
+                    endpoint, region, bucket, prefix, accessKeyEnv, secretKeyEnv, pathStyleAccess, null);
         }
 
         private SourceConfig(
@@ -159,7 +165,8 @@ public class PipelineConfig implements Serializable {
                 String prefix,
                 String accessKeyEnv,
                 String secretKeyEnv,
-                boolean pathStyleAccess) {
+                boolean pathStyleAccess,
+                String documentType) {
             if (maxRowsPerSplit < 0) {
                 throw new IllegalArgumentException("maxRowsPerSplit must not be negative");
             }
@@ -169,6 +176,7 @@ public class PipelineConfig implements Serializable {
             this.type = type;
             this.path = path;
             this.format = format;
+            this.documentType = documentType;
             this.url = url;
             this.userEnv = userEnv;
             this.passwordEnv = passwordEnv;
@@ -194,6 +202,10 @@ public class PipelineConfig implements Serializable {
 
         public String getFormat() {
             return format;
+        }
+
+        public String getDocumentType() {
+            return documentType;
         }
 
         public String getUrl() {
