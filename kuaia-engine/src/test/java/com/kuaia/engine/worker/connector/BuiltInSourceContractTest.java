@@ -131,6 +131,14 @@ class BuiltInSourceContractTest {
                                 .put("s3://kuaia-docs/docs/b.txt", "Beta"),
                         "s3://kuaia-docs/docs/",
                         "auto")),
+                // s3:// + format: csv reads a single CSV OBJECT into a multi-row table with a dynamic
+                // schema (id LONG, content STRING) — the capability the old s3 source never had. The
+                // in-memory filesystem serves the non-directory uri for exists()/readAllBytes().
+                new SourceCase("s3-csv", () -> new FileSource(
+                        new InMemoryFileSystem()
+                                .put("s3://kuaia-docs/data/data.csv", "id,content\n1,Alpha\n2,Beta"),
+                        "s3://kuaia-docs/data/data.csv",
+                        "csv")),
                 new SourceCase("duckdb", () -> new DuckDBSource(duckDbConfig())),
                 new SourceCase("postgres", () -> new PostgresSource(
                         jdbcConfig("postgres", "jdbc:kuaia-contract-postgres:documents"),
