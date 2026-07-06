@@ -11,8 +11,9 @@ mvn -q package
 bin/kuaia help
 bin/kuaia examples
 bin/kuaia validate -f examples/local-file-to-file.yaml
+bin/kuaia validate -f examples/documents-to-file.yaml
 bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
-bin/kuaia validate -f examples/document-directory-to-qdrant.yaml
+bin/kuaia validate -f examples/documents-to-qdrant.yaml
 bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml
 bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml
 bin/kuaia validate -f examples/local-file-to-openai-compatible-vector.yaml

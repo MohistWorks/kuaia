@@ -1,4 +1,4 @@
-name: document-directory-to-qdrant
+name: documents-to-qdrant
 source:
   type: file
   path: data/docs
@@ -12,11 +12,11 @@ transforms:
 sink:
   type: qdrant
   url: http://localhost:6333
-  collection: kuaia_document_directory_docs
+  collection: kuaia_documents
   idField: id
   vectorField: embedding
   payloadFields: [id, path, content]
   wait: true
   timeoutMs: 30000
 checkpoint:
-  stateDir: .kuaia/state/document-directory-to-qdrant
+  stateDir: .kuaia/state/documents-to-qdrant

@@ -97,7 +97,7 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("README.md")).contains("make release-gate"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=mysql-qdrant"));
-        assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=document-directory-qdrant"));
+        assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=documents-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=s3-qdrant"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=file-openai-compatible-vector"));
         assertTrue(read(root.resolve("README.md")).contains("make e2e CASE=file-milvus"));
@@ -122,7 +122,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/examples.md")).contains("mysql-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("docker-compose.mysql.yml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("duckdb-csv-to-qdrant.yaml"));
-        assertTrue(read(root.resolve("docs/examples.md")).contains("document-directory-to-qdrant.yaml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("documents-to-qdrant.yaml"));
+        assertTrue(read(root.resolve("docs/examples.md")).contains("documents-to-file.yaml"));
         assertTrue(read(root.resolve("docs/examples.md")).contains("s3-docs-to-qdrant.yaml"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: qdrant"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("sink.type: pgvector"));
@@ -130,7 +131,9 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: postgres"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: mysql"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: duckdb"));
-        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: document-directory"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("format: document"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md"))
+                .contains("source.type document-directory has been replaced"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: s3"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("bin/kuaia benchmark"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--max-rows-per-split"));
@@ -200,7 +203,7 @@ class KuaiaPackagingTest {
         String e2eScript = read(root.resolve("scripts/connector-e2e-smoke.sh"));
         assertTrue(e2eScript.contains("Available e2e cases"), e2eScript);
         assertTrue(e2eScript.contains("file-qdrant"), e2eScript);
-        assertTrue(e2eScript.contains("document-directory-qdrant"), e2eScript);
+        assertTrue(e2eScript.contains("documents-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("s3-qdrant"), e2eScript);
         assertTrue(e2eScript.contains("file-openai-compatible-vector"), e2eScript);
         assertTrue(e2eScript.contains("file-milvus"), e2eScript);
@@ -244,7 +247,7 @@ class KuaiaPackagingTest {
         assertTrue(Files.exists(root.resolve("examples/data/docs/intro.md")),
                 "Document directory example data should exist");
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("duckdb-qdrant"));
-        assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("document-directory-qdrant"));
+        assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("documents-qdrant"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("s3-qdrant"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("file-openai-compatible-vector"));
         assertTrue(read(root.resolve("scripts/connector-e2e-smoke.sh")).contains("file-milvus"));
@@ -252,7 +255,9 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
-                .contains("bin/kuaia validate -f examples/document-directory-to-qdrant.yaml"));
+                .contains("bin/kuaia validate -f examples/documents-to-file.yaml"));
+        assertTrue(read(root.resolve("scripts/release-gate.sh"))
+                .contains("bin/kuaia validate -f examples/documents-to-qdrant.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))
                 .contains("bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml"));
         assertTrue(read(root.resolve("scripts/release-gate.sh"))

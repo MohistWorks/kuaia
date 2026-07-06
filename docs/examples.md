@@ -36,7 +36,7 @@ public MVP paths in an isolated `.kuaia/public-mvp-smoke` work directory:
 
 After that, run individual examples below when you want to inspect one pipeline
 at a time. Qdrant, pgvector, Milvus, Postgres, MySQL,
-document-directory-to-Qdrant, DuckDB-to-Qdrant, S3-to-Qdrant, and
+documents-to-Qdrant, DuckDB-to-Qdrant, S3-to-Qdrant, and
 OpenAI-compatible examples require external services or credentials and are not
 part of the default smoke. The connector e2e gate provides Docker-backed local
 proof for these paths, including a fake OpenAI-compatible embedding service.
@@ -49,11 +49,18 @@ For a local document import path, start with:
 bin/kuaia run -f examples/local-jsonl-chunk-to-vector.yaml
 ```
 
-For a local directory of `.txt` or Markdown documents into Qdrant, start
+For a no-service run over a local directory of documents, including PDF text
+extraction, start with:
+
+```bash
+bin/kuaia run -f examples/documents-to-file.yaml
+```
+
+For a local directory of `.txt`, Markdown, or PDF documents into Qdrant, start
 Qdrant and then run:
 
 ```bash
-bin/kuaia run -f examples/document-directory-to-qdrant.yaml
+bin/kuaia run -f examples/documents-to-qdrant.yaml
 ```
 
 For an FAQ import path that keeps question and answer metadata together, start
@@ -166,6 +173,23 @@ deterministic JSON Lines output:
 This is the no-service path for checking JSONL cleanup, text normalization,
 literal replacement, length filtering, literal string filtering, and numeric
 row filtering before embedding, chunking, or writing to a vector sink.
+
+## Documents To File
+
+```bash
+bin/kuaia run -f examples/documents-to-file.yaml
+cat .kuaia/output/documents-to-file.csv
+```
+
+Reads the three documents under `examples/data/docs` (`handbook.pdf`,
+`intro.md`, and `nested/guide.txt`) through `source.type: file` with
+`format: document`, splits each document's `content` into character-based
+chunks, and writes a deterministic CSV file with the header
+`id,path,chunk,chunk_index`. Each row keeps the generated document id, the
+slash-separated relative source path, and one chunk of the document text,
+including text extracted from the PDF. This is the no-service path for
+checking document reading and PDF text extraction before switching to a
+vector sink.
 
 ## Skip Bad Records
 
@@ -285,7 +309,7 @@ each other. It also sets
 `chunk_index`, `chunk_start`, and `chunk_end` without repeating the full source
 document text on every point, and pins those fields with `payloadFields`.
 
-## Document Directory To Qdrant
+## Documents To Qdrant
 
 Start Qdrant:
 
@@ -296,22 +320,25 @@ docker compose -f docker-compose.qdrant.yml up -d
 Create the example Qdrant collection:
 
 ```bash
-curl -X PUT http://localhost:6333/collections/kuaia_document_directory_docs \
+curl -X PUT http://localhost:6333/collections/kuaia_documents \
   -H 'Content-Type: application/json' \
   --data '{"vectors":{"size":4,"distance":"Cosine"}}'
 ```
 
-Run the document-directory-to-Qdrant pipeline:
+Run the documents-to-Qdrant pipeline:
 
 ```bash
-bin/kuaia run -f examples/document-directory-to-qdrant.yaml
+bin/kuaia run -f examples/documents-to-qdrant.yaml
 ```
 
-The example reads `.md` and `.txt` files from `examples/data/docs`, creates
-deterministic mock embeddings from `content`, and upserts points into Qdrant
-collection `kuaia_document_directory_docs`. The sink uses
+The example reads the three `.md`, `.txt`, and `.pdf` documents from
+`examples/data/docs` through `source.type: file` with `format: document`,
+creates deterministic mock embeddings from `content`, and upserts three points
+into Qdrant collection `kuaia_documents`. The sink uses
 `payloadFields: [id, path, content]` so each vector keeps the generated document
-id, relative path, and source content.
+id, relative path, and source content. The `handbook.pdf` fixture is a one-page
+PDF generated with pdfbox, so it can be regenerated whenever the fixture text
+needs to change.
 
 ## DuckDB CSV To Qdrant
 

@@ -18,7 +18,7 @@ list_cases() {
   echo "Available e2e cases:"
   echo "  all"
   echo "  file-qdrant"
-  echo "  document-directory-qdrant"
+  echo "  documents-qdrant"
   echo "  duckdb-qdrant"
   echo "  s3-qdrant"
   echo "  file-openai-compatible-vector"
@@ -29,7 +29,7 @@ list_cases() {
 }
 
 usage() {
-  echo "Usage: $0 [all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|file-openai-compatible-vector|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant|--list|--help]"
+  echo "Usage: $0 [all|file-qdrant|documents-qdrant|duckdb-qdrant|s3-qdrant|file-openai-compatible-vector|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant|--list|--help]"
   echo
   list_cases
 }
@@ -48,7 +48,7 @@ case "${1:-${CASE:-all}}" in
     list_cases
     exit 0
     ;;
-  all|file-qdrant|document-directory-qdrant|duckdb-qdrant|s3-qdrant|file-openai-compatible-vector|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant)
+  all|file-qdrant|documents-qdrant|duckdb-qdrant|s3-qdrant|file-openai-compatible-vector|file-milvus|postgres-qdrant|postgres-pgvector|mysql-qdrant)
     SELECTED_CASE=${1:-${CASE:-all}}
     ;;
   *)
@@ -80,7 +80,7 @@ needs_postgres() {
 
 needs_qdrant() {
   case_selected file-qdrant \
-    || case_selected document-directory-qdrant \
+    || case_selected documents-qdrant \
     || case_selected duckdb-qdrant \
     || case_selected s3-qdrant \
     || case_selected postgres-qdrant \
@@ -605,7 +605,7 @@ cp -R "$ROOT_DIR/examples/data/docs" "$WORK_DIR/data/docs"
 FILE_TO_QDRANT="$WORK_DIR/local-jsonl-chunk-to-qdrant.yaml"
 FILE_TO_MILVUS="$WORK_DIR/local-file-to-milvus.yaml"
 FILE_TO_OPENAI_COMPATIBLE_VECTOR="$WORK_DIR/local-file-to-openai-compatible-vector.yaml"
-DOCUMENT_DIRECTORY_TO_QDRANT="$WORK_DIR/document-directory-to-qdrant.yaml"
+DOCUMENTS_TO_QDRANT="$WORK_DIR/documents-to-qdrant.yaml"
 DUCKDB_TO_QDRANT="$WORK_DIR/duckdb-csv-to-qdrant.yaml"
 S3_TO_QDRANT="$WORK_DIR/s3-docs-to-qdrant.yaml"
 POSTGRES_TO_QDRANT="$WORK_DIR/postgres-to-qdrant.yaml"
@@ -741,11 +741,12 @@ checkpoint:
   stateDir: $WORK_DIR/state/file-to-openai-compatible-vector
 EOF
 
-cat > "$DOCUMENT_DIRECTORY_TO_QDRANT" <<EOF
-name: connector-e2e-document-directory-to-qdrant
+cat > "$DOCUMENTS_TO_QDRANT" <<EOF
+name: connector-e2e-documents-to-qdrant
 source:
-  type: document-directory
+  type: file
   path: $WORK_DIR/data/docs
+  format: document
 transforms:
   - type: mock-embedding
     input: content
@@ -755,14 +756,14 @@ transforms:
 sink:
   type: qdrant
   url: $QDRANT_URL
-  collection: kuaia_e2e_document_directory_docs
+  collection: kuaia_e2e_documents
   idField: id
   vectorField: embedding
   payloadFields: [id, path, content]
   wait: true
   timeoutMs: 30000
 checkpoint:
-  stateDir: $WORK_DIR/state/document-directory-to-qdrant
+  stateDir: $WORK_DIR/state/documents-to-qdrant
 EOF
 
 cat > "$DUCKDB_TO_QDRANT" <<EOF
@@ -929,8 +930,8 @@ fi
 if case_selected file-qdrant; then
   create_qdrant_collection kuaia_e2e_article_chunks
 fi
-if case_selected document-directory-qdrant; then
-  create_qdrant_collection kuaia_e2e_document_directory_docs
+if case_selected documents-qdrant; then
+  create_qdrant_collection kuaia_e2e_documents
 fi
 if case_selected duckdb-qdrant; then
   create_qdrant_collection kuaia_e2e_duckdb_docs
@@ -963,14 +964,14 @@ if case_selected file-qdrant; then
   require_qdrant_count kuaia_e2e_article_chunks 6
 fi
 
-if case_selected document-directory-qdrant; then
+if case_selected documents-qdrant; then
   run_pipeline_with_summary \
-    connector-e2e-document-directory-to-qdrant \
-    "$DOCUMENT_DIRECTORY_TO_QDRANT" \
-    "$WORK_DIR/summaries/document-directory-to-qdrant.json" \
-    2 \
-    2
-  require_qdrant_count kuaia_e2e_document_directory_docs 2
+    connector-e2e-documents-to-qdrant \
+    "$DOCUMENTS_TO_QDRANT" \
+    "$WORK_DIR/summaries/documents-to-qdrant.json" \
+    3 \
+    3
+  require_qdrant_count kuaia_e2e_documents 3
 fi
 
 if case_selected file-milvus; then
@@ -1004,6 +1005,9 @@ if case_selected duckdb-qdrant; then
   require_qdrant_count kuaia_e2e_duckdb_docs 2
 fi
 
+# The MinIO seed uploads all of examples/data/docs including handbook.pdf, but the
+# s3 source does not support .pdf objects yet and skips them, so this case still
+# reads and upserts 2 documents while the local documents case reads 3.
 if case_selected s3-qdrant; then
   KUAIA_S3_ACCESS_KEY=minioadmin \
   KUAIA_S3_SECRET_KEY=minioadmin \

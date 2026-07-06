@@ -18,8 +18,8 @@ Kuaia is useful when you want to:
 - transform records through a typed `BinaryRow` model,
 - trim and filter empty text before embedding or chunking,
 - split JSONL document text into embed-ready chunks,
-- ingest local `.txt`, `.md`, and `.markdown` document directories while
-  preserving relative paths,
+- ingest local `.txt`, `.md`, `.markdown`, and `.pdf` document directories
+  while preserving relative paths,
 - ingest text-like objects from S3-compatible storage such as MinIO while
   preserving object keys,
 - import small FAQ JSONL datasets while preserving question and answer fields,
@@ -75,9 +75,9 @@ The FAQ vector example reads `examples/data/faq.jsonl`, trims question and
 answer fields, filters empty values, and emits deterministic mock vectors.
 
 Use `kuaia validate -f <pipeline.yaml>` to check a pipeline before running it.
-For file and document-directory sources, validation checks the source row type,
-transform field compatibility, and sink field compatibility without writing
-output or checkpoint state. For S3, DuckDB, Postgres, and MySQL sources,
+For file sources, including `format: document`, validation checks the source
+row type, transform field compatibility, and sink field compatibility without
+writing output or checkpoint state. For S3, DuckDB, Postgres, and MySQL sources,
 validation parses connector configuration without connecting to the source, so
 row-type checks are deferred until run time.
 
@@ -99,7 +99,7 @@ make e2e
 
 This starts local Postgres, MySQL, Qdrant, Milvus, MinIO, and fake
 OpenAI-compatible embedding services with Docker Compose, runs file-to-Qdrant,
-document-directory-to-Qdrant, DuckDB-to-Qdrant, S3-to-Qdrant,
+documents-to-Qdrant, DuckDB-to-Qdrant, S3-to-Qdrant,
 file-to-OpenAI-compatible-embedding, file-to-Milvus, Postgres-to-Qdrant,
 Postgres-to-pgvector, and MySQL-to-Qdrant pipelines, checks run summaries, and
 tears the services down.
@@ -108,7 +108,7 @@ To iterate on one connector path, pass a case name:
 
 ```bash
 make e2e CASE=file-qdrant
-make e2e CASE=document-directory-qdrant
+make e2e CASE=documents-qdrant
 make e2e CASE=duckdb-qdrant
 make e2e CASE=s3-qdrant
 make e2e CASE=file-openai-compatible-vector
@@ -356,7 +356,7 @@ service requirements.
 
 | Area | Current support |
 | --- | --- |
-| Sources | `file` CSV and JSONL, `document-directory`, `s3`, batch `duckdb`, `postgres`, and `mysql` queries |
+| Sources | `file` CSV, JSONL, and `document` format (`.txt`, `.md`, `.markdown`, `.pdf`), `s3`, batch `duckdb`, `postgres`, and `mysql` queries |
 | Transforms | `select`, `rename`, `trim`, `lowercase`, `replace`, `filter` (`not-empty`, `min-length`, `contains`, `starts-with`, `ends-with`, `equals`, `not-equals`, `greater-than`, `greater-than-or-equal`, `less-than`, `less-than-or-equal`), `chunk`, `mock-embedding`, OpenAI-compatible `embedding` |
 | Sinks | `console`, CSV/JSONL `file`, `mock-vector`, `qdrant`, `pgvector`, `milvus` |
 | Runtime | Linear batch pipeline, preflight validation, checkpoint resume, bad-record skip mode |

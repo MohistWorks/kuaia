@@ -59,12 +59,13 @@ the final planned `0.2.x` release.
 `0.2.1` shipped scope:
 
 - Connector e2e gate and release-gate wrapper that prove file, Postgres, MySQL,
-  DuckDB, document-directory, and Qdrant paths with real local or Docker-backed
+  DuckDB, document, and Qdrant paths with real local or Docker-backed
   runs through `make e2e` and `make release-gate`.
 - DuckDB batch source for local SQL over files, including common CSV, JSON, and
   Parquet read paths exposed through DuckDB queries.
 - Local document-directory source for `.txt`, `.md`, and `.markdown` inputs,
-  including a document-directory-to-Qdrant example and e2e case.
+  including a documents-to-Qdrant example and e2e case. This source has since
+  been folded into the `file` source as `format: document`.
 
 `0.2.2` shipped scope:
 
@@ -120,8 +121,9 @@ Distributed execution engine (shipped):
 
 The intended AI connector coverage is:
 
-- batch sources: file, Postgres, MySQL, DuckDB, document directory, and
-  S3-compatible object storage,
+- batch sources: file (CSV, JSONL, and document format with `.txt`, `.md`,
+  `.markdown`, and `.pdf` inputs), Postgres, MySQL, DuckDB, and S3-compatible
+  object storage,
 - embedding providers: mock and OpenAI-compatible, with local-provider support
   such as Ollama evaluated after fake-server e2e coverage is stable,
 - vector sinks: Qdrant, pgvector, and Milvus,
@@ -161,8 +163,9 @@ mvn -q package
 bin/kuaia help
 bin/kuaia examples
 bin/kuaia validate -f examples/local-file-to-file.yaml
+bin/kuaia validate -f examples/documents-to-file.yaml
 bin/kuaia validate -f examples/local-jsonl-chunk-to-qdrant.yaml
-bin/kuaia validate -f examples/document-directory-to-qdrant.yaml
+bin/kuaia validate -f examples/documents-to-qdrant.yaml
 bin/kuaia validate -f examples/duckdb-csv-to-qdrant.yaml
 bin/kuaia validate -f examples/s3-docs-to-qdrant.yaml
 bin/kuaia validate -f examples/local-file-to-openai-compatible-vector.yaml
