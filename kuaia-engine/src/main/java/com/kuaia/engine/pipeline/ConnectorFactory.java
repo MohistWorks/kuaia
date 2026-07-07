@@ -7,9 +7,10 @@ import com.kuaia.engine.worker.connector.DocumentSource;
 import com.kuaia.engine.worker.connector.DuckDBSource;
 import com.kuaia.engine.worker.connector.FileSink;
 import com.kuaia.engine.worker.connector.FileSource;
+import com.kuaia.engine.worker.connector.FileSystems;
+import com.kuaia.engine.worker.connector.KuaiaFileSystem;
 import com.kuaia.engine.worker.connector.MySQLSource;
 import com.kuaia.engine.worker.connector.PostgresSource;
-import com.kuaia.engine.worker.connector.S3ObjectSource;
 import com.kuaia.engine.worker.connector.SinkFactoryRegistry;
 import com.kuaia.engine.worker.connector.v2.BatchSinkWriter;
 import com.kuaia.engine.worker.connector.v2.FileSourceAdapter;
@@ -42,15 +43,20 @@ public class ConnectorFactory {
     public SourceEnumerator createSource(PipelineConfig config) throws PipelineExecutionException {
         String sourceType = config.getSource().getType();
         if ("file".equals(sourceType)) {
+            KuaiaFileSystem fs = FileSystems.forSource(config.getSource());
             if ("document".equals(config.getSource().getFormat())) {
                 return new LocalSourceAdapter(
                         new DocumentSource(
-                                Paths.get(config.getSource().getPath()),
+                                fs,
+                                config.getSource().getPath(),
                                 config.getSource().getDocumentType()),
                         "document-0");
             }
             return new FileSourceAdapter(
-                    new FileSource(Paths.get(config.getSource().getPath()), config.getSource().getFormat()),
+                    new FileSource(
+                            fs,
+                            config.getSource().getPath(),
+                            config.getSource().getFormat()),
                     "file-0",
                     fileRowsPerSplit(config));
         }
@@ -63,14 +69,17 @@ public class ConnectorFactory {
         if ("duckdb".equals(sourceType)) {
             return new LocalSourceAdapter(new DuckDBSource(config.getSource()), "duckdb-0");
         }
-        if ("s3".equals(sourceType)) {
-            return new LocalSourceAdapter(new S3ObjectSource(config.getSource()), "s3-0");
-        }
         if ("document-directory".equals(sourceType)) {
             // Persisted pre-upgrade tasks replayed by a coordinator bypass the YAML loader; keep
             // this literal in sync with the migration error in PipelineConfigLoader.
             throw new PipelineExecutionException(
                     "source.type document-directory has been replaced by source.type: file with format: document");
+        }
+        if ("s3".equals(sourceType)) {
+            // Persisted pre-upgrade tasks replayed by a coordinator bypass the YAML loader; keep
+            // this literal in sync with the migration error in PipelineConfigLoader.
+            throw new PipelineExecutionException(
+                    "source.type s3 has been replaced by source.type: file with an s3:// path");
         }
         throw new PipelineExecutionException("Unsupported source.type: " + sourceType);
     }

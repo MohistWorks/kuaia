@@ -43,7 +43,9 @@ Supported sources:
 - local CSV and JSONL files through `source.type: file`,
 - local `.txt`, `.md`, `.markdown`, and `.pdf` documents through
   `source.type: file` with `format: document`,
-- S3-compatible object storage through `source.type: s3`,
+- S3-compatible object storage through `source.type: file` with an `s3://`
+  path, which now reads the same csv/jsonl tables and documents (including PDF)
+  as a local path,
 - local DuckDB SQL queries through `source.type: duckdb`,
 - batch PostgreSQL queries through `source.type: postgres`,
 - batch MySQL queries through `source.type: mysql`.

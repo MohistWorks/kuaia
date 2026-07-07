@@ -6,6 +6,7 @@ import com.kuaia.common.type.DataType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -140,6 +141,39 @@ class FileSourceTest {
         assertEquals(Arrays.asList(1L, 3L), seqIds);
         assertEquals(1, errors.size());
         assertEquals("2:Invalid JSONL row at line 2: malformed JSON", errors.get(0));
+        source.close();
+    }
+
+    @Test
+    void jsonlDecodesMalformedUtf8AsReplacementCharAndStillParses() throws Exception {
+        // 0xFF is never a valid UTF-8 byte. The JSONL reader decodes with REPLACE (the InputStreamReader
+        // default), so it becomes the U+FFFD replacement char instead of throwing the way
+        // Files.readAllLines (REPORT) would. This pins that intentional leniency, which matches the CSV
+        // path. A future change to this behavior should be a conscious decision.
+        byte[] schemaLine = "{\"id\":1,\"content\":\"seed\"}\n".getBytes(StandardCharsets.UTF_8);
+        byte[] rowPrefix = "{\"id\":2,\"content\":\"a".getBytes(StandardCharsets.UTF_8);
+        byte[] rowSuffix = "b\"}".getBytes(StandardCharsets.UTF_8);
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        buffer.writeBytes(schemaLine);
+        buffer.writeBytes(rowPrefix);
+        buffer.write(0xFF);
+        buffer.writeBytes(rowSuffix);
+        Path jsonl = tempDir.resolve("malformed.jsonl");
+        Files.write(jsonl, buffer.toByteArray());
+        FileSource source = new FileSource(jsonl, "jsonl");
+        source.open();
+        List<BinaryRow> rows = new ArrayList<>();
+
+        int read = source.readFrom(
+                0L,
+                (seqId, row) -> rows.add(row),
+                (seqId, error) -> {
+                    throw new AssertionError("Unexpected row error for seq " + seqId, error);
+                });
+
+        assertEquals(2, read);
+        assertEquals("seed", rows.get(0).getString(1));
+        assertEquals("a�b", rows.get(1).getString(1));
         source.close();
     }
 

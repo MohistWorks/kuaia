@@ -19,13 +19,17 @@ field types include primitive values, strings, and vectors.
 
 Current built-in sources are:
 
-- `FileSource` for local CSV and JSONL files,
-- `DocumentSource` for local `.txt`, `.md`, `.markdown`, and `.pdf` documents
-  read through the `file` source's `format: document`,
-- `S3ObjectSource` for S3-compatible object-storage document objects,
+- `FileSource` for CSV and JSONL objects,
+- `DocumentSource` for `.txt`, `.md`, `.markdown`, and `.pdf` documents read
+  through the `file` source's `format: document`,
 - `DuckDBSource` for one bounded local DuckDB SQL query,
 - `PostgresSource` for one bounded JDBC query,
 - `MySQLSource` for one bounded JDBC query.
+
+`FileSource` and `DocumentSource` read every object through the
+`KuaiaFileSystem` storage abstraction, so the `file` source `path` scheme picks
+the backend: a bare path or `file://` uses `LocalFileSystem`, `s3://` uses
+`S3FileSystem`, and `hdfs://` is a reserved slot for a future backend.
 
 Local sources implement `LocalSource`:
 

@@ -8,9 +8,10 @@ import com.kuaia.engine.pipeline.embedding.EmbeddingProviderRegistry;
 import com.kuaia.engine.pipeline.transform.TransformPipeline;
 import com.kuaia.engine.worker.connector.DocumentSource;
 import com.kuaia.engine.worker.connector.FileSource;
+import com.kuaia.engine.worker.connector.LocalFileSystem;
+import com.kuaia.engine.worker.connector.UriSchemes;
 
 import java.io.PrintStream;
-import java.nio.file.Paths;
 
 public class LocalPipelineValidator {
     private static final String SOURCE_STAGE = "Source";
@@ -28,7 +29,7 @@ public class LocalPipelineValidator {
     }
 
     public void validate(PipelineConfig config, PrintStream out) throws Exception {
-        if (isDeferredSource(config.getSource().getType())) {
+        if (isDeferredSource(config.getSource())) {
             printDeferredReport(config, out);
             return;
         }
@@ -57,18 +58,23 @@ public class LocalPipelineValidator {
         out.println("Transform and sink row-type checks deferred for source.type: " + config.getSource().getType());
     }
 
-    private boolean isDeferredSource(String sourceType) {
-        return "postgres".equals(sourceType)
-                || "mysql".equals(sourceType)
-                || "duckdb".equals(sourceType)
-                || "s3".equals(sourceType);
+    private boolean isDeferredSource(PipelineConfig.SourceConfig source) {
+        String sourceType = source.getType();
+        if ("postgres".equals(sourceType) || "mysql".equals(sourceType) || "duckdb".equals(sourceType)) {
+            return true;
+        }
+        // A file source over a remote scheme (e.g. s3://) is opened at run time, not at validate:
+        // defer the row-type/transform/sink checks so validate stays offline. Local file:// and bare
+        // paths are still opened here.
+        return "file".equals(sourceType) && UriSchemes.isRemote(source.getPath());
     }
 
     private KuaiaRowType loadSourceType(PipelineConfig config) throws Exception {
         if ("file".equals(config.getSource().getType())) {
             if ("document".equals(config.getSource().getFormat())) {
                 DocumentSource source = new DocumentSource(
-                        Paths.get(config.getSource().getPath()),
+                        new LocalFileSystem(),
+                        config.getSource().getPath(),
                         config.getSource().getDocumentType());
                 try {
                     source.open();
@@ -78,7 +84,8 @@ public class LocalPipelineValidator {
                 }
             }
             FileSource source = new FileSource(
-                    Paths.get(config.getSource().getPath()),
+                    new LocalFileSystem(),
+                    config.getSource().getPath(),
                     config.getSource().getFormat());
             try {
                 source.open();

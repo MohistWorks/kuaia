@@ -48,8 +48,11 @@ source:
 Fields:
 
 - `type`: must be `file`
-- `path`: local file path, or a local directory path for `format: document`.
-  Relative paths are resolved from the YAML file directory.
+- `path`: a storage URI whose scheme selects the backend (see the scheme table
+  below). A bare path or a `file://` URI reads the local filesystem, and
+  relative local paths are resolved from the YAML file directory. For
+  `format: document` the path may be a directory/prefix or a single object; for
+  `format: csv` and `format: jsonl` it points at a single object.
 - `format`: must be `csv`, `jsonl`, or `document`
 - `documentType`: optional document selector for `format: document`. Must be
   `auto`, `text`, `markdown`, or `pdf` when configured and defaults to `auto`.
@@ -57,6 +60,44 @@ Fields:
 - `maxRowsPerSplit`: optional internal source split size for the `csv` and
   `jsonl` formats. Defaults to `10000` and must be a positive integer when
   configured. Rejected for `format: document`.
+
+The `path` scheme selects the storage backend behind the `file` source:
+
+| Scheme | Backend | Notes |
+| --- | --- | --- |
+| bare path or `file://` | local filesystem | relative paths resolve from the YAML directory |
+| `s3://bucket/key` | S3-compatible object storage | bucket and prefix live in the URI; requires the `endpoint`, `region`, `accessKeyEnv`, and `secretKeyEnv` sibling fields (optional `pathStyleAccess`) |
+| `hdfs://` | planned, not yet supported | loading fails with `source.path storage scheme hdfs:// is not yet supported` |
+
+Any other scheme fails to load with `source.path storage scheme <scheme>:// is
+not supported`.
+
+For an `s3://` path, set these sibling fields next to `path`:
+
+- `endpoint`: S3-compatible endpoint URL, for example `http://localhost:9000`
+- `region`: signing region, for example `us-east-1`
+- `accessKeyEnv`: environment variable containing the access key
+- `secretKeyEnv`: environment variable containing the secret key
+- `pathStyleAccess`: optional boolean. Defaults to `true`, which is the common
+  setting for MinIO and other S3-compatible endpoints.
+
+These sibling fields are only accepted for `s3://` paths; a local `path` that
+carries `endpoint`, `region`, `accessKeyEnv`, `secretKeyEnv`, `pathStyleAccess`,
+`bucket`, or `prefix` fails to load. The `bucket` and `prefix` keys are not
+accepted for `source.type: file` at all — fold them into the
+`s3://bucket/prefix/` URI.
+
+An `s3://` path supports the same formats as a local path: `csv` and `jsonl`
+tables plus `document` (including PDF text extraction). A directory/prefix path
+for `format: document` MUST end in `/`; the trailing slash is load-bearing
+because it marks the URI as a prefix (corpus) rather than a single object,
+while a `csv` or `jsonl` `s3://` path points at a single object with no trailing
+slash.
+
+`validate` defers remote (`s3://`) sources: it parses the YAML and connector
+options without connecting to object storage, so transform and sink row-type
+checks against a remote source run at `run` time. Local `file` sources are
+opened during `validate`.
 
 CSV rules:
 
@@ -125,9 +166,21 @@ checkpointed pipeline, start with a fresh `checkpoint.stateDir` or a new
 `name`; resuming against the old state can no-op, silently skip `.pdf` files
 newly included by `documentType: auto`, or duplicate the tail document.
 
-### s3
+### s3 migration
+
+The standalone `source.type: s3` source has been removed. S3-compatible object
+storage is now read through `source.type: file` with an `s3://` path, so it
+flows through the same `FileSource`/`DocumentSource` code as local files and
+gains csv/jsonl table parsing and document (including PDF) extraction.
+
+Loading a pipeline that still uses `source.type: s3` fails with `source.type s3
+has been replaced by source.type: file with an s3:// path`. Migrate the source
+block by folding the old `bucket` and `prefix` into the `s3://bucket/prefix/`
+URI and keeping the endpoint, region, and credential fields as siblings of
+`path`:
 
 ```yaml
+# before
 source:
   type: s3
   endpoint: http://localhost:9000
@@ -137,36 +190,27 @@ source:
   accessKeyEnv: KUAIA_S3_ACCESS_KEY
   secretKeyEnv: KUAIA_S3_SECRET_KEY
   pathStyleAccess: true
+
+# after
+source:
+  type: file
+  path: s3://kuaia-docs/docs/
+  format: document
+  endpoint: http://localhost:9000
+  region: us-east-1
+  accessKeyEnv: KUAIA_S3_ACCESS_KEY
+  secretKeyEnv: KUAIA_S3_SECRET_KEY
+  pathStyleAccess: true
 ```
 
-`source.type: s3` reads text-like objects from an S3-compatible object store.
-It is intended for small RAG ingestion inputs stored in services such as MinIO,
-Ceph, or S3-compatible cloud buckets.
-
-Fields:
-
-- `type`: must be `s3`
-- `endpoint`: S3-compatible endpoint URL, for example `http://localhost:9000`
-- `region`: signing region, for example `us-east-1`
-- `bucket`: bucket name
-- `prefix`: optional object key prefix. Defaults to an empty prefix.
-- `accessKeyEnv`: environment variable containing the access key
-- `secretKeyEnv`: environment variable containing the secret key
-- `pathStyleAccess`: optional boolean. Defaults to `true`, which is the common
-  setting for MinIO and other S3-compatible endpoints.
-
-S3 type rules:
-
-- supported objects are `.txt`, `.md`, `.markdown`, `.jsonl`, and `.csv`,
-- keys ending in `/` and unsupported extensions are ignored,
-- objects are processed in stable key order,
-- output fields are fixed as `id LONG`, `key STRING`, and `content STRING`,
-- `id` is the 1-based sequence id in sorted object order,
-- `key` is the full object key,
-- `content` is the UTF-8 object content.
-
-S3 sources do not use `path`, `format`, `query`, `url`, `userEnv`,
-`passwordEnv`, `fetchSize`, or `maxRowsPerSplit`.
+The middle document column is now `path` (was `key`), so update sink
+`payloadFields` from `[id, key, content]` to `[id, path, content]`, and note
+the `path` value is the object key relative to the prefix (e.g. `a.pdf`),
+matching local documents, not the full key (`docs/a.pdf`) the old `key` column
+held. The
+`bucket` and `prefix` keys are rejected; the trailing slash on
+`s3://kuaia-docs/docs/` marks it as a prefix (corpus) rather than a single
+object.
 
 ### postgres
 
@@ -1079,14 +1123,14 @@ Use `validate` to check a pipeline without executing it:
 bin/kuaia validate -f examples/local-file-to-file.yaml
 ```
 
-For `source.type: file`, including `format: document`, validation opens the
-source enough to infer the row type, builds the transform chain, and checks
+For a local `source.type: file`, including `format: document`, validation opens
+the source enough to infer the row type, builds the transform chain, and checks
 sink field compatibility. It does not write sink output or checkpoint state.
 
-For `source.type: duckdb`, `source.type: postgres`, and `source.type: mysql`,
-validation parses the YAML and connector options without connecting to the
-source. Because the row type comes from query result metadata, transform and
-sink row-type checks are deferred until `run`.
+For a remote `source.type: file` (an `s3://` path), for `source.type: duckdb`,
+`source.type: postgres`, and `source.type: mysql`, validation parses the YAML
+and connector options without connecting to the source. Because the row type is
+not read up front, transform and sink row-type checks are deferred until `run`.
 
 ## Benchmark Smoke
 
@@ -1142,6 +1186,24 @@ Common examples:
 - `source.documentType is only supported for source.format: document`
 - `source.type document-directory has been replaced by source.type: file with
   format: document`
+- `source.type s3 has been replaced by source.type: file with an s3:// path`
+- `source.path storage scheme hdfs:// is not yet supported`
+- `source.path storage scheme <scheme>:// is not supported`
+- `source.bucket is only supported for s3:// paths`
+- `source.prefix is only supported for s3:// paths`
+- `source.endpoint is only supported for s3:// paths`
+- `source.region is only supported for s3:// paths`
+- `source.accessKeyEnv is only supported for s3:// paths`
+- `source.secretKeyEnv is only supported for s3:// paths`
+- `source.pathStyleAccess is only supported for s3:// paths`
+- `source.bucket is not supported for source.type: file; put the bucket in the
+  s3:// path`
+- `source.prefix is not supported for source.type: file; put the prefix in the
+  s3:// path`
+- `Missing S3 access key environment variable: <name>`
+- `Missing S3 secret key environment variable: <name>`
+- `S3 source list failed: <message>`
+- `S3 source read failed at <key>: <message>`
 - `source.url is only supported for JDBC source types`
 - `source.userEnv is only supported for JDBC source types`
 - `source.passwordEnv is only supported for JDBC source types`

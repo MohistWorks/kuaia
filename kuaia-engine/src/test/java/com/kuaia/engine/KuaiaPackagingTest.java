@@ -134,7 +134,8 @@ class KuaiaPackagingTest {
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("format: document"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md"))
                 .contains("source.type document-directory has been replaced"));
-        assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("source.type: s3"));
+        assertTrue(read(root.resolve("docs/pipeline-yaml.md"))
+                .contains("source.type s3 has been replaced by source.type: file with an s3:// path"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("bin/kuaia benchmark"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--max-rows-per-split"));
         assertTrue(read(root.resolve("docs/pipeline-yaml.md")).contains("--batch-sizes 16,64,256"));

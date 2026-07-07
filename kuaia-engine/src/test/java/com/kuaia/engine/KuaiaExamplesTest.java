@@ -148,6 +148,7 @@ class KuaiaExamplesTest {
         assertTrue(read(postgresToQdrantPath).contains("timeoutMs: 30000"));
         assertTrue(read(mysqlToQdrantPath).contains("fetchSize: 1000"));
         assertTrue(read(mysqlToQdrantPath).contains("timeoutMs: 30000"));
+        assertTrue(read(s3ToQdrantPath).contains("path: s3://kuaia-docs/docs/"));
         assertTrue(read(s3ToQdrantPath).contains("pathStyleAccess: true"));
         assertTrue(read(fileToMilvusPath).contains("apiKeyEnv: KUAIA_MILVUS_TOKEN"));
         assertEquals(30000, fileToQdrant.getSink().getTimeoutMs());
@@ -160,10 +161,15 @@ class KuaiaExamplesTest {
         assertEquals(1000, postgresToQdrant.getSource().getFetchSize());
         assertEquals(30000, postgresToQdrant.getSink().getTimeoutMs());
         assertEquals(Arrays.asList("id", "content"), postgresToQdrant.getSink().getPayloadFields());
-        assertEquals("s3", s3ToQdrant.getSource().getType());
-        assertEquals("kuaia-docs", s3ToQdrant.getSource().getBucket());
-        assertEquals("docs/", s3ToQdrant.getSource().getPrefix());
-        assertEquals(Arrays.asList("id", "key", "content"), s3ToQdrant.getSink().getPayloadFields());
+        assertEquals("file", s3ToQdrant.getSource().getType());
+        assertEquals("s3://kuaia-docs/docs/", s3ToQdrant.getSource().getPath());
+        assertEquals("document", s3ToQdrant.getSource().getFormat());
+        assertEquals("http://localhost:9000", s3ToQdrant.getSource().getEndpoint());
+        assertEquals("us-east-1", s3ToQdrant.getSource().getRegion());
+        assertEquals("KUAIA_S3_ACCESS_KEY", s3ToQdrant.getSource().getAccessKeyEnv());
+        assertEquals("KUAIA_S3_SECRET_KEY", s3ToQdrant.getSource().getSecretKeyEnv());
+        assertTrue(s3ToQdrant.getSource().isPathStyleAccess());
+        assertEquals(Arrays.asList("id", "path", "content"), s3ToQdrant.getSink().getPayloadFields());
         assertEquals("mysql", mysqlToQdrant.getSource().getType());
         assertEquals(1000, mysqlToQdrant.getSource().getFetchSize());
         assertEquals(30000, mysqlToQdrant.getSink().getTimeoutMs());

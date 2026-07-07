@@ -12,9 +12,11 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -26,32 +28,39 @@ public class FileSource implements LocalSource {
             .setIgnoreEmptyLines(true)
             .get();
 
-    private final Path path;
+    private final KuaiaFileSystem fs;
+    private final String uri;
     private final String format;
     private KuaiaRowType rowType;
     private List<String> lines;
     private List<CSVRecord> csvRecords;
+    private boolean fsClosed;
 
     public FileSource(Path path) {
         this(path, "csv");
     }
 
     public FileSource(Path path, String format) {
-        this.path = path;
+        this(new LocalFileSystem(), path.toString(), format);
+    }
+
+    public FileSource(KuaiaFileSystem fs, String uri, String format) {
+        this.fs = fs;
+        this.uri = uri;
         this.format = format == null ? "csv" : format.trim().toLowerCase();
     }
 
     @Override
     public void open() throws Exception {
-        if (!Files.exists(path)) {
-            throw new PipelineExecutionException("Source file not found: " + path);
+        if (!fs.exists(uri)) {
+            throw new PipelineExecutionException("Source file not found: " + uri);
         }
         if ("csv".equals(format)) {
             openCsv();
             return;
         }
         if ("jsonl".equals(format)) {
-            lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+            lines = readLines(fs.readAllBytes(uri));
             openJsonl();
             return;
         }
@@ -59,18 +68,25 @@ public class FileSource implements LocalSource {
     }
 
     private void openCsv() throws PipelineExecutionException {
-        try (CSVParser parser = CSVParser.parse(path, StandardCharsets.UTF_8, CSV_FORMAT)) {
+        byte[] bytes;
+        try {
+            bytes = fs.readAllBytes(uri);
+        } catch (Exception e) {
+            throw new PipelineExecutionException("Invalid CSV file: " + uri + ": " + e.getMessage(), e);
+        }
+        try (CSVParser parser = CSVParser.parse(
+                new InputStreamReader(new ByteArrayInputStream(bytes), StandardCharsets.UTF_8), CSV_FORMAT)) {
             csvRecords = parser.getRecords();
         } catch (IOException | IllegalArgumentException e) {
-            throw new PipelineExecutionException("Invalid CSV file: " + path + ": " + e.getMessage(), e);
+            throw new PipelineExecutionException("Invalid CSV file: " + uri + ": " + e.getMessage(), e);
         }
         if (csvRecords.isEmpty()) {
-            throw new PipelineExecutionException("CSV file is empty: " + path);
+            throw new PipelineExecutionException("CSV file is empty: " + uri);
         }
         CSVRecord header = csvRecords.get(0);
         String[] headers = header.values();
         if (headers.length == 0) {
-            throw new PipelineExecutionException("CSV header is empty: " + path);
+            throw new PipelineExecutionException("CSV header is empty: " + uri);
         }
         DataType[] fieldTypes = new DataType[headers.length];
         for (int i = 0; i < headers.length; i++) {
@@ -83,7 +99,7 @@ public class FileSource implements LocalSource {
     private void openJsonl() throws PipelineExecutionException {
         int schemaLineIndex = firstNonEmptyLineIndex();
         if (schemaLineIndex < 0) {
-            throw new PipelineExecutionException("JSONL file is empty: " + path);
+            throw new PipelineExecutionException("JSONL file is empty: " + uri);
         }
         JsonNode schema = parseJsonObject(lines.get(schemaLineIndex), schemaLineIndex + 1);
         Iterator<String> fields = schema.fieldNames();
@@ -217,6 +233,15 @@ public class FileSource implements LocalSource {
     public void close() {
         lines = null;
         csvRecords = null;
+        // The source owns the injected filesystem (both the DI'd one and the one created by the
+        // (Path, ...) delegate ctors); release it so a resource-holding backend (e.g. an S3 client)
+        // does not leak. No-op for LocalFileSystem. Guarded against null/double-close.
+        if (!fsClosed) {
+            fsClosed = true;
+            if (fs != null) {
+                fs.close();
+            }
+        }
     }
 
     @Override
@@ -355,6 +380,28 @@ public class FileSource implements LocalSource {
             }
         }
         return -1;
+    }
+
+    /**
+     * Split {@code bytes} into lines exactly like {@link java.nio.file.Files#readAllLines}: a line is
+     * terminated by {@code \n}, {@code \r}, or {@code \r\n}, and a trailing terminator does not yield a
+     * trailing empty line (BufferedReader.readLine returns {@code null} at EOF).
+     *
+     * <p>Note the UTF-8 decode is REPLACE (malformed input becomes the U+FFFD replacement char), the
+     * default of {@link InputStreamReader}. This differs from {@link java.nio.file.Files#readAllLines},
+     * which is REPORT (throws on malformed input), and intentionally matches the leniency of the CSV
+     * path (commons-csv's {@code CSVParser.parse(Reader, ...)} over an UTF-8 reader).
+     */
+    private static List<String> readLines(byte[] bytes) throws IOException {
+        List<String> result = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new ByteArrayInputStream(bytes), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                result.add(line);
+            }
+        }
+        return result;
     }
 
 }

@@ -69,6 +69,35 @@ class DocumentSourceTest {
     }
 
     @Test
+    void readsSupportedDocumentsFromAFileSchemeDirectoryRootWithSameRelativePaths() throws Exception {
+        Path docs = tempDir.resolve("docs");
+        Files.createDirectories(docs.resolve("nested"));
+        Files.write(docs.resolve("intro.md"), "Intro document".getBytes(StandardCharsets.UTF_8));
+        Files.write(docs.resolve("nested/guide.txt"), "Guide document".getBytes(StandardCharsets.UTF_8));
+
+        // A file:// DIRECTORY root must flow end-to-end: LocalFileSystem.list yields file:// children,
+        // and DocumentSource.relativePath strips the root prefix to the SAME relative paths a bare-path
+        // root produces ("intro.md", "nested/guide.txt").
+        DocumentSource source = new DocumentSource(new LocalFileSystem(), docs.toUri().toString(), "auto");
+        source.open();
+        List<BinaryRow> rows = new ArrayList<>();
+
+        int read = source.readFrom(
+                0L,
+                (seqId, row) -> rows.add(row),
+                (seqId, error) -> {
+                    throw new AssertionError("Unexpected row error for seq " + seqId, error);
+                });
+
+        assertEquals(2, read);
+        assertEquals("intro.md", rows.get(0).getString(1));
+        assertEquals("Intro document", rows.get(0).getString(2));
+        assertEquals("nested/guide.txt", rows.get(1).getString(1));
+        assertEquals("Guide document", rows.get(1).getString(2));
+        source.close();
+    }
+
+    @Test
     void rejectsDirectoryWithoutSupportedDocuments() throws Exception {
         Path docs = tempDir.resolve("docs");
         Files.createDirectories(docs);
